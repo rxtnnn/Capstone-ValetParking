@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "valet-app",
-    "slug": "valet-app",
+    "slug": "valet-parking",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,10 +20,23 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.rxtnrzh.valetparking"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "229d1c74-d45d-4ab1-9ce6-023350a92123"
+      }
+    },
+    "owner": "rxtnrzh",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/229d1c74-d45d-4ab1-9ce6-023350a92123"
     }
   }
 }
