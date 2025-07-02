@@ -1,575 +1,644 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView, 
+  Alert, 
   StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  Dimensions,
+  Modal 
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp } from '@react-navigation/native';
-import { Card, Button, Badge } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
-import * as Animatable from 'react-native-animatable';
-
-// Define types locally
-type RootStackParamList = {
-  Splash: undefined;
-  Home: undefined;
-  Floors: undefined;
-  ParkingMap: { floor: number };
-  Feedback: undefined;
-  Settings: undefined;
-  Profile: undefined;
-  ApiTest: undefined;
-};
-
-type ParkingMapScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ParkingMap'>;
-type ParkingMapScreenRouteProp = RouteProp<RootStackParamList, 'ParkingMap'>;
-
-interface Props {
-  navigation: ParkingMapScreenNavigationProp;
-  route: ParkingMapScreenRouteProp;
-}
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 interface ParkingSpot {
   id: string;
-  position: { x: number; y: number };
-  isOccupied: boolean;
-  isReserved: boolean;
-  spotNumber: string;
-  sensorId: number;
-  distanceCm?: number;
-  lastUpdated: string;
+  isAvailable: boolean;
+  section: string;
 }
 
-interface FloorData {
-  floor: number;
-  spots: ParkingSpot[];
-  availableCount: number;
-  totalCount: number;
-}
+const ParkingMapScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { floor = 1 } = (route.params as { floor?: number }) || {};
+  
+  const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
+  const [showParkingAlert, setShowParkingAlert] = useState(false);
+  const [showNavigationPath, setShowNavigationPath] = useState(false);
+  const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
-const { width: screenWidth } = Dimensions.get('window');
+  // Mock parking spots data
+  const parkingSpots: Record<string, ParkingSpot> = {
+    'B1': { id: 'B1', isAvailable: true, section: 'B' },
+    'B2': { id: 'B2', isAvailable: true, section: 'B' },
+    'B3': { id: 'B3', isAvailable: true, section: 'B' },
+    'B4': { id: 'B4', isAvailable: true, section: 'B' },
+    'D1': { id: 'D1', isAvailable: true, section: 'D' },
+    'D2': { id: 'D2', isAvailable: true, section: 'D' },
+    'D3': { id: 'D3', isAvailable: false, section: 'D' },
+    'D4': { id: 'D4', isAvailable: true, section: 'D' },
+    'D5': { id: 'D5', isAvailable: true, section: 'D' },
+    'D6': { id: 'D6', isAvailable: false, section: 'D' },
+    'D7': { id: 'D7', isAvailable: true, section: 'D' },
+    'E1': { id: 'E1', isAvailable: true, section: 'E' },
+    'E2': { id: 'E2', isAvailable: false, section: 'E' },
+    'E3': { id: 'E3', isAvailable: true, section: 'E' },
+    'E4': { id: 'E4', isAvailable: true, section: 'E' },
+    'E5': { id: 'E5', isAvailable: false, section: 'E' },
+    'E6': { id: 'E6', isAvailable: true, section: 'E' },
+    'C1': { id: 'C1', isAvailable: false, section: 'C' },
+    'C2': { id: 'C2', isAvailable: true, section: 'C' },
+    'C3': { id: 'C3', isAvailable: true, section: 'C' },
+  };
 
-const ParkingMapScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { floor } = route.params;
-  const [floorData, setFloorData] = useState<FloorData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
-
-  useEffect(() => {
-    loadFloorData();
+  const ParkingSpotComponent: React.FC<{
+    id: string;
+    available: boolean;
+    selected: boolean;
+    onPress: (id: string) => void;
+  }> = ({ id, available, selected, onPress }) => {
+    const isHighlighted = selected && selectedSection && parkingSpots[id]?.section === selectedSection;
     
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      // Randomly update a few spots
-      if (floorData) {
-        const updatedSpots = floorData.spots.map(spot => {
-          if (Math.random() > 0.95) { // 5% chance to change
-            return {
-              ...spot,
-              isOccupied: Math.random() > 0.6,
-              lastUpdated: new Date().toLocaleTimeString(),
-            };
-          }
-          return spot;
-        });
-        
-        setFloorData({
-          ...floorData,
-          spots: updatedSpots,
-          availableCount: updatedSpots.filter(s => !s.isOccupied && !s.isReserved).length,
-        });
-      }
-    }, 10000); // Update every 10 seconds
-
-    return () => clearInterval(interval);
-  }, [floor]);
-
-  const loadFloorData = async () => {
-    try {
-      // Simulate API call
-      const mockData = generateMockFloorData(floor);
-      setFloorData(mockData);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load floor data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateMockFloorData = (targetFloor: number): FloorData => {
-    const spots: ParkingSpot[] = [];
-    const totalSpots = 20; // Reduced for better visualization
-    
-    for (let i = 1; i <= totalSpots; i++) {
-      const row = Math.floor((i - 1) / 4);
-      const col = (i - 1) % 4;
-      
-      spots.push({
-        id: `${targetFloor}-${i}`,
-        position: {
-          x: 30 + (col * 80),
-          y: 50 + (row * 100),
-        },
-        isOccupied: Math.random() > 0.6,
-        isReserved: Math.random() > 0.9,
-        spotNumber: `${i <= 10 ? 'A' : 'B'}${((i - 1) % 10) + 1}`,
-        sensorId: ((targetFloor - 1) * 20) + i,
-        distanceCm: Math.floor(Math.random() * 200) + 50,
-        lastUpdated: new Date().toLocaleTimeString(),
-      });
-    }
-
-    const availableCount = spots.filter(spot => !spot.isOccupied && !spot.isReserved).length;
-
-    return {
-      floor: targetFloor,
-      spots,
-      availableCount,
-      totalCount: totalSpots,
-    };
-  };
-
-  const handleSpotPress = (spot: ParkingSpot) => {
-    if (spot.isOccupied) {
-      Alert.alert('Occupied', 'This parking spot is currently occupied.');
-      return;
-    }
-    
-    if (spot.isReserved) {
-      Alert.alert('Reserved', 'This parking spot is reserved.');
-      return;
-    }
-
-    setSelectedSpot(spot);
-    Alert.alert(
-      'Available Spot',
-      `Spot ${spot.spotNumber} is available.\nSensor ID: ${spot.sensorId}\nDistance: ${spot.distanceCm}cm\nWould you like to get directions?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Get Directions', onPress: () => handleGetDirections(spot) },
-      ]
-    );
-  };
-
-  const handleGetDirections = (spot: ParkingSpot) => {
-    Alert.alert('Directions', `🚗 Navigate to spot ${spot.spotNumber}\n📍 Turn right from elevator\n🚶‍♂️ Walk 20 meters\n✅ You'll find spot ${spot.spotNumber} on your left`);
-  };
-
-  const renderParkingSpot = (spot: ParkingSpot, index: number) => {
-    const spotColor = spot.isOccupied 
-      ? '#F44336' 
-      : spot.isReserved 
-      ? '#FF9800' 
-      : '#4CAF50';
-
     return (
-      <Animatable.View
-        key={spot.id}
-        animation="fadeIn"
-        delay={index * 50}
+      <TouchableOpacity
+        onPress={() => onPress(id)}
         style={[
           styles.parkingSpot,
-          {
-            backgroundColor: spotColor,
-            left: spot.position.x,
-            top: spot.position.y,
-          },
+          isHighlighted ? styles.highlightedSpot : 
+          available ? styles.availableSpot : styles.occupiedSpot
         ]}
+        activeOpacity={0.7}
       >
-        <TouchableOpacity
-          style={styles.spotTouchable}
-          onPress={() => handleSpotPress(spot)}
-          disabled={spot.isOccupied}
-        >
-          <Text style={styles.spotText}>{spot.spotNumber}</Text>
-          {spot.isOccupied && (
-            <MaterialIcons name="directions-car" size={12} color="#FFFFFF" />
-          )}
-        </TouchableOpacity>
-      </Animatable.View>
+        <Text style={styles.spotText}>{id}</Text>
+      </TouchableOpacity>
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <MaterialIcons name="map" size={50} color="#B71C1C" />
-        <Text style={styles.loadingText}>Loading floor {floor}...</Text>
-      </View>
-    );
-  }
+  const handleSpotPress = (spotId: string) => {
+    const spot = parkingSpots[spotId];
+    if (!spot || !spot.isAvailable) {
+      Alert.alert('Unavailable', 'This spot is not available!');
+      return;
+    }
+    
+    setSelectedSpot(spotId);
+    setShowParkingAlert(true);
+  };
 
-  if (!floorData) {
-    return (
-      <View style={styles.errorContainer}>
-        <MaterialIcons name="error" size={50} color="#F44336" />
-        <Text style={styles.errorText}>Failed to load floor data</Text>
-        <Button mode="contained" onPress={loadFloorData} style={styles.retryButton}>
-          Retry
-        </Button>
-      </View>
-    );
-  }
+  const confirmParking = () => {
+    setShowParkingAlert(false);
+    setShowNavigationPath(true);
+    setNavigationTarget(selectedSpot);
+  };
+
+  const cancelParking = () => {
+    setShowParkingAlert(false);
+    setSelectedSpot(null);
+    setShowNavigationPath(false);
+    setNavigationTarget(null);
+  };
+
+  const clearNavigation = () => {
+    setShowNavigationPath(false);
+    setNavigationTarget(null);
+    setSelectedSpot(null);
+  };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Status Bar */}
-      <View style={styles.statusBar}>
-        <View style={styles.statusItem}>
-          <View style={[styles.statusIndicator, { backgroundColor: '#4CAF50' }]} />
-          <Text style={styles.statusText}>Available</Text>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.backButton}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Parking Map</Text>
         </View>
-        <View style={styles.statusItem}>
-          <View style={[styles.statusIndicator, { backgroundColor: '#F44336' }]} />
-          <Text style={styles.statusText}>Occupied</Text>
-        </View>
-        <View style={styles.statusItem}>
-          <View style={[styles.statusIndicator, { backgroundColor: '#FF9800' }]} />
-          <Text style={styles.statusText}>Reserved</Text>
-        </View>
+        
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.sectionTabs}>
+            {[
+              { section: 'A', slots: '2 SLOTS' },
+              { section: 'B', slots: '10 SLOTS' },
+              { section: 'C', slots: 'FULL SLOT' },
+              { section: 'D', slots: '5 SLOTS' }
+            ].map(({ section, slots }) => {
+              const isSelected = selectedSection === section;
+              return (
+                <TouchableOpacity
+                  key={section}
+                  onPress={() => setSelectedSection(section)}
+                  style={[
+                    styles.sectionTab,
+                    isSelected ? styles.selectedTab : styles.unselectedTab
+                  ]}
+                >
+                  <Text style={[
+                    styles.sectionText,
+                    isSelected ? styles.selectedTabText : styles.unselectedTabText
+                  ]}>
+                    {section}
+                  </Text>
+                  <Text style={[
+                    styles.slotsText,
+                    isSelected ? styles.selectedTabText : styles.unselectedTabText
+                  ]}>
+                    {slots}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
 
-      {/* Floor Map */}
-      <View style={styles.floorContainer}>
-        <View style={styles.floorLayout}>
-          {/* Parking Structure */}
-          <View style={styles.parkingStructure}>
-            {/* Section Labels */}
-            <View style={styles.sectionA}>
-              <Text style={styles.sectionLabel}>A</Text>
-            </View>
-            <View style={styles.sectionB}>
-              <Text style={styles.sectionLabel}>B</Text>
-            </View>
-            
-            {/* Driveway */}
-            <View style={styles.driveway}>
-              <Text style={styles.drivewayText}>DRIVE WAY</Text>
-              <MaterialIcons name="arrow-forward" size={20} color="#FFA726" />
-            </View>
-            
-            {/* Render parking spots */}
-            {floorData.spots.map((spot, index) => renderParkingSpot(spot, index))}
+      {/* Parking Map Layout */}
+      <View style={styles.mapContainer}>
+        
+        {/* Top Right B Section */}
+        <View style={[styles.absolutePosition, { top: 20, right: 20, flexDirection: 'row' }]}>
+          <ParkingSpotComponent id="B4" available={true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="B3" available={true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="B2" available={true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="B1" available={true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
+        </View>
+
+        {/* Elevator (top) */}
+        <View style={[styles.absolutePosition, styles.elevator, { top: 20, right: 180 }]}>
+          <Text style={styles.elevatorText}>Elevator</Text>
+        </View>
+
+        {/* Top A spot */}
+        <View style={[styles.absolutePosition, styles.aSpot, { top: 20, left: 20 }]}>
+          <Text style={styles.spotText}>A</Text>
+        </View>
+
+        {/* Direction arrows */}
+        <Text style={[styles.absolutePosition, styles.arrow, { top: 30, right: 140 }]}>←</Text>
+        <Text style={[styles.absolutePosition, styles.arrow, { top: 30, right: 160 }]}>←</Text>
+
+        {/* U spots */}
+        <View style={[styles.absolutePosition, { top: 60, right: 110, alignItems: 'center' }]}>
+          <View style={styles.uSpot}>
+            <Text style={styles.spotText}>U</Text>
+          </View>
+          <Text style={styles.arrow}>↓</Text>
+          <View style={styles.uSpot}>
+            <Text style={styles.spotText}>U</Text>
           </View>
         </View>
 
-        {/* Campus Info */}
-        <Card style={styles.campusInfo}>
-          <Card.Content>
-            <View style={styles.campusHeader}>
-              <Text style={styles.campusTitle}>USJ-R Quadricentennial Campus</Text>
-              <TouchableOpacity onPress={() => navigation.goBack()}>
-                <MaterialIcons name="close" size={24} color="#FFFFFF" />
+        {/* STAIRS */}
+        <View style={[styles.absolutePosition, styles.stairs, { top: 100, left: 10 }]}>
+          <Text style={styles.stairsText}>STAIRS</Text>
+        </View>
+
+        {/* Main D Section */}
+        <View style={[styles.absolutePosition, { top: 120, left: 30, flexDirection: 'row' }]}>
+          <ParkingSpotComponent id="D7" available={true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="D6" available={false} selected={selectedSection === 'D'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="D5" available={true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="D4" available={true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="D3" available={false} selected={selectedSection === 'D'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="D2" available={true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="D1" available={true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
+        </View>
+
+        {/* Direction arrows above D */}
+        <View style={[styles.absolutePosition, { top: 90, left: 40, flexDirection: 'row' }]}>
+          <Text style={styles.arrow}>←</Text>
+          <View style={{ width: 20 }} />
+          <Text style={styles.arrow}>←</Text>
+          <View style={{ width: 20 }} />
+          <Text style={styles.arrow}>←</Text>
+          <View style={{ width: 20 }} />
+          <Text style={styles.arrow}>←</Text>
+        </View>
+
+        {/* Main Elevator */}
+        <View style={[styles.absolutePosition, styles.mainElevator, { top: 120, right: 20 }]}>
+          <Text style={styles.elevatorText}>Elevator</Text>
+        </View>
+
+        {/* You are here */}
+        <View style={[styles.absolutePosition, styles.youAreHere, { top: 120, right: 100 }]}>
+          <Text style={styles.youAreHereText}>You are here</Text>
+        </View>
+
+        {/* Down arrows */}
+        <Text style={[styles.absolutePosition, styles.arrow, { top: 170, right: 40 }]}>↓</Text>
+        <Text style={[styles.absolutePosition, styles.arrow, { top: 170, right: 110 }]}>↓</Text>
+
+        {/* Left E section */}
+        <View style={[styles.absolutePosition, { top: 170, left: 10, alignItems: 'center' }]}>
+          <ParkingSpotComponent id="E1" available={true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
+          <Text style={styles.arrow}>↓</Text>
+          <ParkingSpotComponent id="E2" available={false} selected={selectedSection === 'E'} onPress={handleSpotPress} />
+          <Text style={styles.arrow}>→</Text>
+          <ParkingSpotComponent id="E3" available={true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
+        </View>
+
+        {/* Right up arrow */}
+        <Text style={[styles.absolutePosition, styles.arrow, { top: 60, right: 30 }]}>↑</Text>
+
+        {/* Middle A section (5 spots) */}
+        <View style={[styles.absolutePosition, { top: 220, left: 60, flexDirection: 'row' }]}>
+          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
+          <View style={styles.spotSpacing} />
+          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
+          <View style={styles.spotSpacing} />
+          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
+          <View style={styles.spotSpacing} />
+          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
+          <View style={styles.spotSpacing} />
+          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
+        </View>
+
+        {/* EXIT */}
+        <View style={[styles.absolutePosition, { top: 220, right: 20, alignItems: 'center' }]}>
+          <Text style={styles.exitText}>EXIT</Text>
+          <View style={{ marginTop: 8 }}>
+            <Text style={styles.arrow}>↑</Text>
+            <Text style={styles.arrow}>↑</Text>
+          </View>
+        </View>
+
+        {/* Bottom flow arrows */}
+        <View style={[styles.absolutePosition, { top: 270, left: 50, flexDirection: 'row' }]}>
+          <Text style={styles.arrow}>→</Text>
+          <View style={{ width: 15 }} />
+          <Text style={styles.arrow}>→</Text>
+          <View style={{ width: 15 }} />
+          <Text style={styles.arrow}>→</Text>
+          <View style={{ width: 15 }} />
+          <Text style={styles.arrow}>→</Text>
+          <View style={{ width: 15 }} />
+          <Text style={styles.arrow}>→</Text>
+        </View>
+
+        {/* Bottom section */}
+        <View style={[styles.absolutePosition, { top: 300, left: 30, flexDirection: 'row' }]}>
+          <ParkingSpotComponent id="C2" available={true} selected={selectedSection === 'C'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="C1" available={false} selected={selectedSection === 'C'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="E4" available={true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="E5" available={false} selected={selectedSection === 'E'} onPress={handleSpotPress} />
+          <View style={styles.spotSpacing} />
+          <ParkingSpotComponent id="E6" available={true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
+        </View>
+
+        {/* Bottom Elevator */}
+        <View style={[styles.absolutePosition, styles.mainElevator, { top: 300, right: 20 }]}>
+          <Text style={styles.elevatorText}>Elevator</Text>
+        </View>
+
+        {/* Navigation Path */}
+        {showNavigationPath && navigationTarget && (
+          <>
+            {/* Entrance Marker */}
+            <View style={[styles.absolutePosition, styles.entrance, { bottom: 60, alignSelf: 'center', left: '40%' }]}>
+              <Text style={styles.entranceText}>🚗 ENTRANCE</Text>
+            </View>
+
+            {/* Navigation arrows */}
+            <Text style={[styles.absolutePosition, styles.navArrow, { bottom: 50, left: '45%' }]}>↑</Text>
+            <Text style={[styles.absolutePosition, styles.navArrow, { bottom: 35, left: '45%' }]}>↑</Text>
+
+            {/* Target destination banner */}
+            <View style={[styles.absolutePosition, styles.destination, { top: 10, left: '20%' }]}>
+              <Text style={styles.destinationText}>🎯 Destination: {navigationTarget}</Text>
+            </View>
+
+            {/* Clear route button */}
+            <TouchableOpacity 
+              onPress={clearNavigation}
+              style={[styles.absolutePosition, styles.clearButton, { top: 50, right: 20 }]}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.clearButtonText}>Clear Route</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <View style={styles.bottomCard}>
+          <View>
+            <Text style={styles.buildingName}>USJR Quadricentennial</Text>
+            <Text style={styles.floorInfo}>Floor {floor} • Available Spots: 40</Text>
+          </View>
+          <TouchableOpacity style={styles.navigateButton}>
+            <Text style={styles.navigateButtonText}>Navigate</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Parking Confirmation Modal */}
+      <Modal visible={showParkingAlert} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Want to park in spot {selectedSpot}?</Text>
+            <Text style={styles.modalText}>
+              This will guide you to parking spot {selectedSpot} in section {parkingSpots[selectedSpot!]?.section}.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={confirmParking} style={styles.confirmButton}>
+                <Text style={styles.confirmButtonText}>Yes, Guide Me</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={cancelParking} style={styles.cancelButton}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.campusDetails}>
-              <View style={styles.campusRow}>
-                <Text style={styles.campusLabel}>Floor</Text>
-                <Text style={styles.campusValue}>Available Spots</Text>
-              </View>
-              <View style={styles.campusRow}>
-                <Text style={styles.floorNumber}>{floor}</Text>
-                <Text style={styles.availableSpots}>{floorData.availableCount}</Text>
-              </View>
-            </View>
-            <View style={styles.buttonRow}>
-              <Button
-                mode="outlined"
-                onPress={() => navigation.navigate('Floors')}
-                style={styles.viewLevelsButton}
-              >
-                View Levels
-              </Button>
-              <Button
-                mode="contained"
-                onPress={() => Alert.alert('Navigation', 'Starting navigation to this floor...')}
-                style={styles.nextButton}
-                buttonColor="#FFFFFF"
-                textColor="#B71C1C"
-              >
-                Navigate
-              </Button>
-            </View>
-          </Card.Content>
-        </Card>
-      </View>
-
-      {/* Quick Stats */}
-      <Card style={styles.statsCard}>
-        <Card.Content>
-          <Text style={styles.statsTitle}>Floor {floor} Live Statistics</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{floorData.availableCount}</Text>
-              <Text style={styles.statLabel}>Available</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{floorData.totalCount - floorData.availableCount}</Text>
-              <Text style={styles.statLabel}>Occupied</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{floorData.totalCount}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>
-                {Math.round((floorData.availableCount / floorData.totalCount) * 100)}%
-              </Text>
-              <Text style={styles.statLabel}>Free</Text>
-            </View>
           </View>
-          <View style={styles.updateInfo}>
-            <MaterialIcons name="update" size={16} color="#666" />
-            <Text style={styles.updateText}>Updates every 10 seconds</Text>
-          </View>
-        </Card.Content>
-      </Card>
-    </ScrollView>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#374151',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  header: {
+    backgroundColor: '#DC2626',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    marginBottom: 16,
   },
-  loadingText: {
+  backButton: {
+    color: 'white',
+    fontSize: 24,
+    marginRight: 16,
+  },
+  headerTitle: {
+    color: 'white',
     fontSize: 18,
-    color: '#666',
-    marginTop: 10,
+    fontWeight: 'bold',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    padding: 20,
+  sectionTabs: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  errorText: {
-    fontSize: 18,
-    color: '#666',
-    marginVertical: 20,
+  sectionTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 80,
+  },
+  selectedTab: {
+    backgroundColor: 'white',
+  },
+  unselectedTab: {
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+  selectedTabText: {
+    color: '#DC2626',
+  },
+  unselectedTabText: {
+    color: 'white',
+  },
+  sectionText: {
+    fontWeight: 'bold',
     textAlign: 'center',
   },
-  retryButton: {
-    marginTop: 10,
-  },
-  statusBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  statusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  floorContainer: {
-    backgroundColor: '#FFFFFF',
-    margin: 20,
-    borderRadius: 10,
-    overflow: 'hidden',
-    elevation: 4,
-  },
-  floorLayout: {
-    height: 500,
-    backgroundColor: '#424242',
-    position: 'relative',
-  },
-  parkingStructure: {
-    flex: 1,
-    position: 'relative',
-  },
-  sectionA: {
-    position: 'absolute',
-    left: 20,
-    top: 20,
-    width: 40,
-    height: 40,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 5,
-  },
-  sectionB: {
-    position: 'absolute',
-    left: 20,
-    bottom: 20,
-    width: 40,
-    height: 40,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 5,
-  },
-  sectionLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  driveway: {
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    transform: [{ translateY: -15 }],
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 167, 38, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  drivewayText: {
-    color: '#FFA726',
+  slotsText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    marginRight: 5,
+    textAlign: 'center',
+  },
+  mapContainer: {
+    flex: 1,
+    backgroundColor: '#4B5563',
+    position: 'relative',
+  },
+  absolutePosition: {
+    position: 'absolute',
   },
   parkingSpot: {
-    position: 'absolute',
-    width: 35,
-    height: 70,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 32,
+    height: 24,
+    borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
-    elevation: 2,
-  },
-  spotTouchable: {
-    width: '100%',
-    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  availableSpot: {
+    backgroundColor: '#10B981',
+    borderColor: '#047857',
+  },
+  occupiedSpot: {
+    backgroundColor: '#EF4444',
+    borderColor: '#B91C1C',
+  },
+  highlightedSpot: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#D97706',
   },
   spotText: {
-    color: '#FFFFFF',
+    color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-    marginBottom: 2,
   },
-  campusInfo: {
-    backgroundColor: '#B71C1C',
-    borderRadius: 0,
+  spotSpacing: {
+    width: 4,
   },
-  campusHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
+  elevator: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 8,
+    paddingVertical: 16,
+    borderRadius: 4,
+    transform: [{ rotate: '-90deg' }],
   },
-  campusTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  mainElevator: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  elevatorText: {
+    color: 'white',
+    fontSize: 10,
     fontWeight: 'bold',
-    flex: 1,
   },
-  campusDetails: {
-    marginBottom: 15,
+  arrow: {
+    color: 'white',
+    fontSize: 18,
   },
-  campusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
+  aSpot: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  campusLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    opacity: 0.8,
+  uSpot: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  campusValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    opacity: 0.8,
+  stairs: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 8,
+    paddingVertical: 32,
+    borderRadius: 4,
+    transform: [{ rotate: '-90deg' }],
   },
-  floorNumber: {
-    color: '#FFFFFF',
+  stairsText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  youAreHere: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  youAreHereText: {
+    color: 'white',
+    fontSize: 10,
+  },
+  exitText: {
+    color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  availableSpots: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+  entrance: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  viewLevelsButton: {
-    flex: 1,
-    borderColor: '#FFFFFF',
-  },
-  nextButton: {
-    flex: 1,
-  },
-  statsCard: {
-    margin: 20,
-    marginTop: 0,
-    elevation: 4,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 15,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#B71C1C',
-    marginBottom: 5,
-  },
-  statLabel: {
+  entranceText: {
+    color: 'white',
     fontSize: 12,
-    color: '#666',
+    fontWeight: 'bold',
   },
-  updateInfo: {
+  navArrow: {
+    color: '#60A5FA',
+    fontSize: 20,
+  },
+  destination: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  destinationText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  clearButton: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  bottomNav: {
+    backgroundColor: '#DC2626',
+    padding: 16,
+  },
+  bottomCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  buildingName: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  floorInfo: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  navigateButton: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  navigateButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
   },
-  updateText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 5,
-    fontStyle: 'italic',
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 16,
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalText: {
+    color: '#6B7280',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#6B7280',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
