@@ -1,4 +1,3 @@
-// src/services/RealTimeParkingService.ts
 import { NotificationService } from '../services/NotificationService';
 
 export interface ParkingSpace {
@@ -32,11 +31,11 @@ class RealTimeParkingServiceClass {
   private apiUrl = 'https://valet.up.railway.app/api/parking';
   private updateCallbacks: ParkingUpdateCallback[] = [];
   private connectionCallbacks: ConnectionStatusCallback[] = [];
-  private updateInterval: NodeJS.Timeout | null = null;
+ private updateInterval: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
   private lastData: ParkingStats | null = null;
   private connectionStatus: 'connected' | 'disconnected' | 'error' = 'disconnected';
-  private updateIntervalMs = 5000; // 5 seconds for real-time updates
+  private updateIntervalMs = 5000; 
   private retryCount = 0;
   private maxRetries = 3;
 
@@ -44,7 +43,6 @@ class RealTimeParkingServiceClass {
     console.log('🚗 RealTimeParkingService initialized');
   }
 
-  // Start real-time updates
   start(): void {
     if (this.isRunning) {
       console.log('⚠️ Real-time service already running');
@@ -54,14 +52,11 @@ class RealTimeParkingServiceClass {
     console.log('🚀 Starting real-time parking updates...');
     this.isRunning = true;
     this.fetchAndUpdate();
-    
-    // Set up periodic updates
     this.updateInterval = setInterval(() => {
       this.fetchAndUpdate();
     }, this.updateIntervalMs);
   }
 
-  // Stop real-time updates
   stop(): void {
     if (!this.isRunning) return;
 
@@ -76,16 +71,12 @@ class RealTimeParkingServiceClass {
     this.setConnectionStatus('disconnected');
   }
 
-  // Subscribe to parking updates
   onParkingUpdate(callback: ParkingUpdateCallback): () => void {
     this.updateCallbacks.push(callback);
-    
-    // If we have cached data, send it immediately
     if (this.lastData) {
       callback(this.lastData);
     }
     
-    // Return unsubscribe function
     return () => {
       const index = this.updateCallbacks.indexOf(callback);
       if (index > -1) {
@@ -94,14 +85,10 @@ class RealTimeParkingServiceClass {
     };
   }
 
-  // Subscribe to connection status updates
   onConnectionStatus(callback: ConnectionStatusCallback): () => void {
     this.connectionCallbacks.push(callback);
-    
-    // Send current status immediately
     callback(this.connectionStatus);
-    
-    // Return unsubscribe function
+
     return () => {
       const index = this.connectionCallbacks.indexOf(callback);
       if (index > -1) {
@@ -110,13 +97,12 @@ class RealTimeParkingServiceClass {
     };
   }
 
-  // Fetch data from API and update subscribers
   private async fetchAndUpdate(): Promise<void> {
     try {
       console.log('📡 Fetching real-time parking data...');
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); 
 
       const response = await fetch(this.apiUrl, {
         method: 'GET',
@@ -136,27 +122,19 @@ class RealTimeParkingServiceClass {
       }
 
       const rawData: ParkingSpace[] = await response.json();
-      console.log(`✅ Received ${rawData.length} parking records`);
-      
-      // Transform data
       const newData = this.transformParkingData(rawData);
-      
-      // Check for changes and send notifications
+    
       this.checkForChanges(newData);
-      
-      // Update cache and notify subscribers
       this.lastData = newData;
       this.notifyParkingUpdate(newData);
       this.setConnectionStatus('connected');
-      this.retryCount = 0; // Reset retry count on success
+      this.retryCount = 0; 
       
     } catch (error: any) {
       console.error('❌ Error fetching parking data:', error);
       
       this.retryCount++;
       this.setConnectionStatus('error');
-      
-      // If we have cached data, use it but mark as not live
       if (this.lastData) {
         const staleData = {
           ...this.lastData,
@@ -165,8 +143,6 @@ class RealTimeParkingServiceClass {
         };
         this.notifyParkingUpdate(staleData);
       }
-      
-      // Exponential backoff for retries
       if (this.retryCount <= this.maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, this.retryCount), 30000);
         console.log(`🔄 Retrying in ${delay}ms (attempt ${this.retryCount}/${this.maxRetries})`);
@@ -180,19 +156,15 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  // Transform raw API data to app format
   private transformParkingData(rawData: ParkingSpace[]): ParkingStats {
     const totalSpots = rawData.length;
     const availableSpots = rawData.filter(space => !space.is_occupied).length;
     const occupiedSpots = totalSpots - availableSpots;
-
-    // Group by floor
     const floorGroups: { [key: number]: ParkingSpace[] } = {};
     
     rawData.forEach(space => {
-      let floor = 1; // Default floor
+      let floor = 1; 
       
-      // Extract floor from location or estimate from sensor_id
       if (space.location) {
         const floorMatch = space.location.match(/floor\s*(\d+)/i) || 
                           space.location.match(/(\d+)(?:st|nd|rd|th)?\s*floor/i);
@@ -200,9 +172,8 @@ class RealTimeParkingServiceClass {
           floor = parseInt(floorMatch[1]);
         }
       } else {
-        // Estimate floor based on sensor_id (40 sensors per floor)
         floor = Math.ceil(space.sensor_id / 40);
-        floor = Math.max(1, Math.min(3, floor)); // Limit to floors 1-3
+        floor = Math.max(1, Math.min(3, floor));
       }
       
       if (!floorGroups[floor]) {
@@ -211,7 +182,6 @@ class RealTimeParkingServiceClass {
       floorGroups[floor].push(space);
     });
 
-    // Create floors array with status
     const floors = Object.entries(floorGroups).map(([floorNum, spaces]) => {
       const total = spaces.length;
       const available = spaces.filter(s => !s.is_occupied).length;
@@ -245,13 +215,11 @@ class RealTimeParkingServiceClass {
     };
   }
 
-  // Check for significant changes and send notifications
   private checkForChanges(newData: ParkingStats): void {
     if (!this.lastData) return;
 
     const oldData = this.lastData;
 
-    // Check for newly available spots
     if (newData.availableSpots > oldData.availableSpots) {
       const increase = newData.availableSpots - oldData.availableSpots;
       NotificationService.showLocalNotification(
@@ -266,12 +234,10 @@ class RealTimeParkingServiceClass {
       );
     }
 
-    // Check for floor status changes
     newData.floors.forEach(newFloor => {
       const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
       
       if (oldFloor && oldFloor.status !== newFloor.status) {
-        // Floor status changed
         if (newFloor.status === 'available' && oldFloor.status !== 'available') {
           NotificationService.showFloorUpdateNotification(
             newFloor.floor,
@@ -282,7 +248,6 @@ class RealTimeParkingServiceClass {
       }
     });
 
-    // Check for significant availability changes (>5 spots)
     const availabilityChange = Math.abs(newData.availableSpots - oldData.availableSpots);
     if (availabilityChange >= 5) {
       console.log(`📊 Significant change detected: ${availabilityChange} spots`);
@@ -314,7 +279,6 @@ class RealTimeParkingServiceClass {
         }
       });
 
-      // Send connection status notification
       if (status === 'connected') {
         NotificationService.showConnectionStatusNotification(true);
       } else if (status === 'error') {
@@ -323,19 +287,16 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  // Get current data (cached)
   getCurrentData(): ParkingStats | null {
     return this.lastData;
   }
 
-  // Get connection status
   getConnectionStatus(): 'connected' | 'disconnected' | 'error' {
     return this.connectionStatus;
   }
 
-  // Set update interval
   setUpdateInterval(milliseconds: number): void {
-    this.updateIntervalMs = Math.max(1000, milliseconds); // Minimum 1 second
+    this.updateIntervalMs = Math.max(1000, milliseconds); 
     
     if (this.isRunning) {
       this.stop();
@@ -345,14 +306,12 @@ class RealTimeParkingServiceClass {
     console.log(`⏱️ Update interval set to ${this.updateIntervalMs}ms`);
   }
 
-  // Force immediate update
   async forceUpdate(): Promise<void> {
     if (this.isRunning) {
       await this.fetchAndUpdate();
     }
   }
 
-  // Get update statistics
   getStats(): { 
     isRunning: boolean;
     updateInterval: number;
@@ -370,5 +329,4 @@ class RealTimeParkingServiceClass {
   }
 }
 
-// Export singleton instance
 export const RealTimeParkingService = new RealTimeParkingServiceClass();	

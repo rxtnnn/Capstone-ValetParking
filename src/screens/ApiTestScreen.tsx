@@ -1,4 +1,3 @@
-// src/screens/ApiTestScreen.tsx
 import React, { useState } from 'react';
 import {
   View,

@@ -14,7 +14,6 @@ import { TextInput, Button, Card, RadioButton, Chip } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 
-// Define types locally
 type RootStackParamList = {
   Splash: undefined;
   Home: undefined;

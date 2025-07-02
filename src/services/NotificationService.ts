@@ -1,4 +1,3 @@
-// src/services/NotificationService.ts
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
@@ -18,14 +17,13 @@ class NotificationServiceClass {
 
   async initialize(): Promise<void> {
     try {
-      // Configure notification behavior
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
-            shouldShowAlert: true,      // Show alert popup
-            shouldPlaySound: true,      // Play notification sound
-            shouldSetBadge: false,      // Don't update app badge
-            shouldShowBanner: true,     // Show notification banner (iOS)
-            shouldShowList: true,       // Show in notification list
+            shouldShowAlert: true,     
+            shouldPlaySound: true,     
+            shouldSetBadge: false,     
+            shouldShowBanner: true,  
+            shouldShowList: true,    
         }),
         });
 

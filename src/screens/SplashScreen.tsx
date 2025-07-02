@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as Animatable from 'react-native-animatable';
-import { LinearGradient } from 'expo-linear-gradient'; // Expo version
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { RootStackParamList } from '../../App';
 
@@ -23,7 +23,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       navigation.replace('Home');
-    }, 3000); // Show splash for 3 seconds
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [navigation]);
@@ -73,7 +73,6 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.locationDot} />
       </Animatable.View>
 
-      {/* Logo and Title */}
       <Animatable.View
         animation="fadeInUp"
         delay={1500}
@@ -103,7 +102,6 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
         </Animatable.View>
       </Animatable.View>
 
-      {/* Loading Animation */}
       <Animatable.View
         animation="fadeIn"
         delay={2500}
@@ -129,15 +127,6 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
             style={[styles.loadingDot, styles.loadingDot3]}
           />
         </View>
-        
-        {/* Connection Status */}
-        <Animatable.View
-          animation="fadeIn"
-          delay={3000}
-          style={styles.connectionStatus}
-        >
-          <Text style={styles.connectionText}>Connecting to VALET servers...</Text>
-        </Animatable.View>
       </Animatable.View>
     </LinearGradient>
   );
