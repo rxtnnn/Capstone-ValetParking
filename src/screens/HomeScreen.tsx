@@ -41,6 +41,48 @@ interface ParkingStats {
   }>;
 }
 
+// Simple Circular Progress Component
+const CircularProgress: React.FC<{
+  value: number;
+  total: number;
+  color: string;
+  label: string;
+}> = ({ value, total, color, label }) => {
+  return (
+    <View style={styles.circularProgressContainer}>
+      <View style={[styles.circularProgressCircle, { borderColor: color }]}>
+        <Text style={[styles.circularProgressValue, { color }]}>{value}</Text>
+      </View>
+      <Text style={styles.circularProgressLabel}>{label}</Text>
+    </View>
+  );
+};
+
+// Progress Bar Component
+const ProgressBar: React.FC<{
+  available: number;
+  total: number;
+  color: string;
+}> = ({ available, total, color }) => {
+  const percentage = total > 0 ? ((total - available) / total) * 100 : 0;
+  
+  return (
+    <View style={styles.progressBarContainer}>
+      <View style={styles.progressBarBackground}>
+        <View 
+          style={[
+            styles.progressBarFill,
+            { width: `${percentage}%`, backgroundColor: color }
+          ]}
+        />
+      </View>
+      <Text style={styles.progressBarText}>
+        {percentage === 100 ? '100% Full' : `${Math.round(100 - percentage)}% Full`}
+      </Text>
+    </View>
+  );
+};
+
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [parkingData, setParkingData] = useState<ParkingStats>({
     totalSpots: 0,
@@ -50,7 +92,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string>('');
 
   useEffect(() => {
     loadParkingData();
@@ -83,7 +124,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // Transform the data
       const stats = transformParkingData(rawData);
       setParkingData(stats);
-      setLastUpdated(new Date().toLocaleTimeString());
       
     } catch (error) {
       console.error('Error loading parking data:', error);
@@ -92,12 +132,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // Use mock data for development
       setParkingData({
         totalSpots: 120,
-        availableSpots: 45,
-        occupiedSpots: 75,
+        availableSpots: 55,
+        occupiedSpots: 65,
         floors: [
           { floor: 1, total: 40, available: 15 },
-          { floor: 2, total: 40, available: 18 },
-          { floor: 3, total: 40, available: 12 },
+          { floor: 2, total: 40, available: 5 },
+          { floor: 3, total: 40, available: 0 },
         ],
       });
     } finally {
@@ -156,32 +196,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     loadParkingData();
   };
 
-  const menuItems = [
-    {
-      title: 'Find Parking',
-      icon: 'local-parking',
-      onPress: () => navigation.navigate('Floors'),
-      color: '#B71C1C',
-    },
-    {
-      title: 'Settings',
-      icon: 'settings',
-      onPress: () => navigation.navigate('Settings'),
-      color: '#B71C1C',
-    },
-    {
-      title: 'Profile',
-      icon: 'person',
-      onPress: () => navigation.navigate('Profile'),
-      color: '#B71C1C',
-    },
-    {
-      title: 'Send Feedback',
-      icon: 'feedback',
-      onPress: () => navigation.navigate('Feedback'),
-      color: '#B71C1C',
-    },
-  ];
+  const getFloorStatusColor = (available: number, total: number) => {
+    const percentage = available / total;
+    if (percentage > 0.5) return '#4CAF50'; // Green
+    if (percentage > 0.2) return '#FF9800'; // Orange
+    return '#F44336'; // Red
+  };
+
+  const getFloorStatusText = (available: number) => {
+    if (available > 10) return 'Available';
+    if (available > 0) return 'Limited';
+    return 'Full';
+  };
 
   if (loading) {
     return (
@@ -203,135 +229,126 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     >
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>V</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logo}>
+              <Text style={styles.logoText}>V</Text>
+            </View>
+            <Text style={styles.valetText}>VALET</Text>
           </View>
-          <Text style={styles.valetText}>VALET</Text>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.headerIcon}>
+              <Icon name="notifications" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerIcon}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <Icon name="settings" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text style={styles.subtitle}>
-          Your Virtual Assistant with LED{'\n'}Enabled Tracking
-        </Text>
+        <Text style={styles.subtitle}>Your Virtual Parking Buddy</Text>
       </View>
 
-      {/* Welcome Section */}
-      <Animatable.View animation="fadeInUp" delay={300} style={styles.welcomeSection}>
-        <Text style={styles.welcomeText}>Welcome,</Text>
-        <Text style={styles.questionText}>What would you like to do today?</Text>
-      </Animatable.View>
-
-      {/* Menu Grid */}
-      <Animatable.View animation="fadeInUp" delay={500} style={styles.menuGrid}>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuItem}
-            onPress={item.onPress}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.menuIcon, { backgroundColor: item.color }]}>
-              <Icon name={item.icon} size={30} color="#FFFFFF" />
-            </View>
-            <Text style={styles.menuText}>{item.title}</Text>
-          </TouchableOpacity>
-        ))}
-      </Animatable.View>
-
-      {/* Live Parking Status Card */}
-      <Animatable.View animation="fadeInUp" delay={700}>
-        <Card style={styles.statusCard}>
+      {/* Campus Overview Card */}
+      <Animatable.View animation="fadeInUp" delay={300}>
+        <Card style={styles.campusCard}>
           <Card.Content>
-            <View style={styles.statusHeader}>
-              <Text style={styles.statusTitle}>Live Parking Status</Text>
-              <Badge style={styles.liveBadge}>LIVE</Badge>
+            <Text style={styles.campusTitle}>USJ-R Quadricentennial Campus</Text>
+            
+            <View style={styles.circularProgressRow}>
+              <CircularProgress
+                value={parkingData.availableSpots}
+                total={parkingData.totalSpots}
+                color="#4CAF50"
+                label="Available"
+              />
+              <CircularProgress
+                value={parkingData.occupiedSpots}
+                total={parkingData.totalSpots}
+                color="#F44336"
+                label="Occupied"
+              />
+              <CircularProgress
+                value={parkingData.totalSpots}
+                total={parkingData.totalSpots}
+                color="#2196F3"
+                label="Total Spots"
+              />
             </View>
             
-            <View style={styles.statusRow}>
-              <View style={styles.statusItem}>
-                <Text style={styles.statusNumber}>{parkingData.availableSpots}</Text>
-                <Text style={styles.statusLabel}>Available</Text>
-              </View>
-              <View style={styles.statusItem}>
-                <Text style={styles.statusNumber}>{parkingData.occupiedSpots}</Text>
-                <Text style={styles.statusLabel}>Occupied</Text>
-              </View>
-              <View style={styles.statusItem}>
-                <Text style={styles.statusNumber}>{parkingData.totalSpots}</Text>
-                <Text style={styles.statusLabel}>Total Spots</Text>
-              </View>
-            </View>
-
-            {lastUpdated && (
-              <Text style={styles.lastUpdated}>
-                Last updated: {lastUpdated}
-              </Text>
-            )}
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* Floor Status */}
-      <Animatable.View animation="fadeInUp" delay={900}>
-        <Text style={styles.sectionTitle}>Floor Status</Text>
-        {parkingData.floors.map((floor, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.floorCard}
-            onPress={() => navigation.navigate('ParkingMap', { floor: floor.floor })}
-          >
-            <View style={styles.floorInfo}>
-              <Text style={styles.floorTitle}>
-                {floor.floor === 1 ? '1st' : floor.floor === 2 ? '2nd' : '3rd'} Floor
-              </Text>
-              <Text style={styles.floorSubtitle}>
-                {floor.available} of {floor.total} available
-              </Text>
-            </View>
-            <View style={styles.floorStatus}>
-              <Text style={[
-                styles.floorStatusText,
-                { color: floor.available > 0 ? '#4CAF50' : '#F44336' }
-              ]}>
-                {floor.available > 0 ? 'Available' : 'Full'}
-              </Text>
-              <Icon name="chevron-right" size={24} color="#999" />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </Animatable.View>
-
-      {/* Quick Actions */}
-      <Animatable.View animation="fadeInUp" delay={1100}>
-        <Card style={styles.actionsCard}>
-          <Card.Content>
-            <Text style={styles.actionsTitle}>Quick Actions</Text>
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  const availableFloor = parkingData.floors.find(f => f.available > 0);
-                  if (availableFloor) {
-                    navigation.navigate('ParkingMap', { floor: availableFloor.floor });
-                  } else {
-                    Alert.alert('No Available Spots', 'All floors are currently full.');
-                  }
-                }}
-              >
-                <Icon name="search" size={24} color="#B71C1C" />
-                <Text style={styles.actionText}>Find Best Spot</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={onRefresh}
-              >
-                <Icon name="refresh" size={24} color="#B71C1C" />
-                <Text style={styles.actionText}>Refresh Data</Text>
-              </TouchableOpacity>
+            <View style={styles.liveBadgeContainer}>
+              <Badge style={styles.liveBadge}>LIVE</Badge>
             </View>
           </Card.Content>
         </Card>
       </Animatable.View>
+
+      {/* Select Floor Section */}
+      <Animatable.View animation="fadeInUp" delay={500}>
+        <View style={styles.floorSection}>
+          <View style={styles.floorSectionHeader}>
+            <Text style={styles.floorSectionTitle}>Select Floor</Text>
+            <Badge style={styles.liveBadge}>LIVE</Badge>
+          </View>
+
+          {parkingData.floors.map((floor, index) => {
+            const statusColor = getFloorStatusColor(floor.available, floor.total);
+            const statusText = getFloorStatusText(floor.available);
+            
+            return (
+              <TouchableOpacity
+                key={index}
+                style={styles.floorCard}
+                onPress={() => navigation.navigate('ParkingMap', { floor: floor.floor })}
+              >
+                <View style={styles.floorCardHeader}>
+                  <Text style={styles.floorTitle}>
+                    {floor.floor === 1 ? '1st' : floor.floor === 2 ? '2nd' : '3rd'} Floor
+                  </Text>
+                  <View style={styles.floorStatusContainer}>
+                    <Badge style={[styles.floorStatusBadge, { backgroundColor: statusColor }]}>
+                      {statusText}
+                    </Badge>
+                    <Icon name="chevron-right" size={24} color="#999" />
+                  </View>
+                </View>
+
+                <View style={styles.floorStats}>
+                  <View style={styles.floorStat}>
+                    <Text style={[styles.floorStatNumber, { color: '#4CAF50' }]}>
+                      {floor.available}
+                    </Text>
+                    <Text style={styles.floorStatLabel}>Available</Text>
+                  </View>
+                  <View style={styles.floorStat}>
+                    <Text style={[styles.floorStatNumber, { color: '#F44336' }]}>
+                      {floor.total - floor.available}
+                    </Text>
+                    <Text style={styles.floorStatLabel}>Occupied</Text>
+                  </View>
+                  <View style={styles.floorStat}>
+                    <Text style={[styles.floorStatNumber, { color: '#2196F3' }]}>
+                      {floor.total}
+                    </Text>
+                    <Text style={styles.floorStatLabel}>Total Spots</Text>
+                  </View>
+                </View>
+
+                <ProgressBar
+                  available={floor.available}
+                  total={floor.total}
+                  color={statusColor}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Animatable.View>
+
+      {/* Bottom Navigation Placeholder */}
+      <View style={styles.bottomNavPlaceholder} />
     </ScrollView>
   );
 };
@@ -357,191 +374,177 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#B71C1C',
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: 50,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-    alignItems: 'center',
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
   },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
   logoText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#B71C1C',
   },
   valetText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+  },
+  headerIcon: {
+    marginLeft: 15,
+    padding: 5,
   },
   subtitle: {
     color: '#FFFFFF',
-    textAlign: 'center',
-    fontSize: 16,
-    opacity: 0.9,
-  },
-  welcomeSection: {
-    backgroundColor: '#B71C1C',
-    padding: 20,
-    paddingTop: 0,
-  },
-  welcomeText: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  questionText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    opacity: 0.9,
-  },
-  menuGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 20,
-    justifyContent: 'space-between',
-  },
-  menuItem: {
-    width: '48%',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  menuIcon: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  menuText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
+    opacity: 0.9,
   },
-  statusCard: {
+  campusCard: {
     margin: 20,
-    marginTop: 0,
     elevation: 4,
+    borderRadius: 15,
   },
-  statusHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  statusTitle: {
-    fontSize: 20,
+  campusTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  liveBadge: {
-    backgroundColor: '#4CAF50',
-  },
-  statusRow: {
+  circularProgressRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 15,
   },
-  statusItem: {
+  circularProgressContainer: {
     alignItems: 'center',
   },
-  statusNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#B71C1C',
-  },
-  statusLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
-  },
-  lastUpdated: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginHorizontal: 20,
-    marginBottom: 15,
-  },
-  floorCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 20,
+  circularProgressCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 10,
-    padding: 20,
-    borderRadius: 10,
+  },
+  circularProgressValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  circularProgressLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  liveBadgeContainer: {
+    alignItems: 'center',
+  },
+  liveBadge: {
+    backgroundColor: '#4CAF50',
+    color: '#FFFFFF',
+  },
+  floorSection: {
+    margin: 20,
+    marginTop: 0,
+  },
+  floorSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 2,
+    marginBottom: 15,
   },
-  floorInfo: {
-    flex: 1,
+  floorSectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  floorCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 15,
+    elevation: 3,
+  },
+  floorCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   floorTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 5,
   },
-  floorSubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  floorStatus: {
+  floorStatusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  floorStatusText: {
-    fontSize: 16,
-    fontWeight: '600',
+  floorStatusBadge: {
     marginRight: 10,
+    color: '#FFFFFF',
   },
-  actionsCard: {
-    margin: 20,
-    elevation: 3,
-  },
-  actionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  actionsContainer: {
+  floorStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    marginBottom: 20,
   },
-  actionButton: {
+  floorStat: {
     alignItems: 'center',
-    padding: 15,
-    flex: 1,
   },
-  actionText: {
-    fontSize: 14,
-    color: '#B71C1C',
-    marginTop: 8,
-    textAlign: 'center',
+  floorStatNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  floorStatLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  progressBarContainer: {
+    alignItems: 'center',
+  },
+  progressBarBackground: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressBarText: {
+    fontSize: 12,
+    color: '#666',
     fontWeight: '600',
+  },
+  bottomNavPlaceholder: {
+    height: 80,
   },
 });
 
