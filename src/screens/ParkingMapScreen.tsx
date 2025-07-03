@@ -179,7 +179,7 @@ const ParkingMapScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchParkingData(true);
+    fetchParkingData();
     const interval = setInterval(fetchParkingData, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -489,7 +489,7 @@ const ParkingMapScreen: React.FC = () => {
       </View>
 
       {/* Bottom Navigation Card */}
-      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.bottomNav}>
+      <LinearGradient colors={['#B22020', '#4C0E0E']} >
         <View style={styles.bottomCard}>
           <View style={styles.bottomHeader}>
             <Text style={styles.buildingName}>USJ-R Quadricentennial</Text>
@@ -825,10 +825,7 @@ const styles = StyleSheet.create({
   },
   
   // Bottom navigation
-  bottomNav: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
+ 
   bottomCard: {
     borderRadius: 12,
     padding: 20,

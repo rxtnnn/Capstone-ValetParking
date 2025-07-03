@@ -299,7 +299,7 @@ const HomeScreen: React.FC = () => {
 
     const fourFloors = ensureFourFloors([
       ...parkingData.floors.map(floor =>
-        floor.floor === 1 ? { ...floor, floor: 4 } : floor // Redirect floor 1 → floor 4
+        floor.floor === 1 ? { ...floor, floor: 4 } : floor
       )
     ]);
 
