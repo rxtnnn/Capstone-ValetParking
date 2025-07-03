@@ -11,7 +11,6 @@ import Constants from 'expo-constants';
 // Screens
 import SplashScreen from './src/screens/SplashScreen';
 import HomeScreen from './src/screens/HomeScreen';
-import FloorsScreen from './src/screens/FloorsScreen';
 import ParkingMapScreen from './src/screens/ParkingMapScreen';
 import FeedbackScreen from './src/screens/FeedbackScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
@@ -106,11 +105,7 @@ const App: React.FC = () => {
             component={HomeScreen} 
             options={{ headerShown: false }}
           />
-          <Stack.Screen 
-            name="Floors" 
-            component={FloorsScreen}
-            options={{ title: 'Select Floor' }}
-          />
+         
           <Stack.Screen 
             name="ParkingMap" 
             component={ParkingMapScreen}

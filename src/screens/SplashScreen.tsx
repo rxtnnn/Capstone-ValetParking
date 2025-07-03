@@ -2,11 +2,15 @@ import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 const { width, height } = Dimensions.get('window');
+import { useFonts } from 'expo-font';
 import {
-  useFonts,
   Montserrat_100Thin,
   Montserrat_700Bold,
 } from '@expo-google-fonts/montserrat';
+import {
+  Poppins_400Regular,
+  Poppins_600SemiBold,
+} from '@expo-google-fonts/poppins';
 
 const SplashScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -18,6 +22,8 @@ const SplashScreen: React.FC = () => {
   const [fontsLoaded] = useFonts({
     Montserrat_100Thin,
     Montserrat_700Bold,
+    Poppins_400Regular,
+    Poppins_600SemiBold,
   });
 
   if (!fontsLoaded) return null;
@@ -28,7 +34,6 @@ const SplashScreen: React.FC = () => {
       <View>
         <Image source={require('../../assets/splash-car.png')} 
         style={styles.image} 
-        resizeMode="contain" // or 'cover' / 'stretch' etc./>
           />
       </View>
 
@@ -71,7 +76,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   image:{
-    width: 500,
+    width: 400,
     height: 400,
     alignItems: 'flex-start',
   },
@@ -100,7 +105,7 @@ const styles = StyleSheet.create({
     color: 'black',
     textAlign: 'center',
     lineHeight: 24,
-    fontFamily: 'Montserrat_500Thin'
+    fontFamily: 'Poppins_400Regular'
   },
   indicatorContainer: {
     flexDirection: 'row',
