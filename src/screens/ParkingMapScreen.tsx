@@ -57,7 +57,7 @@ const ParkingMapScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('');
-
+  const [refreshing, setRefreshing] = useState(false);
   if (!fontsLoaded) return null;
 
   // Define spot layout exactly as shown in the reference image
@@ -70,9 +70,13 @@ const ParkingMapScreen: React.FC = () => {
   };
 
   // Fetch real-time parking data
-  const fetchParkingData = async () => {
+  const fetchParkingData  = async (showLoadingScreen = false) =>  {
     try {
-      setLoading(true);
+       if (showLoadingScreen) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       const response = await fetch('https://valet.up.railway.app/api/parking', {
         method: 'GET',
         headers: {
@@ -175,7 +179,7 @@ const ParkingMapScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchParkingData();
+    fetchParkingData(true);
     const interval = setInterval(fetchParkingData, 10000);
     return () => clearInterval(interval);
   }, []);

@@ -143,8 +143,6 @@ const HomeScreen: React.FC = () => {
       }
 
       const rawData = await response.json();
-      console.log('Received parking data:', rawData);
-      
       // Transform the data
       const transformedData = transformParkingData(rawData);
       setParkingData(transformedData);
@@ -152,91 +150,75 @@ const HomeScreen: React.FC = () => {
       
     } catch (error) {
       console.error('Error loading parking data:', error);
-      setConnectionStatus('error');
-      
-      // Use mock data as fallback
-      setParkingData({
-        totalSpots: 160,
-        availableSpots: 45,
-        occupiedSpots: 115,
-        floors: [
-          { floor: 1, total: 40, available: 15, occupancyRate: 62.5, status: 'limited' },
-          { floor: 2, total: 40, available: 5, occupancyRate: 87.5, status: 'limited' },
-          { floor: 3, total: 40, available: 0, occupancyRate: 100, status: 'full' },
-          { floor: 4, total: 40, available: 25, occupancyRate: 37.5, status: 'available' },
-        ],
-        lastUpdated: new Date().toLocaleTimeString(),
-        isLive: false,
-      });
+      setConnectionStatus('error'); 
     } finally {
       setLoading(false);
     }
   };
 
   // Transform raw API data to app format
-  const transformParkingData = (rawData: any[]): ParkingStats => {
-    const totalSpots = rawData.length;
-    const availableSpots = rawData.filter((space: any) => !space.is_occupied).length;
-    const occupiedSpots = totalSpots - availableSpots;
+ const transformParkingData = (rawData: any[]): ParkingStats => {
+  const totalSpots = rawData.length;
+  const availableSpots = rawData.filter((space: any) => !space.is_occupied).length;
+  const occupiedSpots = totalSpots - availableSpots;
 
-    // Group by floor
-    const floorGroups: { [key: number]: any[] } = {};
+  // Group by floor - MODIFIED: Assign all API data to floor 4
+  const floorGroups: { [key: number]: any[] } = {};
+  
+  rawData.forEach((space: any) => {
+    // CHANGE: Assign all API data to floor 4 instead of floor 1
+    let floor = 4;
     
-    rawData.forEach((space: any) => {
-      let floor = 1; // Default floor
-      
-      // Extract floor from location or estimate from sensor_id
-      if (space.location) {
-        const floorMatch = space.location.match(/floor\s*(\d+)/i) || 
-                          space.location.match(/(\d+)(?:st|nd|rd|th)?\s*floor/i);
-        if (floorMatch) {
-          floor = parseInt(floorMatch[1]);
-        }
-      } else {
-        // Estimate floor based on sensor_id (40 sensors per floor)
-        floor = Math.ceil(space.sensor_id / 40);
-        floor = Math.max(1, Math.min(4, floor)); // Limit to floors 1-4
+    // You can still use location-based assignment if needed, but default to floor 4
+    if (space.location) {
+      const floorMatch = space.location.match(/floor\s*(\d+)/i) || 
+                        space.location.match(/(\d+)(?:st|nd|rd|th)?\s*floor/i);
+      if (floorMatch) {
+        const extractedFloor = parseInt(floorMatch[1]);
+        // Map extracted floors to floor 4 (or keep original logic if you want)
+        floor = 4; // Force all to floor 4
       }
-      
-      if (!floorGroups[floor]) {
-        floorGroups[floor] = [];
-      }
-      floorGroups[floor].push(space);
-    });
+    }
+    
+    if (!floorGroups[floor]) {
+      floorGroups[floor] = [];
+    }
+    floorGroups[floor].push(space);
+  });
 
-    // Create floors array with status
-    const floors = Object.entries(floorGroups).map(([floorNum, spaces]) => {
-      const total = spaces.length;
-      const available = spaces.filter((s: any) => !s.is_occupied).length;
-      const occupancyRate = total > 0 ? ((total - available) / total) * 100 : 0;
-      
-      let status: 'available' | 'limited' | 'full';
-      if (available === 0) {
-        status = 'full';
-      } else if (available / total < 0.2) {
-        status = 'limited';
-      } else {
-        status = 'available';
-      }
-
-      return {
-        floor: parseInt(floorNum),
-        total,
-        available,
-        occupancyRate,
-        status,
-      };
-    }).sort((a, b) => a.floor - b.floor);
+  // Create floors array with status
+  const floors = Object.entries(floorGroups).map(([floorNum, spaces]) => {
+    const total = spaces.length;
+    const available = spaces.filter((s: any) => !s.is_occupied).length;
+    const occupancyRate = total > 0 ? ((total - available) / total) * 100 : 0;
+    
+    let status: 'available' | 'limited' | 'full';
+    if (available === 0) {
+      status = 'full';
+    } else if (available / total < 0.2) {
+      status = 'limited';
+    } else {
+      status = 'available';
+    }
 
     return {
-      totalSpots,
-      availableSpots,
-      occupiedSpots,
-      floors,
-      lastUpdated: new Date().toLocaleTimeString(),
-      isLive: true,
+      floor: parseInt(floorNum),
+      total,
+      available,
+      occupancyRate,
+      status,
     };
+  }).sort((a, b) => a.floor - b.floor);
+
+  return {
+    totalSpots,
+    availableSpots,
+    occupiedSpots,
+    floors,
+    lastUpdated: new Date().toLocaleTimeString(),
+    isLive: true,
   };
+};
 
   useEffect(() => {
     let unsubscribeParkingUpdates: (() => void) | undefined;
@@ -246,24 +228,19 @@ const HomeScreen: React.FC = () => {
     try {
       // Subscribe to real-time parking updates
       unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
-        console.log('Received parking update:', data);
         setParkingData(data);
         setLoading(false);
       });
 
       // Subscribe to connection status updates
       unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status: 'connected' | 'disconnected' | 'error') => {
-        console.log('Connection status:', status);
         setConnectionStatus(status);
       });
-
-      // Start the real-time service
       RealTimeParkingService.start();
       
       // Fallback: if no data after 5 seconds, fetch directly
       const fallbackTimer = setTimeout(() => {
         if (loading) {
-          console.log('No data from service, fetching directly...');
           fetchParkingDataDirect();
         }
       }, 5000);
@@ -275,7 +252,6 @@ const HomeScreen: React.FC = () => {
         RealTimeParkingService.stop();
       };
     } catch (error) {
-      console.error('Error with RealTimeParkingService:', error);
       // Fallback to direct API call
       fetchParkingDataDirect();
     }
@@ -321,7 +297,11 @@ const HomeScreen: React.FC = () => {
     });
   };
 
-  const fourFloors = ensureFourFloors(parkingData.floors);
+    const fourFloors = ensureFourFloors([
+      ...parkingData.floors.map(floor =>
+        floor.floor === 1 ? { ...floor, floor: 4 } : floor // Redirect floor 1 → floor 4
+      )
+    ]);
 
   // Show loading indicator
   if (loading) {
