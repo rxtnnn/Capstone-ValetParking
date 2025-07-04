@@ -336,12 +336,10 @@ class RealTimeParkingServiceClass {
   // Set update interval
   setUpdateInterval(milliseconds: number): void {
     this.updateIntervalMs = Math.max(1000, milliseconds); // Minimum 1 second
-    
     if (this.isRunning) {
       this.stop();
       this.start();
     }
-    
     console.log(`⏱️ Update interval set to ${this.updateIntervalMs}ms`);
   }
 
@@ -351,8 +349,6 @@ class RealTimeParkingServiceClass {
       await this.fetchAndUpdate();
     }
   }
-
-  // Get update statistics
   getStats(): { 
     isRunning: boolean;
     updateInterval: number;
@@ -370,5 +366,4 @@ class RealTimeParkingServiceClass {
   }
 }
 
-// Export singleton instance
 export const RealTimeParkingService = new RealTimeParkingServiceClass();

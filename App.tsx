@@ -82,7 +82,7 @@ const App: React.FC = () => {
   return (
     <PaperProvider theme={theme}>
       <NavigationContainer>
-        <StatusBar backgroundColor="#B71C1C" barStyle="light-content" />
+        <StatusBar barStyle="light-content" backgroundColor="#B22020" />
         <Stack.Navigator
           initialRouteName="Splash"
           screenOptions={{
@@ -111,10 +111,11 @@ const App: React.FC = () => {
             component={ParkingMapScreen}
             options={{ title: 'Parking Map' }}
           />
+          
           <Stack.Screen 
             name="Feedback" 
             component={FeedbackScreen}
-            options={{ title: 'Send Feedback' }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen 
             name="Settings" 

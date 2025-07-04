@@ -8,7 +8,8 @@ import {
   StyleSheet,
   Modal,
   StatusBar,
-  ActivityIndicator 
+  ActivityIndicator,
+  Dimensions 
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +21,8 @@ import {
   Poppins_600SemiBold,
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 interface ParkingSpot {
   id: string;
@@ -33,6 +36,12 @@ interface SectionStats {
   available: number;
   total: number;
   status: 'AVAILABLE' | 'LIMITED' | 'FULL';
+}
+
+interface NavigationPath {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  waypoints: Array<{ x: number; y: number; direction: string }>;
 }
 
 const ParkingMapScreen: React.FC = () => {
@@ -57,26 +66,165 @@ const ParkingMapScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
+
   if (!fontsLoaded) return null;
 
-  // Define spot layout exactly as shown in the reference image
+  // Complete spot layout mapping (matches the exact image layout)
   const spotLayout = {
-    A: ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'],
-    B: ['B1', 'B2', 'B3', 'B4'],
-    C: ['C1', 'C2'],
-    D: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'],
-    E: ['E1', 'E2', 'E3', 'E4', 'E5', 'E6']
+    A: ['A1', 'A2', 'A3', 'A4', 'A5'], // Top right corner + middle row
+    B: ['B1', 'B2', 'B3', 'B4'], // Top row
+    C: ['C1', 'C2'], // Top left vertical spots
+    D: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'], // Main horizontal rows
+    E: ['E1', 'E2', 'E3'], // Left vertical section
+    F: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7'], // Bottom horizontal sections
+    G: ['G1', 'G2', 'G3', 'G4', 'G5'], // Right vertical section
+    H: ['H1', 'H2', 'H3'], // Bottom right corner
+    I: ['I1', 'I2', 'I3', 'I4', 'I5'] // Far right vertical section
   };
 
+  // Exact spot positions based on the image layout
+  const spotPositions: Record<string, { x: number; y: number }> = {
+    // Top row B section (left to right: B4, B3, B2, B1)
+    'B4': { x: screenWidth * 0.55, y: 40 },
+    'B3': { x: screenWidth * 0.63, y: 40 },
+    'B2': { x: screenWidth * 0.71, y: 40 },
+    'B1': { x: screenWidth * 0.79, y: 40 },
+
+    // Top right corner A spot
+    'A1': { x: screenWidth * 0.90, y: 95 },
+
+    // Top left vertical C spots
+    'C2': { x: screenWidth * 0.50, y: 95 },
+    'C1': { x: screenWidth * 0.50, y: 130 },
+
+    // Main D section - left group (D7, D6, D5, D4)
+    'D7': { x: screenWidth * 0.13, y: 200 },
+    'D6': { x: screenWidth * 0.20, y: 200 },
+    'D5': { x: screenWidth * 0.27, y: 200 },
+    'D4': { x: screenWidth * 0.34, y: 200 },
+
+    // Main D section - right group (D3, D2, D1)
+    'D3': { x: screenWidth * 0.48, y: 200 },
+    'D2': { x: screenWidth * 0.55, y: 200 },
+    'D1': { x: screenWidth * 0.62, y: 200 },
+
+    // Left vertical E section
+    'E1': { x: screenWidth * 0.08, y: 290 },
+    'E2': { x: screenWidth * 0.08, y: 325 },
+    'E3': { x: screenWidth * 0.08, y: 360 },
+
+    // Middle A section horizontal row (A5, A4, A3, A2, A1)
+    'A5': { x: screenWidth * 0.22, y: 310 },
+    'A4': { x: screenWidth * 0.29, y: 310 },
+    'A3': { x: screenWidth * 0.36, y: 310 },
+    'A2': { x: screenWidth * 0.43, y: 310 },
+
+    // Bottom F sections
+    // F1, F2 (left group)
+    'F1': { x: screenWidth * 0.13, y: 450 },
+    'F2': { x: screenWidth * 0.20, y: 450 },
+
+    // F3, F4, F5 (middle group)
+    'F3': { x: screenWidth * 0.30, y: 450 },
+    'F4': { x: screenWidth * 0.37, y: 450 },
+    'F5': { x: screenWidth * 0.44, y: 450 },
+
+    // F6, F7 (right group)
+    'F6': { x: screenWidth * 0.54, y: 450 },
+    'F7': { x: screenWidth * 0.61, y: 450 },
+
+    // Right vertical G section (G1, G2, G3, G4, G5)
+    'G1': { x: screenWidth * 0.75, y: 480 },
+    'G2': { x: screenWidth * 0.75, y: 515 },
+    'G3': { x: screenWidth * 0.75, y: 550 },
+    'G4': { x: screenWidth * 0.75, y: 585 },
+    'G5': { x: screenWidth * 0.75, y: 620 },
+
+    // Far right vertical I section (I5, I4, I3, I2, I1)
+    'I5': { x: screenWidth * 0.90, y: 480 },
+    'I4': { x: screenWidth * 0.90, y: 515 },
+    'I3': { x: screenWidth * 0.90, y: 550 },
+    'I2': { x: screenWidth * 0.90, y: 585 },
+    'I1': { x: screenWidth * 0.90, y: 620 },
+
+    // Bottom right corner H section (H1, H2, H3)
+    'H1': { x: screenWidth * 0.60, y: 680 },
+    'H2': { x: screenWidth * 0.70, y: 680 },
+    'H3': { x: screenWidth * 0.80, y: 680 },
+  };
+
+  // Static elements positions
+  const staticElements = {
+    motorcycleParking: { x: screenWidth * 0.02, y: 40, label: 'MOTORCYCLE\nPARKING' },
+    stairs: { x: screenWidth * 0.02, y: 200, rotation: 90, label: 'STAIRS' },
+    mainElevator: { x: screenWidth * 0.72, y: 200, label: 'Elevator' },
+    entrance: { x: screenWidth * 0.72, y: 240, label: 'Entrance' },
+    youAreHere: { x: screenWidth * 0.85, y: 200, label: 'You are here' },
+    bottomElevator: { x: screenWidth * 0.72, y: 450, label: 'Elevator' },
+    rightElevator: { x: screenWidth * 0.97, y: 380, rotation: 90, label: 'Elevator' },
+    exit: { x: screenWidth * 0.85, y: 310, label: 'EXIT' }
+  };
+
+  // Directional arrows positions
+  const arrows = [
+    // Top arrows under B section
+    { x: screenWidth * 0.59, y: 80, direction: '←' },
+    { x: screenWidth * 0.75, y: 80, direction: '←' },
+
+    // Right side up arrow
+    { x: screenWidth * 0.90, y: 135, direction: '↑' },
+
+    // Vertical arrow between C spots
+    { x: screenWidth * 0.50, y: 115, direction: '↓' },
+
+    // Main D section arrows
+    { x: screenWidth * 0.15, y: 240, direction: '←' },
+    { x: screenWidth * 0.22, y: 240, direction: '←' },
+    { x: screenWidth * 0.50, y: 240, direction: '←' },
+    { x: screenWidth * 0.57, y: 240, direction: '←' },
+
+    // Center vertical arrows
+    { x: screenWidth * 0.72, y: 270, direction: '↓' },
+    { x: screenWidth * 0.72, y: 320, direction: '↓' },
+
+    // Left E section arrows
+    { x: screenWidth * 0.08, y: 305, direction: '↓' },
+
+    // Bottom horizontal arrows (under A middle section)
+    { x: screenWidth * 0.15, y: 350, direction: '→' },
+    { x: screenWidth * 0.22, y: 350, direction: '→' },
+    { x: screenWidth * 0.29, y: 350, direction: '→' },
+    { x: screenWidth * 0.36, y: 350, direction: '→' },
+    { x: screenWidth * 0.43, y: 350, direction: '→' },
+
+    // Right side up arrows for EXIT
+    { x: screenWidth * 0.85, y: 350, direction: '↑' },
+
+    // Bottom elevator arrow
+    { x: screenWidth * 0.72, y: 490, direction: '↓' },
+
+    // Right G section arrows
+    { x: screenWidth * 0.75, y: 495, direction: '↓' },
+    { x: screenWidth * 0.75, y: 530, direction: '↓' },
+    { x: screenWidth * 0.75, y: 565, direction: '↓' },
+    { x: screenWidth * 0.75, y: 600, direction: '↓' },
+
+    // Far right I section arrows
+    { x: screenWidth * 0.90, y: 495, direction: '↑' },
+    { x: screenWidth * 0.90, y: 530, direction: '↑' },
+    { x: screenWidth * 0.90, y: 565, direction: '↑' },
+    { x: screenWidth * 0.90, y: 600, direction: '↑' },
+
+    // Bottom right arrow
+    { x: screenWidth * 0.55, y: 680, direction: '→' },
+  ];
+
+  // Entrance position
+  const entrancePosition = { x: screenWidth * 0.50, y: 750 };
+
   // Fetch real-time parking data
-  const fetchParkingData  = async (showLoadingScreen = false) =>  {
+  const fetchParkingData = async () => {
     try {
-       if (showLoadingScreen) {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
       const response = await fetch('https://valet.up.railway.app/api/parking', {
         method: 'GET',
         headers: {
@@ -90,6 +238,9 @@ const ParkingMapScreen: React.FC = () => {
       }
 
       const rawData = await response.json();
+      console.log('Fetched parking data:', rawData);
+      
+      // Transform API data to our spot format
       const transformedData = transformApiData(rawData);
       setParkingData(transformedData);
       updateSectionStats(transformedData);
@@ -99,6 +250,7 @@ const ParkingMapScreen: React.FC = () => {
     } catch (error) {
       console.error('Error fetching parking data:', error);
       setIsLive(false);
+      // Use mock data as fallback
       const mockData = generateMockData();
       setParkingData(mockData);
       updateSectionStats(mockData);
@@ -111,6 +263,7 @@ const ParkingMapScreen: React.FC = () => {
   const transformApiData = (apiData: any[]): Record<string, ParkingSpot> => {
     const spots: Record<string, ParkingSpot> = {};
     
+    // Initialize all spots as available first
     Object.values(spotLayout).flat().forEach((spotId, index) => {
       spots[spotId] = {
         id: spotId,
@@ -120,6 +273,7 @@ const ParkingMapScreen: React.FC = () => {
       };
     });
 
+    // Map API data to our spots
     apiData.forEach((apiSpot, index) => {
       const spotId = Object.values(spotLayout).flat()[index % Object.values(spotLayout).flat().length];
       if (spotId) {
@@ -135,10 +289,10 @@ const ParkingMapScreen: React.FC = () => {
     return spots;
   };
 
-  // Generate mock data
+  // Generate mock data for fallback
   const generateMockData = (): Record<string, ParkingSpot> => {
     const spots: Record<string, ParkingSpot> = {};
-    const occupiedSpots = ['D3', 'D6', 'E2', 'E5', 'C1', 'B2'];
+    const occupiedSpots = ['D3', 'D6', 'E2', 'F5', 'G2', 'I3', 'B2', 'H1', 'A3']; // Some occupied spots
     
     Object.values(spotLayout).flat().forEach(spotId => {
       spots[spotId] = {
@@ -178,18 +332,54 @@ const ParkingMapScreen: React.FC = () => {
     setSectionStats(stats);
   };
 
+  // Generate navigation path from entrance to selected spot
+  const generateNavigationPath = (targetSpotId: string): NavigationPath => {
+    const target = spotPositions[targetSpotId];
+    const entrance = entrancePosition;
+    
+    // Simple pathfinding
+    const waypoints: Array<{ x: number; y: number; direction: string }> = [];
+    
+    // Basic path from entrance to target
+    if (target.y < 300) {
+      // Going to upper sections (A, B, C, D)
+      waypoints.push(
+        { x: entrance.x, y: entrance.y - 100, direction: '↑' },
+        { x: entrance.x, y: entrance.y - 200, direction: '↑' },
+        { x: target.x, y: target.y + 30, direction: target.x > entrance.x ? '→' : '←' },
+        { x: target.x, y: target.y, direction: '↑' }
+      );
+    } else {
+      // Going to bottom sections (F, G, H, I)
+      waypoints.push(
+        { x: entrance.x, y: entrance.y - 50, direction: '↑' },
+        { x: target.x, y: entrance.y - 50, direction: target.x > entrance.x ? '→' : '←' },
+        { x: target.x, y: target.y, direction: '↓' }
+      );
+    }
+    
+    return {
+      from: entrance,
+      to: target,
+      waypoints
+    };
+  };
+
   useEffect(() => {
     fetchParkingData();
+    
+    // Set up real-time updates every 10 seconds
     const interval = setInterval(fetchParkingData, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const ParkingSpotComponent: React.FC<{
     id: string;
+    position: { x: number; y: number };
     available: boolean;
     selected: boolean;
     onPress: (id: string) => void;
-  }> = ({ id, available, selected, onPress }) => {
+  }> = ({ id, position, available, selected, onPress }) => {
     const isHighlighted = selected && selectedSection && parkingData[id]?.section === selectedSection;
     const isNavigationTarget = navigationTarget === id;
     
@@ -198,6 +388,10 @@ const ParkingMapScreen: React.FC = () => {
         onPress={() => onPress(id)}
         style={[
           styles.parkingSpot,
+          {
+            left: position.x - 16, // Center the spot
+            top: position.y - 12,
+          },
           isNavigationTarget ? styles.targetSpot :
           isHighlighted ? styles.highlightedSpot : 
           available ? styles.availableSpot : styles.occupiedSpot
@@ -208,9 +402,41 @@ const ParkingMapScreen: React.FC = () => {
           styles.spotText,
           !available && styles.occupiedSpotText
         ]}>{id}</Text>
+        {isNavigationTarget && (
+          <View style={styles.targetIndicator}>
+            <Text style={styles.targetArrow}>→</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
+
+  const StaticElement: React.FC<{
+    children: React.ReactNode;
+    position: { x: number; y: number; rotation?: number };
+    style?: any;
+  }> = ({ children, position, style = {} }) => (
+    <View style={[
+      styles.staticElement, 
+      { 
+        left: position.x, 
+        top: position.y,
+        transform: position.rotation ? [{ rotate: `${position.rotation}deg` }] : undefined,
+      }, 
+      style
+    ]}>
+      {children}
+    </View>
+  );
+
+  const DirectionalArrow: React.FC<{
+    position: { x: number; y: number };
+    direction: string;
+  }> = ({ position, direction }) => (
+    <Text style={[styles.arrow, { position: 'absolute', left: position.x, top: position.y }]}>
+      {direction}
+    </Text>
+  );
 
   const handleSpotPress = (spotId: string) => {
     const spot = parkingData[spotId];
@@ -260,6 +486,8 @@ const ParkingMapScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
+      
+      {/* Header with Gradient */}
       <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
         {/* Section Tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -297,202 +525,134 @@ const ParkingMapScreen: React.FC = () => {
         </ScrollView>
       </LinearGradient>
 
-      {/* Main Parking Map - Exact layout from reference image */}
-      <View style={styles.mapContainer}>
-        
-        {/* Top Row: Top Elevator + B4,B3,B2,B1 + A spot */}
-        {/* Top Left Elevator (Vertical) */}
-        <View style={[styles.absolute, styles.topLeftElevator, { top: 20, left: 20 }]}>
-          <Text style={styles.elevatorText}>Elevator</Text>
+      {/* Parking Map Layout */}
+      <ScrollView style={styles.mapScrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.mapContainer}>
+          
+          {/* Render all parking spots */}
+          {Object.entries(spotPositions).map(([spotId, position]) => {
+            const spot = parkingData[spotId];
+            const isHighlighted = selectedSection === spot?.section;
+            
+            return (
+              <ParkingSpotComponent
+                key={spotId}
+                id={spotId}
+                position={position}
+                available={spot?.isAvailable ?? true}
+                selected={isHighlighted}
+                onPress={handleSpotPress}
+              />
+            );
+          })}
+
+          {/* Static elements */}
+          <StaticElement position={staticElements.motorcycleParking} style={styles.motorcycleParkingStyle}>
+            <Text style={styles.motorcycleParkingText}>{staticElements.motorcycleParking.label}</Text>
+          </StaticElement>
+
+          <StaticElement position={staticElements.stairs} style={[styles.stairsStyle, { transform: [{ rotate: `${staticElements.stairs.rotation}deg` }] }]}>
+            <Text style={styles.stairsText}>{staticElements.stairs.label}</Text>
+          </StaticElement>
+
+          <StaticElement position={staticElements.mainElevator} style={styles.elevatorStyle}>
+            <Text style={styles.elevatorText}>{staticElements.mainElevator.label}</Text>
+          </StaticElement>
+
+          <StaticElement position={staticElements.entrance} style={styles.entranceStyle}>
+            <Text style={styles.entranceText}>{staticElements.entrance.label}</Text>
+          </StaticElement>
+
+          <StaticElement position={staticElements.youAreHere} style={styles.youAreHereStyle}>
+            <Text style={styles.youAreHereText}>{staticElements.youAreHere.label}</Text>
+          </StaticElement>
+
+          <StaticElement position={staticElements.bottomElevator} style={styles.elevatorStyle}>
+            <Text style={styles.elevatorText}>{staticElements.bottomElevator.label}</Text>
+          </StaticElement>
+
+          <StaticElement position={staticElements.rightElevator} style={[styles.rightElevatorStyle, { transform: [{ rotate: `${staticElements.rightElevator.rotation}deg` }] }]}>
+            <Text style={styles.elevatorText}>{staticElements.rightElevator.label}</Text>
+          </StaticElement>
+
+          <StaticElement position={staticElements.exit}>
+            <Text style={styles.exitText}>{staticElements.exit.label}</Text>
+          </StaticElement>
+
+          {/* Directional arrows */}
+          {arrows.map((arrow, index) => (
+            <DirectionalArrow
+              key={index}
+              position={{ x: arrow.x, y: arrow.y }}
+              direction={arrow.direction}
+            />
+          ))}
+
+          {/* Navigation Path */}
+          {showNavigationPath && navigationTarget && (
+            <>
+              {/* Entrance Marker */}
+              <StaticElement position={{ x: entrancePosition.x - 60, y: entrancePosition.y - 20 }} style={styles.entranceMarker}>
+                <Text style={styles.entranceMarkerText}>🚗 ENTRANCE</Text>
+              </StaticElement>
+
+              {/* Dynamic navigation arrows based on path */}
+              {generateNavigationPath(navigationTarget).waypoints.map((waypoint, index) => (
+                <Text 
+                  key={index}
+                  style={[
+                    styles.navArrow, 
+                    { 
+                      position: 'absolute',
+                      left: waypoint.x - 10, 
+                      top: waypoint.y - 10,
+                    }
+                  ]}
+                >
+                  {waypoint.direction}
+                </Text>
+              ))}
+
+              {/* Target destination highlight */}
+              <StaticElement 
+                position={{ 
+                  x: spotPositions[navigationTarget].x - 30, 
+                  y: spotPositions[navigationTarget].y - 40 
+                }} 
+                style={styles.destination}
+              >
+                <Text style={styles.destinationText}>🎯 {navigationTarget}</Text>
+              </StaticElement>
+
+              {/* Clear route button */}
+              <TouchableOpacity 
+                onPress={clearNavigation}
+                style={[styles.clearButton, { position: 'absolute', top: 10, right: 20 }]}
+              >
+                <Text style={styles.clearButtonText}>Clear Route</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Live status indicator */}
+          <View style={[styles.statusIndicator, { position: 'absolute', top: 20, left: 20 }]}>
+            <View style={[styles.statusDot, { backgroundColor: isLive ? '#10B981' : '#EF4444' }]} />
+            <Text style={styles.statusText}>{isLive ? 'LIVE' : 'OFFLINE'}</Text>
+          </View>
+
+          {/* Live status indicator */}
+          <View style={[styles.statusIndicator, { position: 'absolute', top: 20, left: 20 }]}>
+            <View style={[styles.statusDot, { backgroundColor: isLive ? '#10B981' : '#EF4444' }]} />
+            <Text style={styles.statusText}>{isLive ? 'LIVE' : 'OFFLINE'}</Text>
+          </View>
         </View>
-
-        {/* B Section: B4, B3, B2, B1 */}
-        <View style={[styles.absolute, { top: 20, left: 120, flexDirection: 'row', gap: 8 }]}>
-          <ParkingSpotComponent id="B4" available={parkingData['B4']?.isAvailable ?? true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="B3" available={parkingData['B3']?.isAvailable ?? true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="B2" available={parkingData['B2']?.isAvailable ?? true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="B1" available={parkingData['B1']?.isAvailable ?? true} selected={selectedSection === 'B'} onPress={handleSpotPress} />
-        </View>
-
-        {/* Top Right A spot */}
-        <View style={[styles.absolute, { top: 20, right: 20 }]}>
-          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
-        </View>
-
-        {/* Arrows under B section */}
-        <View style={[styles.absolute, { top: 60, left: 130, flexDirection: 'row', gap: 40 }]}>
-          <Text style={styles.arrow}>←</Text>
-          <Text style={styles.arrow}>←</Text>
-        </View>
-
-        {/* U spots (vertical) */}
-        <View style={[styles.absolute, { top: 80, left: 80, alignItems: 'center' }]}>
-          <View style={styles.uSpot}><Text style={styles.spotText}>U</Text></View>
-          <Text style={styles.arrow}>↓</Text>
-          <View style={styles.uSpot}><Text style={styles.spotText}>U</Text></View>
-        </View>
-
-        {/* Up arrow (top right) */}
-        <Text style={[styles.absolute, styles.arrow, { top: 80, right: 30 }]}>↑</Text>
-
-        {/* STAIRS (Left side, vertical) */}
-        <View style={[styles.absolute, styles.stairs, { top: 160, left: 20 }]}>
-          <Text style={styles.stairsText}>STAIRS</Text>
-        </View>
-
-        {/* Main D Section: D7, D6, D5, D4, D3, D2, D1 */}
-        <View style={[styles.absolute, { top: 160, left: 80, flexDirection: 'row', gap: 8 }]}>
-          <ParkingSpotComponent id="D7" available={parkingData['D7']?.isAvailable ?? true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="D6" available={parkingData['D6']?.isAvailable ?? true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="D5" available={parkingData['D5']?.isAvailable ?? true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="D4" available={parkingData['D4']?.isAvailable ?? true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="D3" available={parkingData['D3']?.isAvailable ?? true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="D2" available={parkingData['D2']?.isAvailable ?? true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="D1" available={parkingData['D1']?.isAvailable ?? true} selected={selectedSection === 'D'} onPress={handleSpotPress} />
-        </View>
-
-        {/* Main Elevator (Right of D section) */}
-        <View style={[styles.absolute, styles.mainElevator, { top: 160, right: 120 }]}>
-          <Text style={styles.elevatorText}>Elevator</Text>
-        </View>
-
-        {/* You are here */}
-        <View style={[styles.absolute, styles.youAreHere, { top: 160, right: 20 }]}>
-          <Text style={styles.youAreHereText}>You are here</Text>
-        </View>
-
-        {/* Arrows above D section */}
-        <View style={[styles.absolute, { top: 130, left: 90, flexDirection: 'row', gap: 35 }]}>
-          <Text style={styles.arrow}>←</Text>
-          <Text style={styles.arrow}>←</Text>
-          <Text style={styles.arrow}>←</Text>
-          <Text style={styles.arrow}>←</Text>
-        </View>
-
-        {/* Down arrow (right side) */}
-        <Text style={[styles.absolute, styles.arrow, { top: 210, right: 80 }]}>↓</Text>
-
-        {/* Left E Section (Vertical): E1, E2, E3 */}
-        <View style={[styles.absolute, { top: 240, left: 20, alignItems: 'center' }]}>
-          <ParkingSpotComponent id="E1" available={parkingData['E1']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-          <Text style={styles.arrow}>↓</Text>
-          <ParkingSpotComponent id="E2" available={parkingData['E2']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-          <Text style={styles.arrow}>→</Text>
-          <ParkingSpotComponent id="E3" available={parkingData['E3']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-        </View>
-
-        {/* Middle A Section: 5 A spots */}
-        <View style={[styles.absolute, { top: 280, left: 100, flexDirection: 'row', gap: 8 }]}>
-          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
-          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
-          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
-          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
-          <View style={styles.aSpot}><Text style={styles.spotText}>A</Text></View>
-        </View>
-
-        {/* EXIT (Right side) */}
-        <View style={[styles.absolute, { top: 280, right: 20, alignItems: 'center' }]}>
-          <Text style={styles.exitText}>EXIT</Text>
-          <Text style={styles.arrow}>↑</Text>
-        </View>
-
-        {/* Bottom flow arrows */}
-        <View style={[styles.absolute, { top: 330, left: 80, flexDirection: 'row', gap: 30 }]}>
-          <Text style={styles.arrow}>→</Text>
-          <Text style={styles.arrow}>→</Text>
-          <Text style={styles.arrow}>→</Text>
-          <Text style={styles.arrow}>→</Text>
-          <Text style={styles.arrow}>→</Text>
-        </View>
-
-        {/* Bottom Section: C2, C1, E4, E5, E6, E4, E5, E6 */}
-        <View style={[styles.absolute, { top: 360, left: 60, flexDirection: 'row', gap: 8 }]}>
-          <ParkingSpotComponent id="C2" available={parkingData['C2']?.isAvailable ?? true} selected={selectedSection === 'C'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="C1" available={parkingData['C1']?.isAvailable ?? true} selected={selectedSection === 'C'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="E4" available={parkingData['E4']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="E5" available={parkingData['E5']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="E6" available={parkingData['E6']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="E4" available={parkingData['E4']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="E5" available={parkingData['E5']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-          <ParkingSpotComponent id="E6" available={parkingData['E6']?.isAvailable ?? true} selected={selectedSection === 'E'} onPress={handleSpotPress} />
-        </View>
-
-        {/* Bottom Elevator */}
-        <View style={[styles.absolute, styles.bottomElevator, { top: 360, right: 120 }]}>
-          <Text style={styles.elevatorText}>Elevator</Text>
-        </View>
-
-        {/* Down arrow (bottom right) */}
-        <Text style={[styles.absolute, styles.arrow, { top: 410, right: 80 }]}>↓</Text>
-
-        {/* Right Vertical E Section */}
-        <View style={[styles.absolute, { top: 440, right: 80, alignItems: 'center' }]}>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E1</Text></View>
-          <Text style={styles.arrow}>↓</Text>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E2</Text></View>
-          <Text style={styles.arrow}>↓</Text>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E3</Text></View>
-          <Text style={styles.arrow}>↓</Text>
-          <View style={styles.eSpot}><Text style={styles.spotText}>C1</Text></View>
-          <Text style={styles.arrow}>↓</Text>
-          <View style={styles.eSpot}><Text style={styles.spotText}>C2</Text></View>
-        </View>
-
-        {/* Right side arrows */}
-        <View style={[styles.absolute, { top: 450, right: 20, alignItems: 'center' }]}>
-          <Text style={styles.arrow}>↑</Text>
-          <Text style={styles.arrow}>↑</Text>
-          <Text style={styles.arrow}>↑</Text>
-          <Text style={styles.arrow}>↑</Text>
-          <Text style={styles.arrow}>↑</Text>
-        </View>
-
-        {/* Right side E spots (vertical) */}
-        <View style={[styles.absolute, { top: 440, right: 20, alignItems: 'center' }]}>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E3</Text></View>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E1</Text></View>
-          <View style={styles.eSpot}><Text style={styles.spotText}>C2</Text></View>
-          <View style={styles.eSpot}><Text style={styles.spotText}>C1</Text></View>
-        </View>
-
-        {/* Right arrow */}
-        <Text style={[styles.absolute, styles.arrow, { top: 580, right: 60 }]}>→</Text>
-
-        {/* Bottom right E spots */}
-        <View style={[styles.absolute, { top: 600, right: 60, flexDirection: 'row', gap: 8 }]}>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E4</Text></View>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E5</Text></View>
-          <View style={styles.eSpot}><Text style={styles.spotText}>E6</Text></View>
-        </View>
-
-        {/* Right bottom elevator */}
-        <View style={[styles.absolute, styles.rightElevator, { top: 520, right: 20 }]}>
-          <Text style={styles.elevatorText}>Elevator</Text>
-        </View>
-
-        {/* Navigation Path */}
-        {showNavigationPath && navigationTarget && (
-          <>
-            <View style={styles.entrance}>
-              <Text style={styles.entranceText}>🚗 ENTRANCE</Text>
-            </View>
-
-            <View style={styles.destination}>
-              <Text style={styles.destinationText}>🎯 Destination: {navigationTarget}</Text>
-            </View>
-
-            <TouchableOpacity onPress={clearNavigation} style={styles.clearButton}>
-              <Text style={styles.clearButtonText}>Clear Route</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+      </ScrollView>
 
       {/* Bottom Navigation Card */}
-      <LinearGradient colors={['#B22020', '#4C0E0E']} >
+      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.bottomNav}>
         <View style={styles.bottomCard}>
           <View style={styles.bottomHeader}>
-            <Text style={styles.buildingName}>USJ-R Quadricentennial</Text>
+            <Text style={styles.buildingName}>USJR Quadricentennial</Text>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
@@ -520,11 +680,20 @@ const ParkingMapScreen: React.FC = () => {
               <Text style={styles.viewLevelsText}>View other levels</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.navigateButton}>
+            <TouchableOpacity 
+              style={styles.navigateButton}
+              onPress={() => {
+                if (navigationTarget) {
+                  Alert.alert('Navigation', `Navigating to spot ${navigationTarget}`);
+                } else {
+                  Alert.alert('Navigation', 'Select a parking spot to start navigation guidance.');
+                }
+              }}
+            >
               <Text style={styles.navigateButtonText}>Navigate</Text>
             </TouchableOpacity>
           </View>
-          
+
           {lastUpdated && (
             <Text style={styles.lastUpdated}>Last updated: {lastUpdated}</Text>
           )}
@@ -574,28 +743,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   header: {
-    paddingTop: 40,
+    paddingTop: 50,
     paddingBottom: 20,
-    paddingHorizontal: 16,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: 'Poppins_600SemiBold',
-    flex: 1,
-    marginHorizontal: 16,
-  },
-  refreshButton: {
-    padding: 4,
+    paddingHorizontal: 14,
   },
   sectionTabs: {
     flexDirection: 'row',
@@ -635,25 +785,29 @@ const styles = StyleSheet.create({
   fullSlotText: {
     color: '#FF6B6B',
   },
-  mapContainer: {
+  mapScrollView: {
     flex: 1,
+  },
+  mapContainer: {
+    height: 850,
     backgroundColor: '#4B5563',
+    position: 'relative',
     margin: 16,
     borderRadius: 12,
-    position: 'relative',
   },
-  absolute: {
-    position: 'absolute',
-  },
-
-  // Parking spots and infrastructure
   parkingSpot: {
-    width: 36,
-    height: 28,
+    position: 'absolute',
+    width: 32,
+    height: 24,
     borderRadius: 6,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   availableSpot: {
     backgroundColor: '#10B981',
@@ -683,90 +837,93 @@ const styles = StyleSheet.create({
   },
   spotText: {
     color: 'white',
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'Poppins_600SemiBold',
   },
   occupiedSpotText: {
     color: '#FFE5E5',
   },
-  
-  // Infrastructure elements
-  topLeftElevator: {
+  targetIndicator: {
+    position: 'absolute',
+    top: -15,
+    right: -15,
+  },
+  targetArrow: {
+    fontSize: 16,
+    color: '#FF6B35',
+  },
+  staticElement: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  motorcycleParkingStyle: {
     backgroundColor: '#6B7280',
     paddingHorizontal: 8,
-    paddingVertical: 20,
-    borderRadius: 6,
-    transform: [{ rotate: '-90deg' }],
+    paddingVertical: 15,
+    borderRadius: 8,
+    width: 60,
+    height: 80,
   },
-  mainElevator: {
-    backgroundColor: '#6B7280',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 6,
-  },
-  bottomElevator: {
-    backgroundColor: '#6B7280',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 6,
-  },
-  rightElevator: {
-    backgroundColor: '#6B7280',
-    paddingHorizontal: 8,
-    paddingVertical: 20,
-    borderRadius: 6,
-    transform: [{ rotate: '-90deg' }],
-  },
-  stairs: {
-    backgroundColor: '#6B7280',
-    paddingHorizontal: 8,
-    paddingVertical: 40,
-    borderRadius: 6,
-    transform: [{ rotate: '-90deg' }],
-  },
-  youAreHere: {
-    backgroundColor: '#6B7280',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  
-  // Spot types
-  aSpot: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  uSpot: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  eSpot: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 4,
-    marginVertical: 2,
-  },
-  
-  // Text styles
-  elevatorText: {
+  motorcycleParkingText: {
     color: 'white',
-    fontSize: 10,
-    fontFamily: 'Poppins_500Medium',
+    fontSize: 8,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
+    lineHeight: 12,
+  },
+  stairsStyle: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 8,
+    paddingVertical: 20,
+    borderRadius: 6,
   },
   stairsText: {
     color: 'white',
     fontSize: 10,
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  elevatorStyle: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  rightElevatorStyle: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 8,
+    paddingVertical: 15,
+    borderRadius: 6,
+  },
+  elevatorText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
+  },
+  entranceStyle: {
+    backgroundColor: '#9CA3AF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  entranceText: {
+    color: '#1F2937',
+    fontSize: 10,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
+  },
+  youAreHereStyle: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
   youAreHereText: {
     color: 'white',
     fontSize: 9,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: 'Poppins_500Medium',
+    textAlign: 'center',
   },
   exitText: {
     color: 'white',
@@ -775,34 +932,43 @@ const styles = StyleSheet.create({
   },
   arrow: {
     color: 'white',
-    fontSize: 18,
-    fontFamily: 'Poppins_400Regular',
+    fontSize: 16,
+    fontFamily: 'Poppins_700Bold',
   },
-  
-  // Navigation elements
-  entrance: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    left: '40%',
+  entranceMarker: {
     backgroundColor: '#3B82F6',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  entranceText: {
+  entranceMarkerText: {
     color: 'white',
     fontSize: 11,
     fontFamily: 'Poppins_600SemiBold',
   },
+  navArrow: {
+    color: '#60A5FA',
+    fontSize: 20,
+    fontFamily: 'Poppins_700Bold',
+    textShadowColor: '#1E40AF',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
   destination: {
-    position: 'absolute',
-    top: 10,
-    left: 20,
     backgroundColor: '#3B82F6',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
   },
   destinationText: {
     color: 'white',
@@ -810,25 +976,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   clearButton: {
-    position: 'absolute',
-    top: 10,
-    right: 20,
     backgroundColor: '#EF4444',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
   },
   clearButtonText: {
     color: 'white',
     fontSize: 12,
     fontFamily: 'Poppins_600SemiBold',
   },
-  
-  // Bottom navigation
- 
-  bottomCard: {
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
-    padding: 20,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 10,
+    fontFamily: 'Poppins_500Medium',
+    color: '#374151',
+  },
+  bottomNav: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  bottomCard: {
+    padding: 16,
   },
   bottomHeader: {
     flexDirection: 'row',
@@ -901,8 +1088,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     opacity: 0.8,
   },
-  
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

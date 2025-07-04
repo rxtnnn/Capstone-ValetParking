@@ -8,11 +8,19 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
+  TextInput,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { TextInput, Button, Card, RadioButton, Chip } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
-import * as Animatable from 'react-native-animatable';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
 
 // Define types locally
 type RootStackParamList = {
@@ -33,6 +41,13 @@ interface Props {
 }
 
 const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
+  const [fontsLoaded] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+  });
+
   const [feedbackType, setFeedbackType] = useState('general');
   const [rating, setRating] = useState(0);
   const [message, setMessage] = useState('');
@@ -40,11 +55,13 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
 
+  if (!fontsLoaded) return null;
+
   const feedbackTypes = [
-    { value: 'general', label: 'General Feedback' },
-    { value: 'bug', label: 'Report Bug' },
-    { value: 'feature', label: 'Feature Request' },
-    { value: 'parking', label: 'Parking Issue' },
+    { value: 'general', label: 'General Feedback', icon: 'chatbubble-outline' },
+    { value: 'bug', label: 'Report Bug', icon: 'bug-outline' },
+    { value: 'feature', label: 'Feature Request', icon: 'bulb-outline' },
+    { value: 'parking', label: 'Parking Issue', icon: 'car-outline' },
   ];
 
   const commonIssues = [
@@ -119,8 +136,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
               onPress={() => handleRatingPress(star)}
               style={styles.starButton}
             >
-              <MaterialIcons
-                name={star <= rating ? 'star' : 'star-border'}
+              <Ionicons
+                name={star <= rating ? 'star' : 'star-outline'}
                 size={32}
                 color={star <= rating ? '#FFD700' : '#DDD'}
               />
@@ -141,146 +158,185 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <Animatable.View animation="fadeInUp" delay={200}>
-          <Card style={styles.card}>
-            <Card.Content>
-              <View style={styles.header}>
-                <MaterialIcons name="feedback" size={40} color="#B71C1C" />
-                <Text style={styles.title}>We'd love to hear from you!</Text>
-              </View>
-              <Text style={styles.subtitle}>
-                Your feedback helps us improve the VALET experience and make parking easier for everyone.
-              </Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#B22020" />
+      
+      {/* Header */}
+      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color="white" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Feedback</Text>
+          </View>
+          <View style={styles.headerPlaceholder} />
+        </View>
+        
+        <View style={styles.headerDescriptionContainer}>
+          <Text style={styles.headerDescription}>
+            Help us improve VALET by sharing your thoughts and experiences
+          </Text>
+        </View>
+      </LinearGradient>
 
-              {/* Feedback Type Selection */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>What type of feedback do you have?</Text>
-                <RadioButton.Group
-                  onValueChange={setFeedbackType}
-                  value={feedbackType}
+      <KeyboardAvoidingView
+        style={styles.contentContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          
+          {/* Feedback Type Selection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>What type of feedback do you have?</Text>
+            <View style={styles.feedbackTypesContainer}>
+              {feedbackTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.value}
+                  style={[
+                    styles.feedbackTypeCard,
+                    feedbackType === type.value && styles.selectedFeedbackTypeCard
+                  ]}
+                  onPress={() => setFeedbackType(type.value)}
                 >
-                  {feedbackTypes.map((type) => (
-                    <View key={type.value} style={styles.radioItem}>
-                      <RadioButton
-                        value={type.value}
-                        color="#B71C1C"
-                      />
-                      <Text style={styles.radioLabel}>{type.label}</Text>
-                    </View>
-                  ))}
-                </RadioButton.Group>
-              </View>
-
-              {/* Rating Section (only for general feedback) */}
-              {feedbackType === 'general' && (
-                <Animatable.View animation="fadeIn" style={styles.section}>
-                  {renderStarRating()}
-                </Animatable.View>
-              )}
-
-              {/* Common Issues (for bug reports and parking issues) */}
-              {(feedbackType === 'bug' || feedbackType === 'parking') && (
-                <Animatable.View animation="fadeIn" style={styles.section}>
-                  <Text style={styles.sectionTitle}>Related Issues (Optional)</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    Select any that apply to help us understand your issue better
-                  </Text>
-                  <View style={styles.chipsContainer}>
-                    {commonIssues.map((issue) => (
-                      <Chip
-                        key={issue}
-                        selected={selectedIssues.includes(issue)}
-                        onPress={() => handleIssueToggle(issue)}
-                        style={[
-                          styles.chip,
-                          selectedIssues.includes(issue) && styles.selectedChip
-                        ]}
-                        textStyle={[
-                          styles.chipText,
-                          selectedIssues.includes(issue) && styles.selectedChipText
-                        ]}
-                      >
-                        {issue}
-                      </Chip>
-                    ))}
+                  <View style={[
+                    styles.feedbackTypeIcon,
+                    feedbackType === type.value && styles.selectedFeedbackTypeIcon
+                  ]}>
+                    <Ionicons 
+                      name={type.icon as any} 
+                      size={24} 
+                      color={feedbackType === type.value ? 'white' : '#B22020'} 
+                    />
                   </View>
-                </Animatable.View>
-              )}
+                  <Text style={[
+                    styles.feedbackTypeLabel,
+                    feedbackType === type.value && styles.selectedFeedbackTypeLabel
+                  ]}>
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
-              {/* Message Input */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Your Message *</Text>
-                <TextInput
-                  mode="outlined"
-                  placeholder={
-                    feedbackType === 'general' 
-                      ? "Tell us what you think about the VALET app..."
-                      : feedbackType === 'bug'
-                      ? "Describe the bug you encountered and when it happened..."
-                      : feedbackType === 'feature'
-                      ? "What feature would you like to see in VALET..."
-                      : "Describe the parking issue you experienced..."
-                  }
-                  value={message}
-                  onChangeText={setMessage}
-                  multiline
-                  numberOfLines={4}
-                  style={styles.textInput}
-                  outlineColor="#E0E0E0"
-                  activeOutlineColor="#B71C1C"
-                />
+          {/* Rating Section (only for general feedback) */}
+          {feedbackType === 'general' && (
+            <View style={styles.section}>
+              <View style={styles.card}>
+                {renderStarRating()}
               </View>
+            </View>
+          )}
 
-              {/* Email Input */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Email (Optional)</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Leave your email if you'd like us to follow up with you
-                </Text>
+          {/* Common Issues (for bug reports and parking issues) */}
+          {(feedbackType === 'bug' || feedbackType === 'parking') && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Related Issues (Optional)</Text>
+              <Text style={styles.sectionSubtitle}>
+                Select any that apply to help us understand your issue better
+              </Text>
+              <View style={styles.card}>
+                <View style={styles.chipsContainer}>
+                  {commonIssues.map((issue) => (
+                    <TouchableOpacity
+                      key={issue}
+                      style={[
+                        styles.chip,
+                        selectedIssues.includes(issue) && styles.selectedChip
+                      ]}
+                      onPress={() => handleIssueToggle(issue)}
+                    >
+                      <Text style={[
+                        styles.chipText,
+                        selectedIssues.includes(issue) && styles.selectedChipText
+                      ]}>
+                        {issue}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Message Input */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your Message *</Text>
+            <View style={styles.card}>
+              <TextInput
+                placeholder={
+                  feedbackType === 'general' 
+                    ? "Tell us what you think about the VALET app..."
+                    : feedbackType === 'bug'
+                    ? "Describe the bug you encountered and when it happened..."
+                    : feedbackType === 'feature'
+                    ? "What feature would you like to see in VALET..."
+                    : "Describe the parking issue you experienced..."
+                }
+                value={message}
+                onChangeText={setMessage}
+                multiline
+                numberOfLines={4}
+                style={styles.textInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          {/* Email Input */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Email (Optional)</Text>
+            <Text style={styles.sectionSubtitle}>
+              Leave your email if you'd like us to follow up with you
+            </Text>
+            <View style={styles.emailCard}>
+              <View style={styles.emailInputContainer}>
+                <Ionicons name="mail-outline" size={20} color="#666" style={styles.emailIcon} />
                 <TextInput
-                  mode="outlined"
                   placeholder="your.email@example.com"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  style={styles.textInput}
-                  outlineColor="#E0E0E0"
-                  activeOutlineColor="#B71C1C"
-                  left={<TextInput.Icon icon={() => <MaterialIcons name="email" size={20} color="#666" />} />}
+                  style={styles.emailInput}
+                  placeholderTextColor="#999"
                 />
               </View>
-            </Card.Content>
-          </Card>
-        </Animatable.View>
+            </View>
+          </View>
 
-        {/* Submit Button */}
-        <Animatable.View animation="fadeInUp" delay={400} style={styles.submitContainer}>
-          <Button
-            mode="contained"
-            onPress={handleSubmit}
-            loading={loading}
-            disabled={loading}
-            style={styles.submitButton}
-            buttonColor="#B71C1C"
-            contentStyle={styles.submitButtonContent}
-            icon={() => <MaterialIcons name="send" size={20} color="#FFFFFF" />}
-          >
-            {loading ? 'Submitting...' : 'Submit Feedback'}
-          </Button>
-        </Animatable.View>
+          {/* Submit Button */}
+          <View style={styles.submitSection}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={loading}
+              style={[styles.submitButton, loading && styles.disabledButton]}
+            >
+              <LinearGradient
+                colors={loading ? ['#999', '#666'] : ['#B22020', '#4C0E0E']}
+                style={styles.submitButtonGradient}
+              >
+                <View style={styles.submitButtonContent}>
+                  <Ionicons 
+                    name={loading ? "hourglass-outline" : "send"} 
+                    size={20} 
+                    color="white" 
+                    style={styles.submitButtonIcon}
+                  />
+                  <Text style={styles.submitButtonText}>
+                    {loading ? 'Submitting...' : 'Submit Feedback'}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
 
-        {/* Contact Info */}
-        <Animatable.View animation="fadeInUp" delay={600}>
-          <Card style={styles.contactCard}>
-            <Card.Content>
+          {/* Contact Info Card */}
+          <View style={styles.section}>
+            <View style={[styles.card, styles.contactCard]}>
               <View style={styles.contactHeader}>
-                <MaterialIcons name="headset-mic" size={24} color="#B71C1C" />
+                <Ionicons name="headset" size={24} color="#B22020" />
                 <Text style={styles.contactTitle}>Need immediate assistance?</Text>
               </View>
               <Text style={styles.contactText}>
@@ -288,114 +344,168 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
               <View style={styles.contactMethods}>
                 <View style={styles.contactMethod}>
-                  <MaterialIcons name="email" size={16} color="#666" />
+                  <Ionicons name="mail" size={16} color="#666" />
                   <Text style={styles.contactMethodText}>support@valet-parking.com</Text>
                 </View>
                 <View style={styles.contactMethod}>
-                  <MaterialIcons name="phone" size={16} color="#666" />
-                  <Text style={styles.contactMethodText}>+63 123 456 7890</Text>
+                  <Ionicons name="call" size={16} color="#666" />
+                  <Text style={styles.contactMethodText}>+63 919 929 6588</Text>
                 </View>
                 <View style={styles.contactMethod}>
-                  <MaterialIcons name="schedule" size={16} color="#666" />
+                  <Ionicons name="time" size={16} color="#666" />
                   <Text style={styles.contactMethodText}>24/7 Support Available</Text>
                 </View>
               </View>
-            </Card.Content>
-          </Card>
-        </Animatable.View>
+            </View>
+          </View>
 
-        {/* Thank You Message */}
-        <Animatable.View animation="fadeInUp" delay={800}>
-          <Card style={styles.thankYouCard}>
-            <Card.Content>
-              <Text style={styles.thankYouText}>
-                🚗 Thank you for helping us make VALET better! Your feedback is valuable to us and helps improve the parking experience for everyone at USJ-R.
-              </Text>
-            </Card.Content>
-          </Card>
-        </Animatable.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F5F7FA',
+  },
+  header: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    marginBottom: 15,
+  },
+  backButton: {
+    padding: 5,
+  },
+  headerTitleContainer: {
+    gap: 10,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins_600SemiBold',
+    alignItems: 'flex-start',
+    color: 'white',
+  },
+  headerPlaceholder: {
+    width: 34,
+  },
+  headerDescriptionContainer: {
+    alignItems: 'center',
+  },
+  headerDescription: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+  },
+  contentContainer: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
   },
-  card: {
-    margin: 20,
-    elevation: 4,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 22,
-  },
   section: {
-    marginBottom: 25,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#1F2937',
+    marginBottom: 8,
+    marginTop: 10,
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
+    fontFamily: 'Poppins_400Regular',
+    color: '#6B7280',
+    marginBottom: 12,
     lineHeight: 20,
   },
-  radioItem: {
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  feedbackTypesContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  feedbackTypeCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  selectedFeedbackTypeCard: {
+    borderColor: '#B22020',
+    backgroundColor: '#FEF2F2',
+  },
+  feedbackTypeIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
   },
-  radioLabel: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 8,
-    flex: 1,
+  selectedFeedbackTypeIcon: {
+    backgroundColor: '#B22020',
+  },
+  feedbackTypeLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins_500Medium',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  selectedFeedbackTypeLabel: {
+    color: '#B22020',
+    fontFamily: 'Poppins_600SemiBold',
   },
   ratingContainer: {
     alignItems: 'center',
   },
   ratingLabel: {
     fontSize: 16,
-    color: '#333',
-    marginBottom: 15,
+    fontFamily: 'Poppins_500Medium',
+    color: '#374151',
+    marginBottom: 20,
     textAlign: 'center',
   },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 15,
+    gap: 8,
+    marginBottom: 16,
   },
   starButton: {
-    paddingHorizontal: 5,
+    padding: 4,
   },
   ratingText: {
     fontSize: 16,
-    color: '#B71C1C',
-    fontWeight: 'bold',
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B22020',
   },
   chipsContainer: {
     flexDirection: 'row',
@@ -403,55 +513,110 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    marginBottom: 8,
-    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   selectedChip: {
-    backgroundColor: '#B71C1C',
+    backgroundColor: '#B22020',
+    borderColor: '#B22020',
   },
   chipText: {
-    color: '#333',
+    fontSize: 14,
+    fontFamily: 'Poppins_500Medium',
+    color: '#374151',
   },
   selectedChipText: {
-    color: '#FFFFFF',
+    color: 'white',
   },
   textInput: {
-    backgroundColor: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#374151',
+    textAlignVertical: 'top',
+    minHeight: 100,
   },
-  submitContainer: {
-    marginHorizontal: 20,
+  emailCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emailInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  emailIcon: {
+    marginRight: 8,
+    marginLeft: 10
+  },
+  emailInput: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    color: '#374151',
+    height: 40,
+    marginTop: 5
+  },
+  submitSection: {
+    paddingHorizontal: 20,
     marginBottom: 20,
   },
   submitButton: {
-    borderRadius: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  submitButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
   submitButtonContent: {
-    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonIcon: {
+    marginRight: 8,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'white',
   },
   contactCard: {
-    margin: 20,
-    marginTop: 0,
-    elevation: 2,
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#EBF8FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   contactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   contactTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#1F2937',
     marginLeft: 8,
   },
   contactText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
+    fontFamily: 'Poppins_400Regular',
+    color: '#6B7280',
+    marginBottom: 16,
   },
   contactMethods: {
-    gap: 8,
+    gap: 12,
   },
   contactMethod: {
     flexDirection: 'row',
@@ -459,20 +624,31 @@ const styles = StyleSheet.create({
   },
   contactMethodText: {
     fontSize: 14,
-    color: '#666',
+    fontFamily: 'Poppins_500Medium',
+    color: '#374151',
     marginLeft: 8,
   },
   thankYouCard: {
-    margin: 20,
-    marginTop: 0,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
     marginBottom: 40,
-    elevation: 2,
-    backgroundColor: '#E8F5E8',
+  },
+  thankYouHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  thankYouTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#065F46',
+    marginLeft: 8,
   },
   thankYouText: {
     fontSize: 14,
-    color: '#4CAF50',
-    textAlign: 'center',
+    fontFamily: 'Poppins_400Regular',
+    color: '#047857',
     lineHeight: 22,
   },
 });
