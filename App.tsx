@@ -3,10 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, Alert, Platform } from 'react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-
 
 // Screens
 import SplashScreen from './src/screens/SplashScreen';
@@ -80,66 +80,68 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <PaperProvider theme={theme}>
-      <NavigationContainer>
-        <StatusBar barStyle="light-content" backgroundColor="#B22020" />
-        <Stack.Navigator
-          initialRouteName="Splash"
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: '#B71C1C',
-            },
-            headerTintColor: '#FFFFFF',
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
-          }}
-        >
-          <Stack.Screen 
-            name="Splash" 
-            component={SplashScreen} 
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Home" 
-            component={HomeScreen} 
-            options={{ headerShown: false }}
-          />
-         
-          <Stack.Screen 
-            name="ParkingMap" 
-            component={ParkingMapScreen}
-            options={{ title: 'Parking Map' }}
-          />
-          
-          <Stack.Screen 
-            name="Feedback" 
-            component={FeedbackScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Settings" 
-            component={SettingsScreen}
-            options={{ title: 'Settings' }}
-          />
-          <Stack.Screen 
-            name="Profile" 
-            component={ProfileScreen}
-            options={{ title: 'Profile' }}
-          />
-          <Stack.Screen 
-            name="ApiTest" 
-            component={ApiTestScreen}
-            options={{ 
-              title: 'API Test',
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider theme={theme}>
+        <NavigationContainer>
+          <StatusBar barStyle="light-content" backgroundColor="#B22020" />
+          <Stack.Navigator
+            initialRouteName="Splash"
+            screenOptions={{
               headerStyle: {
-                backgroundColor: '#4CAF50',
+                backgroundColor: '#B71C1C',
+              },
+              headerTintColor: '#FFFFFF',
+              headerTitleStyle: {
+                fontWeight: 'bold',
               },
             }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </PaperProvider>
+          >
+            <Stack.Screen 
+              name="Splash" 
+              component={SplashScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Home" 
+              component={HomeScreen} 
+              options={{ headerShown: false }}
+            />
+           
+            <Stack.Screen 
+              name="ParkingMap" 
+              component={ParkingMapScreen}
+              options={{ title: 'Parking Map' }}
+            />
+            
+            <Stack.Screen 
+              name="Feedback" 
+              component={FeedbackScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Settings" 
+              component={SettingsScreen}
+              options={{ title: 'Settings' }}
+            />
+            <Stack.Screen 
+              name="Profile" 
+              component={ProfileScreen}
+              options={{ title: 'Profile' }}
+            />
+            <Stack.Screen 
+              name="ApiTest" 
+              component={ApiTestScreen}
+              options={{ 
+                title: 'API Test',
+                headerStyle: {
+                  backgroundColor: '#4CAF50',
+                },
+              }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 };
 

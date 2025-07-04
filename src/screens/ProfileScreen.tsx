@@ -10,7 +10,6 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Card, List, Button, Divider, Chip } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Animatable from 'react-native-animatable';
 
 // Define types locally
 type RootStackParamList = {
@@ -160,10 +159,14 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const renderAchievement = (achievement: Achievement) => (
-    <View key={achievement.id} style={[
-      styles.achievementItem,
-      { opacity: achievement.unlocked ? 1 : 0.5 }
-    ]}>
+    <TouchableOpacity 
+      key={achievement.id} 
+      style={[
+        styles.achievementItem,
+        { opacity: achievement.unlocked ? 1 : 0.6 }
+      ]}
+      activeOpacity={0.7}
+    >
       <View style={[styles.achievementIcon, { backgroundColor: achievement.color }]}>
         <MaterialIcons
           name={achievement.icon as any}
@@ -176,353 +179,345 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.achievementDescription}>{achievement.description}</Text>
         {achievement.unlocked && achievement.dateUnlocked && (
           <Text style={styles.achievementDate}>
-            Unlocked: {new Date(achievement.dateUnlocked).toLocaleDateString()}
+            {new Date(achievement.dateUnlocked).toLocaleDateString()}
           </Text>
         )}
       </View>
       {achievement.unlocked && (
         <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Profile Header */}
-      <Animatable.View animation="fadeInDown" delay={200}>
-        <Card style={styles.profileCard}>
-          <Card.Content>
-            <View style={styles.profileHeader}>
-              <TouchableOpacity style={styles.avatar} onPress={handleEditProfile}>
-                <MaterialIcons name="person" size={50} color="#B71C1C" />
-                <View style={styles.editBadge}>
-                  <MaterialIcons name="edit" size={12} color="#FFFFFF" />
+    <View style={styles.container}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Profile Section */}
+        <View>
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <MaterialIcons name="person" size={40} color="#B22020" />
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={styles.userName}>John Doe</Text>
+                <Text style={styles.userEmail}>john.doe@example.com</Text>
+                <View style={styles.membershipBadge}>
+                  <Text style={styles.roleText}>STUDENT</Text>
                 </View>
-              </TouchableOpacity>
-              <Text style={styles.userName}>VALET User</Text>
-              <Text style={styles.userEmail}>user@example.com</Text>
-              <View style={styles.membershipInfo}>
-                <Chip style={styles.memberChip} textStyle={styles.memberChipText}>
-                  Premium Member
-                </Chip>
-                <Text style={styles.userSince}>Member since January 2025</Text>
               </View>
             </View>
-          </Card.Content>
-        </Card>
-      </Animatable.View>
+          </View>
+        </View>
 
-      {/* Parking Statistics */}
-      <Animatable.View animation="fadeInUp" delay={400}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="analytics" size={24} color="#B71C1C" />
-              <Text style={styles.sectionTitle}>Your Parking Analytics</Text>
-              <TouchableOpacity onPress={handleShareStats} style={styles.shareButton}>
-                <MaterialIcons name="share" size={20} color="#B71C1C" />
-              </TouchableOpacity>
+        {/* Quick Stats */}
+        <View>
+          <View style={styles.quickStatsContainer}>
+            <View style={styles.statCard}>
+              <MaterialIcons name="local-parking" size={24} color="#B22020" />
+              <Text style={styles.statNumber}>{userStats.timesParked}</Text>
+              <Text style={styles.statLabel}>Times Parked</Text>
             </View>
+            <View style={styles.statCard}>
+              <MaterialIcons name="schedule" size={24} color="#B22020" />
+              <Text style={styles.statNumber}>{userStats.averageHours}</Text>
+              <Text style={styles.statLabel}>Avg Hours</Text>
+            </View>
+            <View style={styles.statCard}>
+              <MaterialIcons name="eco" size={24} color="#B22020" />
+              <Text style={styles.statNumber}>{userStats.co2Saved}</Text>
+              <Text style={styles.statLabel}>CO2 Saved</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Menu Options */}
+        <View>
+          <View style={styles.menuSection}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleViewHistory}>
+              <View style={styles.menuIconContainer}>
+                <MaterialIcons name="history" size={24} color="#B22020" />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Parking History</Text>
+                <Text style={styles.menuSubtitle}>View your past parking sessions</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#999" />
+            </TouchableOpacity>
+
+            <View style={styles.menuDivider} />
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Feedback')}>
+              <View style={styles.menuIconContainer}>
+                <MaterialIcons name="feedback" size={24} color="#B22020" />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Feedback</Text>
+                <Text style={styles.menuSubtitle}>Help us improve VALET</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#999" />
+            </TouchableOpacity>
+
+            <View style={styles.menuDivider} />
+
+            <TouchableOpacity style={styles.menuItem} onPress={handleShareStats}>
+              <View style={styles.menuIconContainer}>
+                <MaterialIcons name="share" size={24} color="#B22020" />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Share Stats</Text>
+                <Text style={styles.menuSubtitle}>Share your parking achievements</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#999" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+  
+        {/* Account Management */}
+        <View>
+          <View style={styles.accountSection}>
+            <Text style={styles.sectionTitle}>Account</Text>
             
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <MaterialIcons name="local-parking" size={24} color="#4CAF50" />
-                <Text style={styles.statNumber}>{userStats.timesParked}</Text>
-                <Text style={styles.statLabel}>Times Parked</Text>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => Alert.alert('Privacy Settings', 'Manage your privacy and data settings')}
+            >
+              <View style={styles.menuIconContainer}>
+                <MaterialIcons name="privacy-tip" size={24} color="#B22020" />
               </View>
-              <View style={styles.statItem}>
-                <MaterialIcons name="schedule" size={24} color="#2196F3" />
-                <Text style={styles.statNumber}>{userStats.averageHours}</Text>
-                <Text style={styles.statLabel}>Avg. Hours</Text>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Privacy Settings</Text>
+                <Text style={styles.menuSubtitle}>Control your data and privacy</Text>
               </View>
-              <View style={styles.statItem}>
-                <MaterialIcons name="favorite" size={24} color="#E91E63" />
-                <Text style={styles.statNumber}>{userStats.favoriteFloor}</Text>
-                <Text style={styles.statLabel}>Favorite Floor</Text>
+              <MaterialIcons name="chevron-right" size={24} color="#999" />
+            </TouchableOpacity>
+
+            <View style={styles.menuDivider} />
+
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => Alert.alert('Export Data', 'Download your parking data')}
+            >
+              <View style={styles.menuIconContainer}>
+                <MaterialIcons name="download" size={24} color="#B22020" />
               </View>
-            </View>
-
-            <View style={styles.additionalStats}>
-              <View style={styles.additionalStatItem}>
-                <MaterialIcons name="eco" size={20} color="#4CAF50" />
-                <Text style={styles.additionalStatText}>
-                  {userStats.co2Saved}kg CO2 saved by efficient parking
-                </Text>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Export Data</Text>
+                <Text style={styles.menuSubtitle}>Download your parking statistics</Text>
               </View>
-              <View style={styles.additionalStatItem}>
-                <MaterialIcons name="access-time" size={20} color="#FF9800" />
-                <Text style={styles.additionalStatText}>
-                  {userStats.totalHours} total hours parked
-                </Text>
-              </View>
-              <View style={styles.additionalStatItem}>
-                <MaterialIcons name="account-balance-wallet" size={20} color="#9C27B0" />
-                <Text style={styles.additionalStatText}>
-                  ₱{userStats.moneySpent.toLocaleString()} total spent
-                </Text>
-              </View>
-            </View>
-          </Card.Content>
-        </Card>
-      </Animatable.View>
+              <MaterialIcons name="chevron-right" size={24} color="#999" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      {/* Achievements */}
-      <Animatable.View animation="fadeInUp" delay={600}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="emoji-events" size={24} color="#B71C1C" />
-              <Text style={styles.sectionTitle}>Achievements</Text>
-              <View style={styles.achievementProgress}>
-                <Text style={styles.achievementProgressText}>
-                  {achievements.filter(a => a.unlocked).length}/{achievements.length}
-                </Text>
-              </View>
-            </View>
+        {/* Sign Out Button */}
+        <View>
+          <TouchableOpacity 
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+            disabled={loading}
+          >
+            <MaterialIcons name="logout" size={20} color="#B22020" />
+            <Text style={styles.signOutText}>
+              {loading ? 'Signing Out...' : 'Sign Out'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-            <View style={styles.achievementsList}>
-              {achievements.map(renderAchievement)}
-            </View>
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* Quick Actions */}
-      <Animatable.View animation="fadeInUp" delay={800}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="speed" size={24} color="#B71C1C" />
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
-            </View>
-
-            <View style={styles.quickActions}>
-              <TouchableOpacity style={styles.quickAction} onPress={handleViewHistory}>
-                <MaterialIcons name="history" size={24} color="#4CAF50" />
-                <Text style={styles.quickActionText}>View History</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('Settings')}>
-                <MaterialIcons name="settings" size={24} color="#2196F3" />
-                <Text style={styles.quickActionText}>Settings</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('Feedback')}>
-                <MaterialIcons name="feedback" size={24} color="#FF9800" />
-                <Text style={styles.quickActionText}>Feedback</Text>
-              </TouchableOpacity>
-            </View>
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* Account Management */}
-      <Animatable.View animation="fadeInUp" delay={1000}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="account-circle" size={24} color="#B71C1C" />
-              <Text style={styles.sectionTitle}>Account Management</Text>
-            </View>
-            
-            <List.Item
-              title="Edit Profile"
-              description="Update your personal information and preferences"
-              left={() => <MaterialIcons name="edit" size={24} color="#2196F3" />}
-              onPress={handleEditProfile}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Parking Preferences"
-              description="Set your default parking preferences"
-              left={() => <MaterialIcons name="tune" size={24} color="#4CAF50" />}
-              onPress={() => Alert.alert('Preferences', 'Set your preferred floor, notification timing, and parking duration preferences.')}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Privacy Settings"
-              description="Manage your privacy and data settings"
-              left={() => <MaterialIcons name="privacy-tip" size={24} color="#9C27B0" />}
-              onPress={() => Alert.alert('Privacy Settings', 'Control what data is collected and how it\'s used to improve your parking experience.')}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Export Data"
-              description="Download your parking data and statistics"
-              left={() => <MaterialIcons name="download" size={24} color="#FF9800" />}
-              onPress={() => Alert.alert('Export Data', 'Download your complete parking history and statistics as a CSV file.')}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Delete Account"
-              description="Permanently delete your account and data"
-              left={() => <MaterialIcons name="delete-forever" size={24} color="#F44336" />}
-              onPress={() => Alert.alert(
-                'Delete Account',
-                'This action cannot be undone. All your data will be permanently deleted.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive' },
-                ]
-              )}
-            />
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* Sign Out Button */}
-      <Animatable.View animation="fadeInUp" delay={1200}>
-        <Button
-          mode="outlined"
-          onPress={handleSignOut}
-          loading={loading}
-          style={styles.signOutButton}
-          icon={() => <MaterialIcons name="logout" size={20} color="#F44336" />}
-          textColor="#F44336"
-        >
-          {loading ? 'Signing Out...' : 'Sign Out'}
-        </Button>
-      </Animatable.View>
-    </ScrollView>
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F8F9FA',
   },
-  profileCard: {
-    margin: 20,
-    elevation: 6,
-    backgroundColor: '#FFEBEE',
-  },
-  profileHeader: {
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 20,
+    justifyContent: 'space-between',
+    backgroundColor: '#B22020',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  editButton: {
+    padding: 8,
+  },
+  content: {
+    flex: 1,
+  },
+  profileSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  avatarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FFFFFF',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
-    elevation: 4,
-    position: 'relative',
+    marginRight: 16,
   },
-  editBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#B71C1C',
-    justifyContent: 'center',
-    alignItems: 'center',
+  profileInfo: {
+    flex: 1,
   },
   userName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
+    color: '#4C0E0E',
+    marginBottom: 4,
   },
   userEmail: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    marginBottom: 10,
-  },
-  membershipInfo: {
-    alignItems: 'center',
-  },
-  memberChip: {
-    backgroundColor: '#B71C1C',
     marginBottom: 8,
   },
-  memberChipText: {
-    color: '#FFFFFF',
+  membershipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  roleText: {
     fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+    fontWeight: '600',
   },
-  userSince: {
+  quickStatsContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 16,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4C0E0E',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  menuSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  menuIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  menuContent: {
+    flex: 1,
+  },
+  menuTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  menuSubtitle: {
     fontSize: 14,
-    color: '#999',
-    fontStyle: 'italic',
+    color: '#666',
   },
-  card: {
-    margin: 20,
-    marginBottom: 10,
-    elevation: 4,
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginLeft: 68,
+  },
+  achievementsSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginLeft: 8,
-    flex: 1,
+    color: '#4C0E0E',
   },
-  shareButton: {
-    padding: 8,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#B71C1C',
-    marginTop: 8,
-    marginBottom: 5,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  additionalStats: {
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    paddingTop: 15,
-    gap: 10,
-  },
-  additionalStatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  additionalStatText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-  },
-  achievementProgress: {
-    backgroundColor: '#B71C1C',
-    borderRadius: 12,
+  achievementCounter: {
+    backgroundColor: '#B22020',
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderRadius: 12,
   },
-  achievementProgressText: {
-    color: '#FFFFFF',
+  achievementCounterText: {
     fontSize: 12,
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
   achievementsList: {
@@ -536,9 +531,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   achievementIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -547,42 +542,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   achievementTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
     marginBottom: 2,
   },
   achievementDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     marginBottom: 2,
   },
   achievementDate: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
     fontStyle: 'italic',
   },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  quickAction: {
-    alignItems: 'center',
-    padding: 15,
-    flex: 1,
-  },
-  quickActionText: {
-    fontSize: 14,
-    color: '#333',
-    marginTop: 8,
-    textAlign: 'center',
-    fontWeight: '600',
+  accountSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   signOutButton: {
-    margin: 20,
-    marginTop: 10,
-    marginBottom: 40,
-    borderColor: '#F44336',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#B22020',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  signOutText: {
+    fontSize: 16,
+    color: '#B22020',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  bottomSpacer: {
+    height: 24,
   },
 });
 

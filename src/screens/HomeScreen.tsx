@@ -16,8 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParking';
-
-const { width } = Dimensions.get('window');
+import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
+import AppLoading from 'expo-app-loading';
 
 // Define navigation types
 type RootStackParamList = {
@@ -89,6 +89,8 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 };
 
 const HomeScreen: React.FC = () => {
+  
+  const { width } = Dimensions.get('window');
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [parkingData, setParkingData] = useState<ParkingStats>({
     totalSpots: 0,
@@ -98,6 +100,7 @@ const HomeScreen: React.FC = () => {
     lastUpdated: '',
     isLive: false,
   });
+
   const [refreshing, setRefreshing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [loading, setLoading] = useState(true);
@@ -113,6 +116,7 @@ const HomeScreen: React.FC = () => {
       default: return `${floorNumber}th Floor`;
     }
   };
+  
 
   // Handle floor card press
   const handleFloorPress = (floor: any) => {
@@ -317,7 +321,9 @@ const HomeScreen: React.FC = () => {
   }
 
   return (
+    
     <View style={styles.container}>
+      
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
       
       {/* Header with Gradient */}
@@ -540,10 +546,6 @@ const HomeScreen: React.FC = () => {
           <Ionicons name="map" size={24} color="white" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Feedback')}>
-          <Ionicons name="chatbubble-outline" size={24} color="white" />
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Profile')}>
           <Ionicons name="person-outline" size={24} color="white" />
         </TouchableOpacity>
@@ -567,7 +569,6 @@ const HomeScreen: React.FC = () => {
         )}
     </View>
   );
-  
 };
 
 const styles = StyleSheet.create({
@@ -587,6 +588,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginTop: 16,
+    fontFamily: 'Poppins_600SemiBold'
   },
   loadingSubtext: {
     fontSize: 14,
@@ -790,18 +792,19 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
+  //TABS PART
   tabBar: {
     flexDirection: 'row',
     backgroundColor: '#333',
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginHorizontal: 20,
+    paddingHorizontal: 40,
+    marginHorizontal: 40,
     marginBottom: 20,
     borderRadius: 25,
     justifyContent: 'space-around',
   },
   tabItem: {
-    padding: 8,
+    padding: 10,
     borderRadius: 20,
   },
   activeTab: {
