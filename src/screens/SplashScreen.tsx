@@ -16,7 +16,7 @@ const SplashScreen: React.FC = () => {
   const navigation = useNavigation();
 
   const handleExploreNow = () => {
-    navigation.navigate('Home' as never);
+    navigation.navigate('Register' as never);
   };
 
   const [fontsLoaded] = useFonts({

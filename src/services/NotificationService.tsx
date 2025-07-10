@@ -18,39 +18,32 @@ class NotificationServiceClass {
 
   async initialize(): Promise<void> {
     try {
-      // Configure notification behavior
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
-            shouldShowAlert: true,      // Show alert popup
-            shouldPlaySound: true,      // Play notification sound
-            shouldSetBadge: false,      // Don't update app badge
-            shouldShowBanner: true,     // Show notification banner (iOS)
-            shouldShowList: true,       // Show in notification list
+            shouldShowAlert: true,      
+            shouldPlaySound: true,    
+            shouldSetBadge: false,  
+            shouldShowBanner: true,     
+            shouldShowList: true, 
         }),
         });
-
-      // Create notification channels for Android
       if (Platform.OS === 'android') {
         await this.createNotificationChannels();
       }
 
-      // Register for push notifications
       await this.registerForPushNotifications();
-
-      console.log('✅ NotificationService initialized successfully');
     } catch (error) {
-      console.error('❌ Error initializing NotificationService:', error);
+      alert('❌ Error initializing NotificationService:'+ error);
     }
   }
 
   private async createNotificationChannels(): Promise<void> {
-    // Main parking updates channel
     await Notifications.setNotificationChannelAsync('parking-updates', {
       name: 'VALET Parking Updates',
       description: 'Real-time notifications for parking spot availability',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#B71C1C', // VALET red color
+      lightColor: '#B71C1C', 
       sound: 'default',
       enableLights: true,
       enableVibrate: true,
@@ -140,7 +133,6 @@ class NotificationServiceClass {
     try {
       const settings = await this.getNotificationSettings();
       
-      // Check if notifications are enabled
       if (!settings.spotAvailable && channelId === 'parking-updates') return;
       if (!settings.floorUpdates && channelId === 'floor-updates') return;
       if (!settings.maintenanceAlerts && channelId === 'maintenance-alerts') return;
@@ -153,11 +145,10 @@ class NotificationServiceClass {
           sound: settings.sound ? 'default' : undefined,
           vibrate: settings.vibration ? [0, 250, 250, 250] : undefined,
         },
-        trigger: null, // Show immediately
+        trigger: null, 
         identifier: `valet_${Date.now()}`,
       });
 
-      console.log('📳 Notification sent:', title);
     } catch (error) {
       console.error('Error showing notification:', error);
     }
@@ -291,7 +282,6 @@ class NotificationServiceClass {
   async cancelAllNotifications(): Promise<void> {
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
-      console.log('🚫 All notifications cancelled');
     } catch (error) {
       console.error('Error cancelling notifications:', error);
     }
@@ -307,7 +297,6 @@ class NotificationServiceClass {
         }
       }
       
-      console.log(`🚫 Cancelled all ${type} notifications`);
     } catch (error) {
       console.error('Error cancelling notifications by type:', error);
     }
@@ -338,9 +327,9 @@ class NotificationServiceClass {
   async saveNotificationSettings(settings: NotificationSettings): Promise<void> {
     try {
       await AsyncStorage.setItem('notificationSettings', JSON.stringify(settings));
-      console.log('💾 Notification settings saved:', settings);
+      alert('💾 Notification settings saved:'+ settings);
     } catch (error) {
-      console.error('Error saving notification settings:', error);
+      alert('Error saving notification settings:'+ error);
     }
   }
 

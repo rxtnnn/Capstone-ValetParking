@@ -25,7 +25,7 @@ export interface FeedbackData {
   rating?: number;
   email?: string;
   issues?: string[];
-  timestamp: any; // Firestore timestamp
+  timestamp: any;
   status: 'pending' | 'reviewed' | 'resolved';
   userId?: string;
   deviceInfo?: {

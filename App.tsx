@@ -16,7 +16,7 @@ import FeedbackScreen from './src/screens/FeedbackScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import ApiTestScreen from './src/screens/ApiTestScreen';
-
+import RegisterScreen from './src/screens/RegisterScreen';
 // Services
 import { NotificationService } from './src/services/NotificationService';
 
@@ -44,6 +44,7 @@ export type RootStackParamList = {
   Settings: undefined;
   Profile: undefined;
   ApiTest: undefined;
+  Register: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -99,6 +100,11 @@ const App: React.FC = () => {
             <Stack.Screen 
               name="Splash" 
               component={SplashScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Register" 
+              component={RegisterScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 

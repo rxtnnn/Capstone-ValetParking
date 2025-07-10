@@ -38,27 +38,53 @@ interface ParkingSection {
   isFull: boolean;
 }
 
+interface ApiParkingData {
+  id: number;
+  sensor_id: number;
+  is_occupied: number;
+  distance_cm: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const ParkingMapScreen: React.FC = () => {
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [parkingData, setParkingData] = useState<ParkingSpot[]>([]);
   const [highlightedSection, setHighlightedSection] = useState<string | null>(null);
   const [navigationPath, setNavigationPath] = useState<{x: number, y: number}[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-
-  // ADD THESE TWO LINES:
   const bottomPanelY = useSharedValue(0);
   const bottomPanelPanRef = useRef<PanGestureHandler>(null);
+  const panRef = useRef<PanGestureHandler>(null);
+  const pinchRef = useRef<PinchGestureHandler>(null);
 
-const panRef = useRef<PanGestureHandler>(null);
-const pinchRef = useRef<PinchGestureHandler>(null);
-  // Mock parking sections data (top indicators)
-  const parkingSections: ParkingSection[] = [
-    { id: 'A', label: 'A', totalSlots: 2, availableSlots: 2, isFull: false },
+  // API Configuration
+  const API_URL = 'https://valet.up.railway.app/api/parking';
+  const UPDATE_INTERVAL = 5000; // 5 seconds
+
+  // Mapping from sensor_id to spot_id
+  const sensorToSpotMapping: { [key: number]: string } = {
+    1: 'A1',   2: 'B1',   3: 'B2',   4: 'B3',   5: 'B4',
+    6: 'C1',   7: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
+    11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
+    16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
+    21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
+    26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
+    31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
+    36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
+    41: 'J4',  42: 'J5'
+  };
+
+  // Mock parking sections data (will be updated based on real data)
+  const [parkingSections, setParkingSections] = useState<ParkingSection[]>([
+    { id: 'A', label: 'A', totalSlots: 1, availableSlots: 1, isFull: false },
     { id: 'B', label: 'B', totalSlots: 4, availableSlots: 4, isFull: false },
-    { id: 'C', label: 'C', totalSlots: 2, availableSlots: 0, isFull: true },
+    { id: 'C', label: 'C', totalSlots: 2, availableSlots: 2, isFull: false },
     { id: 'D', label: 'D', totalSlots: 7, availableSlots: 7, isFull: false },
     { id: 'E', label: 'E', totalSlots: 3, availableSlots: 3, isFull: false },
     { id: 'F', label: 'F', totalSlots: 7, availableSlots: 7, isFull: false },
@@ -66,23 +92,116 @@ const pinchRef = useRef<PinchGestureHandler>(null);
     { id: 'H', label: 'H', totalSlots: 3, availableSlots: 3, isFull: false },
     { id: 'I', label: 'I', totalSlots: 5, availableSlots: 5, isFull: false },
     { id: 'J', label: 'J', totalSlots: 5, availableSlots: 5, isFull: false },
-  ];
+  ]);
 
-  // Initialize parking spots based on the exact layout from the image
+  // Fetch parking data from API
+  const fetchParkingData = async () => {
+    try {
+      console.log('🚗 Fetching parking data from API...');
+      const response = await fetch(API_URL, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const apiData: ApiParkingData[] = await response.json();
+      console.log(`✅ Received ${apiData.length} parking records`);
+      
+      updateParkingSpots(apiData);
+      setIsConnected(true);
+      setLastUpdated(new Date().toLocaleTimeString());
+      
+    } catch (error) {
+      console.error('❌ Error fetching parking data:', error);
+      setIsConnected(false);
+      Alert.alert(
+        'Connection Error', 
+        'Unable to fetch real-time parking data. Showing last known status.',
+        [{ text: 'OK', style: 'default' }]
+      );
+    }
+  };
+
+  // Update parking spots based on API data
+  const updateParkingSpots = (apiData: ApiParkingData[]) => {
+    setParkingData(prevSpots => {
+      return prevSpots.map(spot => {
+        // Find the sensor data that corresponds to this spot
+        const sensorId = Object.keys(sensorToSpotMapping).find(
+          key => sensorToSpotMapping[parseInt(key)] === spot.id
+        );
+
+        if (sensorId) {
+          const sensorData = apiData.find(data => data.sensor_id === parseInt(sensorId));
+          if (sensorData) {
+            return {
+              ...spot,
+              isOccupied: sensorData.is_occupied === 1
+            };
+          }
+        }
+        
+        return spot;
+      });
+    });
+
+    // Update section indicators
+    updateSectionIndicators(apiData);
+  };
+
+  // Update section indicators based on real data
+  const updateSectionIndicators = (apiData: ApiParkingData[]) => {
+    setParkingSections(prevSections => {
+      return prevSections.map(section => {
+        // Find all spots in this section
+        const sectionSpots = Object.entries(sensorToSpotMapping)
+          .filter(([_, spotId]) => spotId.startsWith(section.id))
+          .map(([sensorId, _]) => parseInt(sensorId));
+
+        const totalSlots = sectionSpots.length;
+        let availableSlots = 0;
+
+        sectionSpots.forEach(sensorId => {
+          const sensorData = apiData.find(data => data.sensor_id === sensorId);
+          if (sensorData && sensorData.is_occupied === 0) {
+            availableSlots++;
+          } else if (!sensorData) {
+            // If no sensor data, assume available
+            availableSlots++;
+          }
+        });
+
+        return {
+          ...section,
+          totalSlots,
+          availableSlots,
+          isFull: availableSlots === 0
+        };
+      });
+    });
+  };
+
+  // Initialize parking spots (same as before)
   useEffect(() => {
     const spots: ParkingSpot[] = [
+      // Right edge (A1)
+      { id: 'A1', isOccupied: false, position: { x: 680, y: 110 }, width: 35, height: 35 },
+      
       // Top right section (B4, B3, B2, B1)
       { id: 'B4', isOccupied: false, position: { x: 500, y: 50 }, width: 35, height: 35 },
       { id: 'B3', isOccupied: false, position: { x: 540, y: 50 }, width: 35, height: 35 },
       { id: 'B2', isOccupied: false, position: { x: 580, y: 50 }, width: 35, height: 35 },
       { id: 'B1', isOccupied: false, position: { x: 620, y: 50 }, width: 35, height: 35 },
 
-      // Right edge (A1, A2)
-      { id: 'A1', isOccupied: false, position: { x: 680, y: 100 }, width: 35, height: 35 },
-      { id: 'A2', isOccupied: false, position: { x: 680, y: 140 }, width: 35, height: 35 },
-
       // Right side vertical spots (C2, C1)
-      { id: 'C2', isOccupied: true, position: { x: 450, y: 100 }, width: 35, height: 35 },
+      { id: 'C2', isOccupied: false, position: { x: 450, y: 100 }, width: 35, height: 35 },
       { id: 'C1', isOccupied: false, position: { x: 450, y: 140 }, width: 35, height: 35 },
 
       // Upper middle section (D7, D6, D5, D4)
@@ -121,11 +240,10 @@ const pinchRef = useRef<PinchGestureHandler>(null);
       { id: 'F6', isOccupied: false, position: { x: 360, y: 520 }, width: 35, height: 35 },
       { id: 'F7', isOccupied: false, position: { x: 400, y: 520 }, width: 35, height: 35 },
 
-      // Right side bottom vertical (G2, G1)
+      // Right side bottom vertical (G1, G2, G3, G4, G5)
       { id: 'G1', isOccupied: false, position: { x: 500, y: 590 }, width: 35, height: 35 },
       { id: 'G2', isOccupied: false, position: { x: 500, y: 630 }, width: 35, height: 35 },
       { id: 'G3', isOccupied: false, position: { x: 500, y: 670 }, width: 35, height: 35 }, 
-      // Bottom right vertical section (G5, G4)
       { id: 'G4', isOccupied: false, position: { x: 500, y: 730 }, width: 35, height: 35 },
       { id: 'G5', isOccupied: false, position: { x: 500, y: 770 }, width: 35, height: 35 },
 
@@ -143,6 +261,18 @@ const pinchRef = useRef<PinchGestureHandler>(null);
     ];
 
     setParkingData(spots);
+    
+    // Initial API call
+    fetchParkingData();
+  }, []);
+
+  // Set up periodic updates
+  useEffect(() => {
+    const interval = setInterval(fetchParkingData, UPDATE_INTERVAL);
+    
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
   const generatePathToSpot = (spotId: string) => {
@@ -271,6 +401,7 @@ const pinchRef = useRef<PinchGestureHandler>(null);
 
     return waypoints;
   };
+
   // Pan gesture handler
   const panGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
@@ -318,7 +449,7 @@ const pinchRef = useRef<PinchGestureHandler>(null);
       }
     },
   });
-    // ADD THIS ENTIRE FUNCTION:
+
   const bottomPanelGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
       context.startY = bottomPanelY.value;
@@ -344,6 +475,7 @@ const pinchRef = useRef<PinchGestureHandler>(null);
       }
     },
   });
+
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -353,12 +485,13 @@ const pinchRef = useRef<PinchGestureHandler>(null);
       ],
     };
   });
+
   const clearNavigation = () => {
     setShowNavigation(false);
     setNavigationPath([]);
     setSelectedSpot(null);
   };
-    // ADD THIS FUNCTION:
+
   const bottomPanelAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateY: bottomPanelY.value }],
@@ -391,12 +524,16 @@ const pinchRef = useRef<PinchGestureHandler>(null);
           text: 'Guide Me',
           onPress: () => {
             setShowNavigation(true);
-            // ADD THIS LINE:
             setNavigationPath(generatePathToSpot(spot.id));
           },
         },
       ]
     );
+  };
+
+  // Manual refresh function
+  const handleRefresh = () => {
+    fetchParkingData();
   };
 
   const renderParkingSpot = (spot: ParkingSpot) => {
@@ -443,7 +580,7 @@ const pinchRef = useRef<PinchGestureHandler>(null);
     >
       <Text style={styles.sectionLabel}>{section.label}</Text>
       <Text style={styles.sectionSlots}>
-        {section.isFull ? 'FULL SLOT' : `${section.availableSlots} SLOTS`}
+        {section.isFull ? 'FULL' : `${section.availableSlots} SLOTS`}
       </Text>
     </TouchableOpacity>
   );
@@ -485,10 +622,6 @@ const pinchRef = useRef<PinchGestureHandler>(null);
         {navigationPath.map((point, index) => {
           if (index === 0 || index === navigationPath.length - 1) return null;
           
-          const nextPoint = navigationPath[index + 1];
-          const deltaX = nextPoint.x - point.x;
-          const deltaY = nextPoint.y - point.y;
-          
           return (
             <View
               key={`arrow-${index}`}
@@ -511,6 +644,10 @@ const pinchRef = useRef<PinchGestureHandler>(null);
       </>
     );
   };
+
+  // Calculate total available spots
+  const totalAvailableSpots = parkingSections.reduce((sum, section) => sum + section.availableSlots, 0);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -520,18 +657,34 @@ const pinchRef = useRef<PinchGestureHandler>(null);
         colors={['#B22020', '#4C0E0E']}
         style={styles.header}
       >
-        
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
           style={styles.sectionIndicators}
           contentContainerStyle={styles.sectionIndicatorsContent}
         >
-        {parkingSections.map(renderSectionIndicator)}
-      </ScrollView>
+          {parkingSections.map(renderSectionIndicator)}
+        </ScrollView>
+        
+        {/* Connection Status Indicator */}
+        <View style={styles.connectionStatus}>
+          <View style={[
+            styles.connectionDot, 
+            { backgroundColor: isConnected ? '#4CAF50' : '#ff4444' }
+          ]} />
+          <Text style={styles.connectionText}>
+            {isConnected ? 'LIVE' : 'OFFLINE'}
+          </Text>
+        </View>
       </LinearGradient>
 
-      {/* Parking map area with pan and zoom - contained within its own frame */}
+      {/* Refresh Button */}
+      <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+        <Ionicons name="refresh" size={20} color="white" />
+        <Text style={styles.refreshText}>Refresh</Text>
+      </TouchableOpacity>
+
+      {/* Parking map area with pan and zoom */}
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
           <PinchGestureHandler
@@ -551,6 +704,7 @@ const pinchRef = useRef<PinchGestureHandler>(null);
                   {/* Render all parking spots */}
                   {parkingData.map(renderParkingSpot)}
                   {renderNavigationPath()}
+                  
                   {/* Structural elements */}
                   <View style={styles.elevator1}>
                     <Text style={styles.elevatorText}>Elevator</Text>
@@ -566,8 +720,6 @@ const pinchRef = useRef<PinchGestureHandler>(null);
                     <Text style={styles.stairsText}>STAIRS</Text>
                   </View>
                   
-                 
-                  
                   <View style={styles.youAreHere}>
                     <Text style={styles.youAreHereText}>You are here</Text>
                   </View>
@@ -575,7 +727,8 @@ const pinchRef = useRef<PinchGestureHandler>(null);
                   <View style={styles.exitSign}>
                     <Text style={styles.exitText}>EXIT</Text>
                   </View>
-                   {/* Direction arrows */}
+                  
+                  {/* Direction arrows */}
                   <View style={styles.arrow1}>
                     <Ionicons name="arrow-up" size={28} color="white" />
                   </View>
@@ -585,10 +738,10 @@ const pinchRef = useRef<PinchGestureHandler>(null);
                   <View style={styles.arrow3}>
                     <Ionicons name="arrow-back" size={28} color="white" />
                   </View>
-                 <View style={styles.arrow4}>
+                  <View style={styles.arrow4}>
                     <Ionicons name="arrow-down" size={28} color="white" />
                   </View>
-                   <View style={styles.arrow5}>
+                  <View style={styles.arrow5}>
                     <Ionicons name="arrow-down" size={28} color="white" />
                   </View>
                   <View style={styles.arrow6}>
@@ -624,7 +777,7 @@ const pinchRef = useRef<PinchGestureHandler>(null);
                   <View style={styles.arrow17}>
                     <Ionicons name="arrow-forward" size={28} color="white" />
                   </View>
-                   <View style={styles.arrow18}>
+                  <View style={styles.arrow18}>
                     <Ionicons name="arrow-up" size={28} color="white" />
                   </View>
                   <View style={styles.arrow19}>
@@ -643,53 +796,60 @@ const pinchRef = useRef<PinchGestureHandler>(null);
         </View>
       </View>
 
-        {/* Bottom info panel - REPLACE YOUR ENTIRE BOTTOM PANEL WITH THIS */}
-  <PanGestureHandler ref={bottomPanelPanRef} onGestureEvent={bottomPanelGestureHandler}>
-    <Animated.View style={[bottomPanelAnimatedStyle]}>
-      <LinearGradient
-        colors={['#B22020', '#4C0E0E']}
-        style={styles.bottomPanel}
-      >
-        {/* ADD THIS DRAG HANDLE */}
-        <View style={styles.dragHandle} />
-        
-        <View style={styles.floorInfo}>
-          <Text style={styles.buildingName}>USJ-R Quadricentennial</Text>
-          <View style={styles.floorDetails}>
-            <View>
-              <Text style={styles.floorLabel}>Floor</Text>
-              <Text style={styles.floorNumber}>1</Text>
+      {/* Bottom info panel */}
+      <PanGestureHandler ref={bottomPanelPanRef} onGestureEvent={bottomPanelGestureHandler}>
+        <Animated.View style={[bottomPanelAnimatedStyle]}>
+          <LinearGradient
+            colors={['#B22020', '#4C0E0E']}
+            style={styles.bottomPanel}
+          >
+            <View style={styles.dragHandle} />
+            
+            <View style={styles.floorInfo}>
+              <Text style={styles.buildingName}>USJ-R Quadricentennial</Text>
+              <View style={styles.floorDetails}>
+                <View>
+                  <Text style={styles.floorLabel}>Floor</Text>
+                  <Text style={styles.floorNumber}>4</Text>
+                </View>
+                <View>
+                  <Text style={styles.availableLabel}>Available Spots</Text>
+                  <Text style={styles.availableNumber}>{totalAvailableSpots}</Text>
+                </View>
+              </View>
+              
+              {/* Last Updated Info */}
+              <View style={styles.lastUpdated}>
+                <Text style={styles.lastUpdatedText}>
+                  Last updated: {lastUpdated || 'Loading...'}
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.availableLabel}>Available Spots</Text>
-              <Text style={styles.availableNumber}>40</Text>
+            
+            <View style={styles.bottomButtons}>
+              <TouchableOpacity style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>View other levels</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>Navigate</Text>
+              </TouchableOpacity>
             </View>
-          </View>
-        </View>
-        
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>View other levels</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Navigate</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <TouchableOpacity style={styles.closeButton}>
-          <Ionicons name="close" size={24} color="white" />
+            
+            <TouchableOpacity style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
+      </PanGestureHandler>
+      
+      {/* Clear Route Button */}
+      {showNavigation && (
+        <TouchableOpacity style={styles.clearRouteButton} onPress={clearNavigation}>
+          <Ionicons name="close-circle" size={20} color="white" />
+          <Text style={styles.clearRouteText}>Clear Route</Text>
         </TouchableOpacity>
-      </LinearGradient>
-    </Animated.View>
-  </PanGestureHandler>
-  {/* ADD THE CLEAR ROUTE BUTTON HERE - OUTSIDE THE DRAGGABLE CONTAINER */}
-  {showNavigation && (
-    <TouchableOpacity style={styles.clearRouteButton} onPress={clearNavigation}>
-      <Ionicons name="close-circle" size={20} color="white" />
-      <Text style={styles.clearRouteText}>Clear Route</Text>
-    </TouchableOpacity>
-  )}
+      )}
     </View>
   );
 };
@@ -736,16 +896,51 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
   },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 5,
+  },
+  connectionText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 120,
+    left: 20,
+    backgroundColor: 'rgba(178, 32, 32, 0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    zIndex: 2000,
+    elevation: 10,
+  },
+  refreshText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   mapContainer: {
-  flex: 1,
-  backgroundColor: '#2C2C2C',
-  paddingBottom: 100, // Remove any bottom padding
-  marginTop: 100,
-},
+    flex: 1,
+    backgroundColor: '#2C2C2C',
+    paddingBottom: 100,
+    marginTop: 100,
+  },
   mapFrame: {
     flex: 1,
-    overflow: 'visible', // Change from 'hidden' to 'visible'
-    paddingBottom: 0,   // This contains the pan/zoom within the frame
+    overflow: 'visible',
+    paddingBottom: 0,
   },
   mapWrapper: {
     flex: 1,
@@ -850,22 +1045,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: 'center',
   },
-  entrance: {
-    position: 'absolute',
-    right: 150,
-    top: 230,
-    backgroundColor: '#666',
-    borderRadius: 4,
-    width: 50,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  entranceText: {
-    color: 'white',
-    fontSize: 8,
-    textAlign: 'center',
-  },
   youAreHere: {
     position: 'absolute',
     right: 100,
@@ -901,35 +1080,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  parkingBuilding: {
-    position: 'absolute',
-    left: 450,
-    top: 50,
-    backgroundColor: '#666',
-    padding: 8,
-    borderRadius: 4,
-    width: 20,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    transform: [{ rotate: '90deg' }],
-  },
-  parkingBuildingText: {
-    color: 'white',
-    fontSize: 6,
-    textAlign: 'center',
-  },
-  navigationArrow: {
-    position: 'absolute',
-    backgroundColor: 'rgba(255, 215, 0, 0.8)',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-  },
- 
   bottomPanel: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -938,7 +1088,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    zIndex: 1000, // Already correct - Above map
+    zIndex: 1000,
   },
   buildingName: {
     color: 'white',
@@ -976,6 +1126,14 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  lastUpdated: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  lastUpdatedText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
   },
   bottomButtons: {
     flexDirection: 'row',
@@ -1018,7 +1176,7 @@ const styles = StyleSheet.create({
   },
   clearRouteButton: {
     position: 'absolute',
-    top: 120, // Below the header
+    top: 120,
     right: 20,
     backgroundColor: 'rgba(255, 0, 0, 0.8)',
     borderRadius: 20,
@@ -1027,7 +1185,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    zIndex: 2000, // Higher than everything else
+    zIndex: 2000,
     elevation: 10,
   },
   clearRouteText: {

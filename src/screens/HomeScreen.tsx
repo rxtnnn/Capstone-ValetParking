@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParking';
+import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
 import AppLoading from 'expo-app-loading';
 
