@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Alert,
-  Dimensions,
   StatusBar,
   ScrollView
 } from 'react-native';
@@ -18,9 +16,8 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-
-const { width, height } = Dimensions.get('window');
-
+import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
+import { styles } from '../screens/ParkingMapScreen.style';
 interface ParkingSpot {
   id: string;
   isOccupied: boolean;
@@ -63,14 +60,18 @@ const ParkingMapScreen: React.FC = () => {
   const panRef = useRef<PanGestureHandler>(null);
   const pinchRef = useRef<PinchGestureHandler>(null);
 
-  // API Configuration
+  const [fontsLoaded] = useFonts({
+      Poppins_400Regular,
+      Poppins_600SemiBold,
+    });
+
   const API_URL = 'https://valet.up.railway.app/api/parking';
   const UPDATE_INTERVAL = 5000; // 5 seconds
 
   // Mapping from sensor_id to spot_id
   const sensorToSpotMapping: { [key: number]: string } = {
-    1: 'A1',   2: 'B1',   3: 'B2',   4: 'B3',   5: 'B4',
-    6: 'C1',   7: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
+    7: 'A1',   1: 'B1',   2: 'B2',   3: 'B3',   4: 'B4',
+    5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
     11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
     16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
     21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
@@ -853,354 +854,5 @@ const ParkingMapScreen: React.FC = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#2C2C2C',
-  },
-  header: {
-    paddingTop: 10,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    zIndex: 1000, 
-  },
-  sectionIndicators: {
-    flex: 1,
-  },
-  sectionIndicatorsContent: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 2,
-  },
-  sectionIndicator: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  sectionLabel: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  sectionSlots: {
-    color: 'white',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  connectionStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 10,
-  },
-  connectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 5,
-  },
-  connectionText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  refreshButton: {
-    position: 'absolute',
-    top: 120,
-    left: 20,
-    backgroundColor: 'rgba(178, 32, 32, 0.8)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    zIndex: 2000,
-    elevation: 10,
-  },
-  refreshText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  mapContainer: {
-    flex: 1,
-    backgroundColor: '#2C2C2C',
-    paddingBottom: 100,
-    marginTop: 100,
-  },
-  mapFrame: {
-    flex: 1,
-    overflow: 'visible',
-    paddingBottom: 0,
-  },
-  mapWrapper: {
-    flex: 1,
-  },
-  arrow1: { position: 'absolute', right: 140, top: 160},
-  arrow2: { position: 'absolute', right: 160, top: 100},
-  arrow3: { position: 'absolute', right: 230, top: 100},
-  arrow4: { position: 'absolute', right: 270, top: 160},
-  arrow5: { position: 'absolute', right: 270, top: 260},
-  arrow6: { position: 'absolute', right: 350, top: 285},
-  arrow7: { position: 'absolute', right: 470, top: 285},
-  arrow8: { position: 'absolute', right: 600, top: 285},
-  arrow9: { position: 'absolute', right: 650, top: 390},
-  arrow11: { position: 'absolute', right: 580, top: 470},
-  arrow12: { position: 'absolute', right: 430, top: 470},
-  arrow13: { position: 'absolute', right: 280, top: 470},
-  arrow14: { position: 'absolute', right: 220, top: 510},
-  arrow15: { position: 'absolute', right: 220, top: 620},
-  arrow16: { position: 'absolute', right: 220, top: 730},
-  arrow17: { position: 'absolute', right: 180, top: 780},
-  arrow18: { position: 'absolute', right: 140, top: 730},
-  arrow19: { position: 'absolute', right: 140, top: 620},
-  arrow20: { position: 'absolute', right: 140, top: 490},
-  arrow21: { position: 'absolute', right: 90, top: 410},
-  parkingLayout: {
-    width: 800,
-    height: height + 200,
-    backgroundColor: '#2C2C2C',
-  },
-  parkingSpot: {
-    position: 'absolute',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  spotText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  elevator1: {
-    position: 'absolute',
-    left: 430,
-    top: 200,
-    backgroundColor: '#666',
-    padding: 10,
-    borderRadius: 4,
-    width: 60,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  elevator2: {
-    position: 'absolute',
-    left: 450,
-    top: 520,
-    backgroundColor: '#666',
-    padding: 10,
-    borderRadius: 4,
-    width: 85,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  elevatorText: {
-    color: 'white',
-    fontSize: 10,
-    textAlign: 'center',
-  },
-  elevator3:{
-    position: 'absolute',
-    left: 655,
-    top: 500,
-    backgroundColor: '#666',
-    padding: 10,
-    borderRadius: 4,
-    width: 85,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    transform: [{rotate: '90deg'}]
-  },
-  stairs: {
-    position: 'absolute',
-    left: 30,
-    top: 225,
-    backgroundColor: '#666',
-    padding: 8,
-    borderRadius: 4,
-    width: 80,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    transform: [{ rotate: '-90deg'}]
-  },
-  stairsText: {
-    color: 'white',
-    fontSize: 10,
-    textAlign: 'center',
-  },
-  youAreHere: {
-    position: 'absolute',
-    right: 100,
-    top: 240,
-    backgroundColor: '#666',
-    padding: 8,
-    borderRadius: 4,
-    width: 60,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  youAreHereText: {
-    color: 'white',
-    fontSize: 8,
-    textAlign: 'center',
-  },
-  exitSign: {
-    position: 'absolute',
-    right: 120,
-    top: 400,
-    backgroundColor: 'transparent',
-    padding: 8,
-    borderRadius: 4,
-    width: 100,
-    height: 45,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  exitText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  bottomPanel: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 13,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-  },
-  buildingName: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  floorInfo: {
-    marginBottom: 20,
-  },
-  floorDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  floorLabel: {
-    color: 'white',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  floorNumber: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  availableLabel: {
-    color: 'white',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  availableNumber: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  lastUpdated: {
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  lastUpdatedText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-  },
-  bottomButtons: {
-    flexDirection: 'row',
-    gap: 15,
-    justifyContent: 'center',
-    marginBottom: 10
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    flex: 1,
-    maxWidth: 150,
-  },
-  secondaryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  primaryButton: {
-    backgroundColor: '#FF4444',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    flex: 1,
-    maxWidth: 120,
-  },
-  primaryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-  },
-  clearRouteButton: {
-    position: 'absolute',
-    top: 120,
-    right: 20,
-    backgroundColor: 'rgba(255, 0, 0, 0.8)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    zIndex: 2000,
-    elevation: 10,
-  },
-  clearRouteText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 15,
-  },
-});
 
 export default ParkingMapScreen;

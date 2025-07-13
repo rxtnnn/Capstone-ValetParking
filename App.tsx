@@ -8,7 +8,6 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 
-// Screens
 import SplashScreen from './src/screens/SplashScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ParkingMapScreen from './src/screens/ParkingMapScreen';
@@ -17,20 +16,16 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import ApiTestScreen from './src/screens/ApiTestScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
-// Services
 import { NotificationService } from './src/services/NotificationService';
-
-// Theme
 import { theme } from './src/theme/theme';
 
-// Configure notifications
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,      // Show alert popup
-    shouldPlaySound: true,      // Play notification sound
-    shouldSetBadge: false,      // Don't update app badge
-    shouldShowBanner: true,     // Show notification banner (iOS)
-    shouldShowList: true,       // Show in notification list
+    shouldShowAlert: true,      
+    shouldPlaySound: true,   
+    shouldSetBadge: false,    
+    shouldShowBanner: true,    
+    shouldShowList: true,       
   }),
 });
 
@@ -151,7 +146,6 @@ const App: React.FC = () => {
   );
 };
 
-// Register for push notifications
 async function registerForPushNotificationsAsync() {
   let token;
 
@@ -182,7 +176,6 @@ async function registerForPushNotificationsAsync() {
       token = await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig?.extra?.eas?.projectId,
       });
-      console.log('Expo push token:', token);
     } catch (error) {
       console.log('Error getting push token:', error);
     }
