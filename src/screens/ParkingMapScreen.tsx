@@ -133,17 +133,18 @@ const ParkingMapScreen: React.FC = () => {
     }
   };
 
-  // Update parking spots based on API data
   const updateParkingSpots = (apiData: ApiParkingData[]) => {
     setParkingData(prevSpots => {
       return prevSpots.map(spot => {
-        // Find the sensor data that corresponds to this spot
-        const sensorId = Object.keys(sensorToSpotMapping).find(
-          key => sensorToSpotMapping[parseInt(key)] === spot.id
+        // Find the sensor_id that maps to this spot.id
+        const matchingSensorEntry = Object.entries(sensorToSpotMapping).find(
+          ([sensorId, mappedSpotId]) => mappedSpotId === spot.id
         );
 
-        if (sensorId) {
-          const sensorData = apiData.find(data => data.sensor_id === parseInt(sensorId));
+        if (matchingSensorEntry) {
+          const sensorId = parseInt(matchingSensorEntry[0]);
+          const sensorData = apiData.find(s => s.sensor_id === sensorId);
+
           if (sensorData) {
             return {
               ...spot,
@@ -151,16 +152,15 @@ const ParkingMapScreen: React.FC = () => {
             };
           }
         }
-        
-        return spot;
+
+        return spot; // no match found, return original spot
       });
     });
 
-    // Update section indicators
     updateSectionIndicators(apiData);
   };
 
-  // Update section indicators based on real data
+
   const updateSectionIndicators = (apiData: ApiParkingData[]) => {
     setParkingSections(prevSections => {
       return prevSections.map(section => {
@@ -190,71 +190,45 @@ const ParkingMapScreen: React.FC = () => {
     });
   };
 
-  // Initialize parking spots (same as before)
   useEffect(() => {
     const spots: ParkingSpot[] = [
-      // Right edge (A1)
       { id: 'A1', isOccupied: false, position: { x: 680, y: 110 }, width: 35, height: 35 },
-      
-      // Top right section (B4, B3, B2, B1)
       { id: 'B4', isOccupied: false, position: { x: 500, y: 50 }, width: 35, height: 35 },
       { id: 'B3', isOccupied: false, position: { x: 540, y: 50 }, width: 35, height: 35 },
       { id: 'B2', isOccupied: false, position: { x: 580, y: 50 }, width: 35, height: 35 },
       { id: 'B1', isOccupied: false, position: { x: 620, y: 50 }, width: 35, height: 35 },
-
-      // Right side vertical spots (C2, C1)
       { id: 'C2', isOccupied: false, position: { x: 450, y: 100 }, width: 35, height: 35 },
       { id: 'C1', isOccupied: false, position: { x: 450, y: 140 }, width: 35, height: 35 },
-
-      // Upper middle section (D7, D6, D5, D4)
       { id: 'D7', isOccupied: false, position: { x: 120, y: 200 }, width: 35, height: 35 },
       { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 35, height: 35 },
       { id: 'D5', isOccupied: false, position: { x: 200, y: 200 }, width: 35, height: 35 },
       { id: 'D4', isOccupied: false, position: { x: 240, y: 200 }, width: 35, height: 35 },
-
-      // Upper middle section (D3, D2, D1)
       { id: 'D3', isOccupied: false, position: { x: 300, y: 200 }, width: 35, height: 35 },
       { id: 'D2', isOccupied: false, position: { x: 340, y: 200 }, width: 35, height: 35 },
       { id: 'D1', isOccupied: false, position: { x: 380, y: 200 }, width: 35, height: 35 },
-
-      // Middle horizontal row (J5, J4, J3, J2, J1)
       { id: 'J5', isOccupied: false, position: { x: 300, y: 370 }, width: 35, height: 35 },
       { id: 'J4', isOccupied: false, position: { x: 340, y: 370 }, width: 35, height: 35 },
       { id: 'J3', isOccupied: false, position: { x: 380, y: 370 }, width: 35, height: 35 },
       { id: 'J2', isOccupied: false, position: { x: 420, y: 370 }, width: 35, height: 35 },
       { id: 'J1', isOccupied: false, position: { x: 460, y: 370 }, width: 35, height: 35 },
-
-      // Left side vertical spots (E3, E2, E1)
       { id: 'E3', isOccupied: false, position: { x: 55, y: 315 }, width: 35, height: 60 },
       { id: 'E2', isOccupied: false, position: { x: 55, y: 380 }, width: 35, height: 60 },
       { id: 'E1', isOccupied: false, position: { x: 55, y: 445 }, width: 35, height: 60 },
-
-      // Bottom left section (F1, F2)
       { id: 'F1', isOccupied: false, position: { x: 120, y: 520 }, width: 35, height: 35 },
       { id: 'F2', isOccupied: false, position: { x: 160, y: 520 }, width: 35, height: 35 },
-
-      // Bottom middle section (F3, F4, F5)
       { id: 'F3', isOccupied: false, position: { x: 220, y: 520 }, width: 35, height: 35 },
       { id: 'F4', isOccupied: false, position: { x: 260, y: 520 }, width: 35, height: 35 },
       { id: 'F5', isOccupied: false, position: { x: 300, y: 520 }, width: 35, height: 35 },
-
-      // Bottom section (F6, F7)
       { id: 'F6', isOccupied: false, position: { x: 360, y: 520 }, width: 35, height: 35 },
       { id: 'F7', isOccupied: false, position: { x: 400, y: 520 }, width: 35, height: 35 },
-
-      // Right side bottom vertical (G1, G2, G3, G4, G5)
       { id: 'G1', isOccupied: false, position: { x: 500, y: 590 }, width: 35, height: 35 },
       { id: 'G2', isOccupied: false, position: { x: 500, y: 630 }, width: 35, height: 35 },
       { id: 'G3', isOccupied: false, position: { x: 500, y: 670 }, width: 35, height: 35 }, 
       { id: 'G4', isOccupied: false, position: { x: 500, y: 730 }, width: 35, height: 35 },
       { id: 'G5', isOccupied: false, position: { x: 500, y: 770 }, width: 35, height: 35 },
-
-      // Bottom most section (H1, H2, H3)
       { id: 'H1', isOccupied: false, position: { x: 550, y: 830 }, width: 35, height: 35 },
       { id: 'H2', isOccupied: false, position: { x: 590, y: 830 }, width: 35, height: 35 },
       { id: 'H3', isOccupied: false, position: { x: 630, y: 830 }, width: 35, height: 35 },
-
-      // Far right edge (I5, I4, I3, I2, I1)
       { id: 'I5', isOccupied: false, position: { x: 680, y: 590 }, width: 35, height: 35 },
       { id: 'I4', isOccupied: false, position: { x: 680, y: 630 }, width: 35, height: 35 },
       { id: 'I3', isOccupied: false, position: { x: 680, y: 670 }, width: 35, height: 35 },
@@ -263,12 +237,9 @@ const ParkingMapScreen: React.FC = () => {
     ];
 
     setParkingData(spots);
-    
-    // Initial API call
     fetchParkingData();
   }, []);
 
-  // Set up periodic updates
   useEffect(() => {
     const interval = setInterval(fetchParkingData, UPDATE_INTERVAL);
     
@@ -277,134 +248,6 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, []);
 
-  const generatePathToSpot = (spotId: string) => {
-    const spot = parkingData.find(s => s.id === spotId);
-    if (!spot) return [];
-
-    const start = { x: 660, y: 240 }; // "You are here" position
-    const end = { x: spot.position.x + 17, y: spot.position.y + 17 };
-
-    let waypoints = [];
-
-    // For B spots (top section) - follow arrow1 (up) -> arrow2,3 (left) -> arrow4 (down)
-    if (spot.id.startsWith('B')) {
-      waypoints = [
-        start,                                    // You are here (bottom)
-        { x: 720, y: 100 },                      // Go straight up to B level
-        { x: spot.position.x + 17, y: 100 },     // Turn left to spot column
-        end                                       // Go down to final spot
-      ];
-    }
-    // For A spots (right side) - direct path
-    else if (spot.id.startsWith('A')) {
-      waypoints = [
-        start,
-        end // Direct since A spots are close to entrance
-      ];
-    }
-    // For C spots - follow arrow5 (down) then left
-    else if (spot.id.startsWith('C')) {
-      waypoints = [
-        start,
-        { x: 720, y: 260 },                      // arrow5 (down)
-        { x: 450, y: 260 },                      // Move left
-        { x: 450, y: spot.position.y + 17 },     // Move to spot row
-        end
-      ];
-    }
-    // For D spots - follow arrow6,7,8 (left) path
-    else if (spot.id.startsWith('D')) {
-      waypoints = [
-        start,
-        { x: 720, y: 285 },                      // Move to arrow level
-        { x: 370, y: 285 },                      // arrow6,7,8 (left)
-        { x: 370, y: 200 },                      // Move up to D level
-        { x: spot.position.x + 17, y: 200 },     // Move to spot column
-        end
-      ];
-    }
-    // For J spots - follow arrow6,7,8 (left) then to J level
-    else if (spot.id.startsWith('J')) {
-      waypoints = [
-        start,
-        { x: 720, y: 285 },                      // Move to arrow level
-        { x: 370, y: 285 },                      // arrow6,7,8 (left)
-        { x: 370, y: 370 },                      // Move to J level
-        { x: spot.position.x + 17, y: 370 },     // Move to spot column
-        end
-      ];
-    }
-    // For E spots - follow arrow9 (down) then arrow21 (left)
-    else if (spot.id.startsWith('E')) {
-      waypoints = [
-        start,
-        { x: 720, y: 390 },                      // arrow9 (down)
-        { x: 420, y: 390 },                      // arrow21 (left)
-        { x: 420, y: 380 },                      // Move up to E level
-        { x: 55, y: 380 },                       // Move to E column
-        { x: 55, y: spot.position.y + 30 },      // Move to specific E spot
-        end
-      ];
-    }
-    // For F spots - follow arrow9 (down) -> arrow21 (left) -> arrow11,12,13 (right)
-    else if (spot.id.startsWith('F')) {
-      waypoints = [
-        start,
-        { x: 720, y: 390 },                      // arrow9 (down)
-        { x: 420, y: 390 },                      // arrow21 (left)
-        { x: 420, y: 470 },                      // arrow20 (down)
-        { x: spot.position.x + 17, y: 470 },     // arrow11,12,13 (right)
-        { x: spot.position.x + 17, y: 520 },     // Move down to F level
-        end
-      ];
-    }
-    // For G spots - follow arrow9 (down) -> arrow14,15,16 (down) -> then to G
-    else if (spot.id.startsWith('G')) {
-      waypoints = [
-        start,
-        { x: 720, y: 390 },                      // arrow9 (down)
-        { x: 580, y: 390 },                      // Move toward G area
-        { x: 580, y: 510 },                      // arrow14 (down)
-        { x: 580, y: 620 },                      // arrow15 (down)
-        { x: 580, y: 730 },                      // arrow16 (down)
-        { x: 500, y: 730 },                      // Move to G column
-        { x: 500, y: spot.position.y + 17 },     // Move to specific G spot
-        end
-      ];
-    }
-    // For H spots - follow arrow17 (right) -> arrow18,19,20 (up)
-    else if (spot.id.startsWith('H')) {
-      waypoints = [
-        start,
-        { x: 720, y: 390 },                      // arrow9 (down)
-        { x: 620, y: 780 },                      // arrow17 (right)
-        { x: 580, y: 780 },                      // Move toward H
-        { x: 580, y: 730 },                      // arrow18 (up)
-        { x: 580, y: 620 },                      // arrow19 (up)
-        { x: 580, y: 490 },                      // arrow20 (up)
-        { x: spot.position.x + 17, y: 830 },     // Move to H level
-        end
-      ];
-    }
-    // For I spots - direct path from entrance area
-    else if (spot.id.startsWith('I')) {
-      waypoints = [
-        start,
-        { x: 720, y: 390 },                      // arrow9 (down)
-        { x: 680, y: 390 },                      // Move to I column
-        { x: 680, y: spot.position.y + 17 },     // Move to specific I spot
-        end
-      ];
-    }
-    // Default fallback
-    else {
-      waypoints = [start, end];
-    }
-
-    return waypoints;
-  };
-
-  // Pan gesture handler
   const panGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
       context.startX = translateX.value;
@@ -415,7 +258,6 @@ const ParkingMapScreen: React.FC = () => {
       translateY.value = context.startY + event.translationY;
     },
     onEnd: () => {
-      // Add boundaries to prevent panning too far
       const maxTranslateX = 200;
       const minTranslateX = -400;
       const maxTranslateY = 100;
@@ -435,7 +277,6 @@ const ParkingMapScreen: React.FC = () => {
     },
   });
 
-  // Pinch gesture handler
   const pinchGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
       context.startScale = scale.value;
@@ -526,25 +367,24 @@ const ParkingMapScreen: React.FC = () => {
           text: 'Guide Me',
           onPress: () => {
             setShowNavigation(true);
-            setNavigationPath(generatePathToSpot(spot.id));
           },
         },
       ]
     );
   };
 
-  // Manual refresh function
   const handleRefresh = () => {
     fetchParkingData();
   };
 
   const renderParkingSpot = (spot: ParkingSpot) => {
     const isSelected = selectedSpot === spot.id;
-    const spotSection = spot.id.charAt(0); // Get first character (A, B, C, D, etc.)
+    const spotSection = spot.id.charAt(0); 
     const isHighlighted = highlightedSection === spotSection;
     
     return (
       <TouchableOpacity
+      //turn red if occupied spot
         key={spot.id}
         style={[
           styles.parkingSpot,
@@ -592,7 +432,6 @@ const ParkingMapScreen: React.FC = () => {
 
     return (
       <>
-        {/* Render red path lines */}
         {navigationPath.map((point, index) => {
           if (index === navigationPath.length - 1) return null;
           
@@ -620,7 +459,6 @@ const ParkingMapScreen: React.FC = () => {
           );
         })}
         
-        {/* White directional arrows at turns */}
         {navigationPath.map((point, index) => {
           if (index === 0 || index === navigationPath.length - 1) return null;
           
@@ -647,7 +485,6 @@ const ParkingMapScreen: React.FC = () => {
     );
   };
 
-  // Calculate total available spots
   const totalAvailableSpots = parkingSections.reduce((sum, section) => sum + section.availableSlots, 0);
 
   return (

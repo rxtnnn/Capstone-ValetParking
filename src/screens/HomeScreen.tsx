@@ -131,15 +131,14 @@ const HomeScreen: React.FC = () => {
     }
 
     const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
-    const match = floor_level.match(pattern);
+    const match = floor_level.match(pattern); //match[0] "4th floor", [1] "4"
 
     if (match) {
       const floorNumber = parseInt(match[1]);
-      if (floorNumber >= 1 && floorNumber <= 10) {
+      if (floorNumber >= 1 && floorNumber <= 4) {
         return floorNumber;
       }
     }
-
     return 1;
   };
 
