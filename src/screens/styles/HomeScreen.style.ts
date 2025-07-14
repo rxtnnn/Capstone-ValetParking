@@ -116,9 +116,10 @@ export const styles = StyleSheet.create({
     gap: 12,
   },
   occupancyText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: 'Poppins_400Regular',
+    fontStyle: 'italic',
   },
   liveBadge: {
     paddingHorizontal: 8,
@@ -245,25 +246,7 @@ export const styles = StyleSheet.create({
   progressBarText: {
     fontSize: 12,
     color: '#666',
-    fontWeight: '500',
-    fontFamily: 'Poppins_400Regular'
-  },
-  noDataOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 12,
-    flexDirection: 'row',
-  },
-  noDataOverlayText: {
-    fontSize: 12,
-    color: '#999',
-    marginLeft: 6,
+    fontStyle: 'italic',
     fontWeight: '500',
     fontFamily: 'Poppins_400Regular'
   },

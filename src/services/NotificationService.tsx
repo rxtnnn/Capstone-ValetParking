@@ -33,7 +33,7 @@ class NotificationServiceClass {
 
       await this.registerForPushNotifications();
     } catch (error) {
-      alert('❌ Error initializing NotificationService:'+ error);
+      alert('Error initializing NotificationService:'+ error);
     }
   }
 
@@ -50,7 +50,6 @@ class NotificationServiceClass {
       showBadge: true,
     });
 
-    // Floor updates channel
     await Notifications.setNotificationChannelAsync('floor-updates', {
       name: 'Floor Status Updates',
       description: 'Updates about floor occupancy changes',
@@ -60,7 +59,6 @@ class NotificationServiceClass {
       sound: 'default',
     });
 
-    // Maintenance alerts channel
     await Notifications.setNotificationChannelAsync('maintenance-alerts', {
       name: 'Maintenance Alerts',
       description: 'Important system maintenance notifications',
@@ -70,7 +68,6 @@ class NotificationServiceClass {
       sound: 'default',
     });
 
-    // Emergency alerts channel
     await Notifications.setNotificationChannelAsync('emergency-alerts', {
       name: 'Emergency Alerts',
       description: 'Critical emergency notifications',
@@ -103,7 +100,7 @@ class NotificationServiceClass {
       }
       
       if (finalStatus !== 'granted') {
-        console.warn('Push notification permissions not granted');
+        alert('Push notification permissions not granted');
         return null;
       }
       
@@ -113,7 +110,6 @@ class NotificationServiceClass {
         });
         token = tokenData.data;
         this.expoPushToken = token;
-        console.log('📱 Expo push token:', token);
       } catch (error) {
         console.error('Error getting push token:', error);
       }
@@ -160,7 +156,7 @@ class NotificationServiceClass {
     sensorId: number
   ): Promise<void> {
     await this.showLocalNotification(
-      '🚗 Parking Spot Available!',
+      'Parking Spot Available!',
       `Spot ${spotNumber} on Floor ${floor} is now available`,
       { 
         type: 'spot-available', 
@@ -181,7 +177,7 @@ class NotificationServiceClass {
     const percentage = Math.round((availableSpots / totalSpots) * 100);
     
     await this.showLocalNotification(
-      '📊 Floor Update',
+      'Floor Update',
       `Floor ${floor}: ${availableSpots}/${totalSpots} spots available (${percentage}% free)`,
       { 
         type: 'floor-update', 
@@ -212,7 +208,7 @@ class NotificationServiceClass {
 
   async showSensorAlertNotification(sensorId: number, issue: string): Promise<void> {
     await this.showLocalNotification(
-      '⚠️ Sensor Alert',
+      'Sensor Alert',
       `Sensor ${sensorId}: ${issue}`,
       { 
         type: 'sensor-alert', 
@@ -229,7 +225,7 @@ class NotificationServiceClass {
     timeLeft: number
   ): Promise<void> {
     await this.showLocalNotification(
-      '⏰ Parking Reminder',
+      'Parking Reminder',
       `Your parking at spot ${spotNumber} expires in ${timeLeft} minutes`,
       { 
         type: 'parking-reminder', 
@@ -256,7 +252,7 @@ class NotificationServiceClass {
   async showConnectionStatusNotification(isConnected: boolean): Promise<void> {
     if (isConnected) {
       await this.showLocalNotification(
-        '✅ Connected to VALET',
+        'Connected to VALET',
         'Real-time parking data is now available',
         { 
           type: 'connection-status',
@@ -267,7 +263,7 @@ class NotificationServiceClass {
       );
     } else {
       await this.showLocalNotification(
-        '⚠️ Connection Issue',
+        'Connection Issue',
         'Unable to connect to parking sensors. Using cached data.',
         { 
           type: 'connection-status',
@@ -313,7 +309,6 @@ class NotificationServiceClass {
         sound: true,
       };
     } catch (error) {
-      console.error('Error getting notification settings:', error);
       return {
         spotAvailable: true,
         floorUpdates: true,
@@ -336,7 +331,6 @@ class NotificationServiceClass {
   async requestPermissions(): Promise<boolean> {
     try {
       if (!Device.isDevice) {
-        console.warn('Must use physical device for Push Notifications');
         return false;
       }
 
@@ -350,7 +344,6 @@ class NotificationServiceClass {
       
       return finalStatus === 'granted';
     } catch (error) {
-      console.error('Error requesting notification permissions:', error);
       return false;
     }
   }
@@ -369,7 +362,6 @@ class NotificationServiceClass {
     return this.expoPushToken;
   }
 
-  // Listen for notification interactions
   addNotificationReceivedListener(listener: (notification: any) => void) {
     return Notifications.addNotificationReceivedListener(listener);
   }
@@ -380,19 +372,6 @@ class NotificationServiceClass {
 
   removeNotificationSubscription(subscription: any) {
     return Notifications.removeNotificationSubscription(subscription);
-  }
-
-  // Test notification for debugging
-  async sendTestNotification(): Promise<void> {
-    await this.showLocalNotification(
-      '🧪 Test Notification',
-      'This is a test notification from VALET. If you see this, notifications are working!',
-      { 
-        type: 'test',
-        timestamp: Date.now()
-      },
-      'parking-updates'
-    );
   }
 }
 

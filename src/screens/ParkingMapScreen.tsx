@@ -17,7 +17,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
-import { styles } from '../screens/ParkingMapScreen.style';
+import { styles } from './styles/ParkingMapScreen.style';
 interface ParkingSpot {
   id: string;
   isOccupied: boolean;
@@ -42,6 +42,7 @@ interface ApiParkingData {
   distance_cm: number;
   created_at: string;
   updated_at: string;
+  floor_level: string;
 }
 
 const ParkingMapScreen: React.FC = () => {
@@ -66,9 +67,8 @@ const ParkingMapScreen: React.FC = () => {
     });
 
   const API_URL = 'https://valet.up.railway.app/api/parking';
-  const UPDATE_INTERVAL = 5000; // 5 seconds
+  const UPDATE_INTERVAL = 5000;
 
-  // Mapping from sensor_id to spot_id
   const sensorToSpotMapping: { [key: number]: string } = {
     7: 'A1',   1: 'B1',   2: 'B2',   3: 'B3',   4: 'B4',
     5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
@@ -80,25 +80,30 @@ const ParkingMapScreen: React.FC = () => {
     36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
     41: 'J4',  42: 'J5'
   };
+ 
+  const computeInitialSections = (): ParkingSection[] => {
+    const sectionMap: { [key: string]: number } = {};
 
-  // Mock parking sections data (will be updated based on real data)
-  const [parkingSections, setParkingSections] = useState<ParkingSection[]>([
-    { id: 'A', label: 'A', totalSlots: 1, availableSlots: 1, isFull: false },
-    { id: 'B', label: 'B', totalSlots: 4, availableSlots: 4, isFull: false },
-    { id: 'C', label: 'C', totalSlots: 2, availableSlots: 2, isFull: false },
-    { id: 'D', label: 'D', totalSlots: 7, availableSlots: 7, isFull: false },
-    { id: 'E', label: 'E', totalSlots: 3, availableSlots: 3, isFull: false },
-    { id: 'F', label: 'F', totalSlots: 7, availableSlots: 7, isFull: false },
-    { id: 'G', label: 'G', totalSlots: 5, availableSlots: 5, isFull: false },
-    { id: 'H', label: 'H', totalSlots: 3, availableSlots: 3, isFull: false },
-    { id: 'I', label: 'I', totalSlots: 5, availableSlots: 5, isFull: false },
-    { id: 'J', label: 'J', totalSlots: 5, availableSlots: 5, isFull: false },
-  ]);
+    // Count how many slots exist per section (e.g., A1, B1...)
+    Object.values(sensorToSpotMapping).forEach(spotId => {
+      const section = spotId.charAt(0); // A, B, C, etc.
+      sectionMap[section] = (sectionMap[section] || 0) + 1;
+    });
 
-  // Fetch parking data from API
+    // Build ParkingSection objects
+    return Object.entries(sectionMap).map(([section, total]) => ({
+      id: section,
+      label: section,
+      totalSlots: total,
+      availableSlots: total, // Assume all available initially
+      isFull: false,
+    })).sort((a, b) => a.id.localeCompare(b.id)); // Sort alphabetically
+  };
+
+ const [parkingSections, setParkingSections] = useState<ParkingSection[]>(computeInitialSections());
+
   const fetchParkingData = async () => {
     try {
-      console.log('🚗 Fetching parking data from API...');
       const response = await fetch(API_URL, {
         method: 'GET',
         headers: {
@@ -113,14 +118,12 @@ const ParkingMapScreen: React.FC = () => {
       }
 
       const apiData: ApiParkingData[] = await response.json();
-      console.log(`✅ Received ${apiData.length} parking records`);
       
       updateParkingSpots(apiData);
       setIsConnected(true);
       setLastUpdated(new Date().toLocaleTimeString());
       
     } catch (error) {
-      console.error('❌ Error fetching parking data:', error);
       setIsConnected(false);
       Alert.alert(
         'Connection Error', 
@@ -161,7 +164,6 @@ const ParkingMapScreen: React.FC = () => {
   const updateSectionIndicators = (apiData: ApiParkingData[]) => {
     setParkingSections(prevSections => {
       return prevSections.map(section => {
-        // Find all spots in this section
         const sectionSpots = Object.entries(sensorToSpotMapping)
           .filter(([_, spotId]) => spotId.startsWith(section.id))
           .map(([sensorId, _]) => parseInt(sensorId));
@@ -174,7 +176,6 @@ const ParkingMapScreen: React.FC = () => {
           if (sensorData && sensorData.is_occupied === 0) {
             availableSlots++;
           } else if (!sensorData) {
-            // If no sensor data, assume available
             availableSlots++;
           }
         });
@@ -844,7 +845,7 @@ const ParkingMapScreen: React.FC = () => {
         </Animated.View>
       </PanGestureHandler>
       
-      {/* Clear Route Button */}
+      {/* clear route btn */}
       {showNavigation && (
         <TouchableOpacity style={styles.clearRouteButton} onPress={clearNavigation}>
           <Ionicons name="close-circle" size={20} color="white" />

@@ -6,11 +6,9 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
-  Dimensions,
   StatusBar,
   Image,
   Modal,
-  Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +16,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
-import { styles } from '../screens/HomeScreen.style';
+import { styles } from './styles/HomeScreen.style';
 type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
@@ -107,7 +105,6 @@ const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showFullAlert, setShowFullAlert] = useState(false);
 
-  // Flexible floor naming with proper suffixes
   const getFloorName = (floorNumber: number): string => {
     const suffixes = ['th', 'st', 'nd', 'rd'];
     const remainder = floorNumber % 100;
@@ -118,18 +115,7 @@ const HomeScreen: React.FC = () => {
     return `${floorNumber}${suffix} Floor`;
   };
 
-  // Handle floor card press with disabled state for no data
   const handleFloorPress = (floor: any) => {
-    // Check if floor has no data (no sensors)
-    if (floor.total === 0) {
-      Alert.alert(
-        'No Data Available',
-        `No sensors are installed on ${getFloorName(floor.floor)}. Please select another floor.`,
-        [{ text: 'OK', style: 'default' }]
-      );
-      return;
-    }
-
     const status = getFloorStatus(floor.available, floor.total);
     
     if (status.text === 'FULL') {
@@ -139,39 +125,26 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  // Extract floor from location (same logic as service)
-  const extractFloorFromLocation = (location: string): number => {
-    if (!location) {
+  const extractFloorFromLocation = (floor_level: string): number => {
+    if (!floor_level) {
       return 1;
     }
 
-    const patterns = [
-      /(\d+)(?:st|nd|rd|th)?\s*floor/i,
-      /floor\s*(\d+)/i,
-      /level\s*(\d+)/i,
-      /(\d+)(?:st|nd|rd|th)?\s*level/i,
-      /f(\d+)/i,
-      /^(\d+)$/,
-    ];
+    const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
+    const match = floor_level.match(pattern);
 
-    for (const pattern of patterns) {
-      const match = location.match(pattern);
-      if (match) {
-        const floorNumber = parseInt(match[1]);
-        if (floorNumber >= 1 && floorNumber <= 10) {
-          return floorNumber;
-        }
+    if (match) {
+      const floorNumber = parseInt(match[1]);
+      if (floorNumber >= 1 && floorNumber <= 10) {
+        return floorNumber;
       }
     }
 
     return 1;
   };
 
-  // Fallback function to fetch data directly from API
   const fetchParkingDataDirect = async () => {
     try {
-      console.log('🔄 Fetching parking data directly from API...');
-      
       const response = await fetch('https://valet.up.railway.app/api/parking', {
         method: 'GET',
         headers: {
@@ -185,31 +158,26 @@ const HomeScreen: React.FC = () => {
       }
 
       const rawData = await response.json();
-      console.log(`✅ Direct fetch received ${rawData.length} records`);
-      
       const transformedData = transformParkingData(rawData);
       setParkingData(transformedData);
       setConnectionStatus('connected');
       
     } catch (error) {
-      console.error('❌ Direct fetch error:', error);
       setConnectionStatus('error'); 
     } finally {
       setLoading(false);
     }
   };
 
-  // Transform raw API data using location field to assign floors
   const transformParkingData = (rawData: any[]): ParkingStats => {
     const totalSpots = rawData.length;
     const availableSpots = rawData.filter((space: any) => !space.is_occupied).length;
     const occupiedSpots = totalSpots - availableSpots;
 
     const floorGroups: { [key: number]: any[] } = {};
-    
-    // Group by floor based on location field
+  
     rawData.forEach((space: any) => {
-      const floor = extractFloorFromLocation(space.location || '');
+      const floor = extractFloorFromLocation(space.floor_level || '');
       
       if (!floorGroups[floor]) {
         floorGroups[floor] = [];
@@ -255,8 +223,8 @@ const HomeScreen: React.FC = () => {
     let unsubscribeConnectionStatus: (() => void) | undefined;
     
     try {
-      unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
-        setParkingData(data);
+      unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => { //register to subscribe to parking updates
+        setParkingData(data); 
         setLoading(false);
       });
 
@@ -289,7 +257,6 @@ const HomeScreen: React.FC = () => {
     try {
       await RealTimeParkingService.forceUpdate();
     } catch (error) {
-      console.log('🔄 Service update failed, trying direct fetch...');
       await fetchParkingDataDirect();
     }
     setRefreshing(false);
@@ -308,11 +275,9 @@ const HomeScreen: React.FC = () => {
     return ((total - available) / total) * 100;
   };
 
-  // Always show exactly 4 floors (1-4) with real data where available
   const prepareFloorsForDisplay = (realFloors: any[]) => {
-    console.log('🔍 Real floors from API:', realFloors);
+    console.log('Fetching real floors from API:', realFloors);
     
-    // Always create exactly 4 floors
     const fixedFloors = [
       { floor: 1, total: 0, available: 0, occupancyRate: 0, status: 'available' as const },
       { floor: 2, total: 0, available: 0, occupancyRate: 0, status: 'available' as const },
@@ -353,7 +318,7 @@ const HomeScreen: React.FC = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
       
-      {/* Header with Gradient */}
+      {/*Header*/}
       <LinearGradient
         colors={['#B22020', '#4C0E0E']}
         style={styles.header}
@@ -379,7 +344,7 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Campus Overview Card */}
+        {/*Campus Overall Card*/}
         <View style={styles.campusCard}>
           <Text style={styles.campusTitle}>USJ-R Quadricentennial Campus</Text>
           
@@ -457,13 +422,13 @@ const HomeScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Show floors dynamically based on real data */}
+          {/* dynamic floor real data */}
           {floorsToDisplay.map((floor, index) => {
             const status = getFloorStatus(floor.available, floor.total);
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
             const isFull = status.text === 'FULL';
             const hasNoData = status.text === 'NO DATA' || floor.total === 0;
-            const isDisabled = hasNoData; // Disable when no data
+            const isDisabled = hasNoData; // disable if no data
             
             return (
               <TouchableOpacity
@@ -548,7 +513,7 @@ const HomeScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Progress Bar */}
+                {/* Progress Container */}
                 <View style={styles.progressBarContainer}>
                   <View style={styles.progressBarBackground}>
                     <View 
@@ -569,14 +534,6 @@ const HomeScreen: React.FC = () => {
                     {hasNoData ? 'No sensors' : `${Math.round(progressPercentage)}% Full`}
                   </Text>
                 </View>
-
-                {/* No Data Overlay */}
-                {isDisabled && (
-                  <View style={styles.noDataOverlay}>
-                    <Ionicons name="ban-outline" size={20} color="#999" />
-                    <Text style={styles.noDataOverlayText}>No sensors installed</Text>
-                  </View>
-                )}
               </TouchableOpacity>
             );
           })}

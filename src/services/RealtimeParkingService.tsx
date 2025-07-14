@@ -8,7 +8,7 @@ export interface ParkingSpace {
   distance_cm: number;
   created_at: string;
   updated_at: string;
-  location: string; 
+  floor_level: string; 
 }
 
 export interface ParkingStats {
@@ -57,26 +57,24 @@ class RealTimeParkingServiceClass {
 
   stop(): void {
     if (!this.isRunning) return;
-    
-    console.log('⏹️ Stopping real-time parking updates...');
     this.isRunning = false;
     
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
     }
-    
     this.setConnectionStatus('disconnected');
   }
 
+  //to update subscribers abt parking updates
   onParkingUpdate(callback: ParkingUpdateCallback): () => void { 
-    this.updateCallbacks.push(callback);
+    this.updateCallbacks.push(callback); //push all the subscribers 
  
     if (this.lastData) {
       callback(this.lastData);
     }
     
-    return () => {
+    return () => { //unsubscribe
       const index = this.updateCallbacks.indexOf(callback);
       if (index > -1) {
         this.updateCallbacks.splice(index, 1);
@@ -120,7 +118,7 @@ class RealTimeParkingServiceClass {
 
       const rawData: ParkingSpace[] = await response.json();
       
-      const newData = this.transformParkingData(rawData);
+      const newData = this.transformRawData(rawData);
       this.checkForChanges(newData);
       
       this.lastData = newData;
@@ -153,62 +151,40 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  private extractFloorFromLocation(location: string): number {
-    if (!location) {
-      console.warn('⚠️ Missing location field, defaulting to floor 1');
-      return 1;
-    }
-
-    // Try multiple patterns to extract floor number
-    const patterns = [
-      /(\d+)(?:st|nd|rd|th)?\s*floor/i,           // "1st Floor", "2nd Floor", etc.
-      /floor\s*(\d+)/i,                           // "Floor 1", "Floor 2", etc.
-      /level\s*(\d+)/i,                           // "Level 1", "Level 2", etc.
-      /(\d+)(?:st|nd|rd|th)?\s*level/i,           // "1st Level", "2nd Level", etc.
-      /f(\d+)/i,                                  // "F1", "F2", etc.
-      /^(\d+)$/,                                  // Just a number "1", "2", etc.
-    ];
-
-    for (const pattern of patterns) {
-      const match = location.match(pattern);
-      if (match) {
-        const floorNumber = parseInt(match[1]);
-        if (floorNumber >= 1 && floorNumber <= 10) { // Reasonable floor range
-          console.log(`🏢 Extracted floor ${floorNumber} from location: "${location}"`);
-          return floorNumber;
-        }
-      }
-    }
-
-    console.warn(`⚠️ Could not extract floor from location: "${location}", defaulting to floor 1`);
-    return 1; // Default fallback
+  private extractFloorFromLocation = (floor_level: string): number => {
+  if (!floor_level) {
+    return 1;
   }
 
-  // Transforms raw API data into organized floor statistics
-  private transformParkingData(rawData: ParkingSpace[]): ParkingStats {   
+  const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
+  const match = floor_level.match(pattern);
+
+  if (match) {
+    const floorNumber = parseInt(match[1]);
+    if (floorNumber >= 1 && floorNumber <= 4) {
+      return floorNumber;
+    }
+  }
+
+  return 1;
+};
+
+  private transformRawData(rawData: ParkingSpace[]): ParkingStats {   
     const totalSpots = rawData.length;
     const availableSpots = rawData.filter(space => !space.is_occupied).length;
     const occupiedSpots = rawData.filter(space => space.is_occupied).length;
 
-    console.log(`📊 Processing ${totalSpots} spots: ${availableSpots} available, ${occupiedSpots} occupied`);
-
     const floorGroups: { [key: number]: ParkingSpace[] } = {};
     
-    // Group parking spaces by floor based on location field
-    rawData.forEach(space => {
-      const floor = this.extractFloorFromLocation(space.location);
+    rawData.forEach(space => { //to know hw mny space for each floor
+      const floor = this.extractFloorFromLocation(space.floor_level);
       
-      if (!floorGroups[floor]) {
+      if (!floorGroups[floor]) { //checks if the floor alrdy exists
         floorGroups[floor] = [];
       }
       floorGroups[floor].push(space);
     });
 
-    console.log('📍 Floor distribution:', Object.keys(floorGroups).map(floor => 
-      `Floor ${floor}: ${floorGroups[parseInt(floor)].length} spots`
-    ));
-
-    // Create floors array with status
     const floors = Object.entries(floorGroups).map(([floorNum, spaces]) => {
       const total = spaces.length;
       const available = spaces.filter(s => !s.is_occupied).length;
@@ -222,8 +198,6 @@ class RealTimeParkingServiceClass {
       } else {
         status = 'available';
       }
-
-      console.log(`🏢 Floor ${floorNum}: ${available}/${total} available (${Math.round(occupancyRate)}% occupied) - ${status}`);
 
       return {
         floor: parseInt(floorNum),
@@ -249,9 +223,9 @@ class RealTimeParkingServiceClass {
 
     const oldData = this.lastData;
 
-    // Check for newly available spots
+    //check new spots
     if (newData.availableSpots > oldData.availableSpots) {
-      const increase = newData.availableSpots - oldData.availableSpots;
+      const increase = newData.availableSpots - oldData.availableSpots; //detects if more spots available
       NotificationService.showLocalNotification(
         'More Spots Available!',
         `${increase} new parking spot${increase > 1 ? 's' : ''} just became available`,
@@ -264,8 +238,8 @@ class RealTimeParkingServiceClass {
       );
     }
 
-    // Check for floor status changes
-    newData.floors.forEach(newFloor => {
+    
+    newData.floors.forEach(newFloor => { //chck floor status
       const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
       
       if (oldFloor && oldFloor.status !== newFloor.status) {
@@ -278,15 +252,10 @@ class RealTimeParkingServiceClass {
         }
       }
     });
-
-    const availabilityChange = Math.abs(newData.availableSpots - oldData.availableSpots);
-    if (availabilityChange >= 5) {
-      console.log(`📊 Significant change detected: ${availabilityChange} spots`);
-    }
   }
 
   private notifyParkingUpdate(data: ParkingStats): void {
-    this.updateCallbacks.forEach(callback => {
+    this.updateCallbacks.forEach(callback => { //notify subscribers fr prking updte
       try {
         callback(data);
       } catch (error) {
@@ -298,8 +267,6 @@ class RealTimeParkingServiceClass {
   private setConnectionStatus(status: 'connected' | 'disconnected' | 'error'): void {
     if (this.connectionStatus !== status) {
       this.connectionStatus = status;
-      console.log(`📡 Connection status: ${status}`);
-      
       this.connectionCallbacks.forEach(callback => {
         try {
           callback(status);
@@ -316,43 +283,10 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  getCurrentData(): ParkingStats | null {
-    return this.lastData;
-  }
-
-  getConnectionStatus(): 'connected' | 'disconnected' | 'error' {
-    return this.connectionStatus;
-  }
-
-  setUpdateInterval(milliseconds: number): void {
-    this.updateIntervalMs = Math.max(1000, milliseconds);
-    if (this.isRunning) {
-      this.stop();
-      this.start();
-    }
-    console.log(`⏱️ Update interval set to ${this.updateIntervalMs}ms`);
-  }
-
   async forceUpdate(): Promise<void> {
     if (this.isRunning) {
       await this.fetchAndUpdate();
     }
-  }
-
-  getStats(): { 
-    isRunning: boolean;
-    updateInterval: number;
-    lastUpdated: string | null;
-    connectionStatus: string;
-    retryCount: number;
-  } {
-    return {
-      isRunning: this.isRunning,
-      updateInterval: this.updateIntervalMs,
-      lastUpdated: this.lastData?.lastUpdated || null,
-      connectionStatus: this.connectionStatus,
-      retryCount: this.retryCount,
-    };
   }
 }
 
