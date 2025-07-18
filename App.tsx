@@ -14,7 +14,6 @@ import ParkingMapScreen from './src/screens/ParkingMapScreen';
 import FeedbackScreen from './src/screens/FeedbackScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import ApiTestScreen from './src/screens/ApiTestScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import { NotificationService } from './src/services/NotificationService';
 import { theme } from './src/theme/theme';
@@ -128,16 +127,6 @@ const App: React.FC = () => {
               name="Profile" 
               component={ProfileScreen}
               options={{ title: 'Profile' }}
-            />
-            <Stack.Screen 
-              name="ApiTest" 
-              component={ApiTestScreen}
-              options={{ 
-                title: 'API Test',
-                headerStyle: {
-                  backgroundColor: '#4CAF50',
-                },
-              }}
             />
           </Stack.Navigator>
         </NavigationContainer>

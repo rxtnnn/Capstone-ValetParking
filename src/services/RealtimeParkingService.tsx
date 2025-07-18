@@ -37,16 +37,20 @@ class RealTimeParkingServiceClass {
   private isRunning = false;
   private lastData: ParkingStats | null = null;
   private connectionStatus: 'connected' | 'disconnected' | 'error' = 'disconnected';
-  private updateIntervalMs = 2000; 
+  private updateIntervalMs = 5000; // 🔄 Changed from 2000 to 5000 (5 seconds)
   private retryCount = 0;
   private maxRetries = 3;
+  private lastFetchTime = 0; // Track last fetch to prevent spam
 
   constructor() {}
 
   start(): void {
     if (this.isRunning) {
+      console.log('⚠️ Service already running');
       return;
     }
+    
+    console.log('🚀 Starting parking service with 5-second intervals');
     this.isRunning = true;
     this.fetchAndUpdate();
     
@@ -57,6 +61,8 @@ class RealTimeParkingServiceClass {
 
   stop(): void {
     if (!this.isRunning) return;
+    
+    console.log('⏹️ Stopping parking service');
     this.isRunning = false;
     
     if (this.updateInterval) {
@@ -64,6 +70,34 @@ class RealTimeParkingServiceClass {
       this.updateInterval = null;
     }
     this.setConnectionStatus('disconnected');
+  }
+
+  // Allow dynamic refresh rate changes
+  setRefreshRate(intervalMs: number): void {
+    if (intervalMs < 1000) {
+      console.warn('⚠️ Minimum refresh rate is 1 second, setting to 1000ms');
+      intervalMs = 1000;
+    }
+    
+    if (intervalMs > 60000) {
+      console.warn('⚠️ Maximum refresh rate is 60 seconds, setting to 60000ms');
+      intervalMs = 60000;
+    }
+
+    console.log(`🔄 Changing refresh rate from ${this.updateIntervalMs}ms to ${intervalMs}ms`);
+    this.updateIntervalMs = intervalMs;
+
+    // Restart with new interval if currently running
+    if (this.isRunning && this.updateInterval) {
+      clearInterval(this.updateInterval);
+      this.updateInterval = setInterval(() => {
+        this.fetchAndUpdate();
+      }, this.updateIntervalMs);
+    }
+  }
+
+  getRefreshRate(): number {
+    return this.updateIntervalMs;
   }
 
   //to update subscribers abt parking updates
@@ -95,9 +129,21 @@ class RealTimeParkingServiceClass {
   }
 
   private async fetchAndUpdate(): Promise<void> {
+    const now = Date.now();
+    
+    // Prevent rapid consecutive requests
+    if (now - this.lastFetchTime < 1000) {
+      console.log('⏭️ Skipping fetch - too soon since last request');
+      return;
+    }
+    
+    this.lastFetchTime = now;
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      console.log(`📡 Fetching parking data... (${new Date().toLocaleTimeString()})`);
 
       const response = await fetch(this.apiUrl, {
         method: 'GET',
@@ -126,8 +172,11 @@ class RealTimeParkingServiceClass {
       this.setConnectionStatus('connected'); 
       this.retryCount = 0; 
       
+      console.log(`✅ Successfully updated parking data - ${newData.availableSpots}/${newData.totalSpots} spots available`);
+      
     } catch (error: any) {
       this.retryCount++;
+      console.error(`❌ Fetch error (attempt ${this.retryCount}/${this.maxRetries}):`, error.message);
       this.setConnectionStatus('error');
       
       if (this.lastData) {
@@ -141,33 +190,37 @@ class RealTimeParkingServiceClass {
       
       if (this.retryCount <= this.maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, this.retryCount), 30000);
+        console.log(`🔄 Retrying in ${delay}ms...`);
         
         setTimeout(() => {
           if (this.isRunning) {
             this.fetchAndUpdate();
           }
         }, delay);
+      } else {
+        console.error('🚫 Max retries exceeded, stopping automatic updates');
+        this.stop();
       }
     }
   }
 
   private extractFloorFromLocation = (floor_level: string): number => {
-  if (!floor_level) {
-    return 1;
-  }
-
-  const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
-  const match = floor_level.match(pattern);
-
-  if (match) {
-    const floorNumber = parseInt(match[1]);
-    if (floorNumber >= 1 && floorNumber <= 4) {
-      return floorNumber;
+    if (!floor_level) {
+      return 1;
     }
-  }
 
-  return 1;
-};
+    const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
+    const match = floor_level.match(pattern);
+
+    if (match) {
+      const floorNumber = parseInt(match[1]);
+      if (floorNumber >= 1 && floorNumber <= 4) {
+        return floorNumber;
+      }
+    }
+
+    return 1;
+  };
 
   private transformRawData(rawData: ParkingSpace[]): ParkingStats {   
     const totalSpots = rawData.length;
@@ -226,24 +279,30 @@ class RealTimeParkingServiceClass {
     //check new spots
     if (newData.availableSpots > oldData.availableSpots) {
       const increase = newData.availableSpots - oldData.availableSpots; //detects if more spots available
-      NotificationService.showLocalNotification(
-        'More Spots Available!',
-        `${increase} new parking spot${increase > 1 ? 's' : ''} just became available`,
-        { 
-          type: 'spots-increased',
-          oldCount: oldData.availableSpots,
-          newCount: newData.availableSpots,
-          increase,
-        }
+      console.log(`🎉 ${increase} new spot(s) available!`);
+      
+      // ✅ FIXED: Use correct method for spot notifications
+      NotificationService.showSpotAvailableNotification(
+        newData.availableSpots,
+        // Find which floor has the most available spots
+        newData.floors.reduce((prev, current) => 
+          prev.available > current.available ? prev : current
+        ).floor
       );
     }
 
+    // Check if spots decreased significantly
+    if (newData.availableSpots < oldData.availableSpots) {
+      const decrease = oldData.availableSpots - newData.availableSpots;
+      console.log(`📉 ${decrease} spot(s) taken`);
+    }
     
     newData.floors.forEach(newFloor => { //chck floor status
       const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
       
       if (oldFloor && oldFloor.status !== newFloor.status) {
         if (newFloor.status === 'available' && oldFloor.status !== 'available') {
+          console.log(`🏢 Floor ${newFloor.floor} status changed to available`);
           NotificationService.showFloorUpdateNotification(
             newFloor.floor,
             newFloor.available,
@@ -266,7 +325,10 @@ class RealTimeParkingServiceClass {
 
   private setConnectionStatus(status: 'connected' | 'disconnected' | 'error'): void {
     if (this.connectionStatus !== status) {
+      const oldStatus = this.connectionStatus;
       this.connectionStatus = status;
+      console.log(`🔗 Connection status: ${oldStatus} → ${status}`);
+      
       this.connectionCallbacks.forEach(callback => {
         try {
           callback(status);
@@ -275,7 +337,7 @@ class RealTimeParkingServiceClass {
         }
       });
 
-      if (status === 'connected') {
+      if (status === 'connected' && oldStatus !== 'connected') {
         NotificationService.showConnectionStatusNotification(true);
       } else if (status === 'error') {
         NotificationService.showConnectionStatusNotification(false);
@@ -283,10 +345,26 @@ class RealTimeParkingServiceClass {
     }
   }
 
+  // Manual refresh for user-triggered updates
   async forceUpdate(): Promise<void> {
+    console.log('🔄 Force update requested');
     if (this.isRunning) {
       await this.fetchAndUpdate();
+    } else {
+      console.warn('⚠️ Service not running, cannot force update');
     }
+  }
+
+  // Get service statistics
+  getServiceStats() {
+    return {
+      isRunning: this.isRunning,
+      refreshRate: this.updateIntervalMs,
+      connectionStatus: this.connectionStatus,
+      lastUpdate: this.lastData?.lastUpdated || 'Never',
+      subscriberCount: this.updateCallbacks.length,
+      retryCount: this.retryCount,
+    };
   }
 }
 

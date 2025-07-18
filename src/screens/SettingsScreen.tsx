@@ -4,15 +4,18 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   Switch,
+  TouchableOpacity,
+  Modal,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Card, List, Button, Divider } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Animatable from 'react-native-animatable';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Define types locally
+const { width } = Dimensions.get('window');
+
 type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
@@ -38,6 +41,20 @@ interface NotificationSettings {
   sound: boolean;
 }
 
+interface AlertConfig {
+  visible: boolean;
+  title: string;
+  message: string;
+  icon?: string;
+  type: 'info' | 'success' | 'warning' | 'confirm';
+  onConfirm?: () => void;
+  onCancel?: () => void;
+  confirmText?: string;
+  cancelText?: string;
+}
+
+const SETTINGS_KEY = '@valet_notification_settings';
+
 const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [notifications, setNotifications] = useState<NotificationSettings>({
     spotAvailable: true,
@@ -47,31 +64,96 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     sound: true,
   });
   const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [alert, setAlert] = useState<AlertConfig>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+  
+  const fadeAnim = new Animated.Value(0);
+  const scaleAnim = new Animated.Value(0.8);
 
   useEffect(() => {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    if (!isLoading) {
+      autoSaveSettings();
+    }
+  }, [notifications, isLoading]);
+
+  useEffect(() => {
+    if (alert.visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.8,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [alert.visible]);
+
+  const showAlert = (config: Omit<AlertConfig, 'visible'>) => {
+    setAlert({ ...config, visible: true });
+  };
+
+  const hideAlert = () => {
+    setAlert(prev => ({ ...prev, visible: false }));
+  };
+
   const loadSettings = async () => {
     try {
-      // TODO: Load settings from AsyncStorage or your API
-      // For now, using default values
-      console.log('Loading settings...');
+      setIsLoading(true);
+      const savedSettings = await AsyncStorage.getItem(SETTINGS_KEY);
+      
+      if (savedSettings) {
+        const parsedSettings = JSON.parse(savedSettings);
+        setNotifications(parsedSettings);
+      } else {
+        await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(notifications));
+      }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      showAlert({
+        title: 'Loading Error',
+        message: 'Couldn\'t load your saved settings. Don\'t worry - VALET will use the default settings for now.',
+        type: 'warning',
+        icon: 'warning',
+        confirmText: 'OK',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const saveSettings = async () => {
-    setLoading(true);
+  const autoSaveSettings = async () => {
     try {
-      // TODO: Save settings to AsyncStorage or your API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      Alert.alert('Success ✅', 'Settings saved successfully!');
+      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(notifications));
+      console.log('Settings saved');
     } catch (error) {
-      Alert.alert('Error ❌', 'Failed to save settings. Please try again.');
-    } finally {
-      setLoading(false);
+      console.error('Save failed:', error);
     }
   };
 
@@ -83,297 +165,410 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const resetSettings = () => {
-    Alert.alert(
-      'Reset Settings',
-      'Are you sure you want to reset all settings to default?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            setNotifications({
-              spotAvailable: true,
-              floorUpdates: true,
-              maintenanceAlerts: false,
-              vibration: true,
-              sound: true,
-            });
-            Alert.alert('Reset Complete', 'Settings have been reset to default values.');
-          },
-        },
-      ]
+    showAlert({
+      title: 'Reset Settings',
+      message: 'This will turn off all notifications and reset VALET to how it was when you first installed it. You can always change these settings again later.',
+      type: 'confirm',
+      icon: 'restore',
+      confirmText: 'Reset',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        const defaultSettings = {
+          spotAvailable: false,
+          floorUpdates: false,
+          maintenanceAlerts: false,
+          vibration: false,
+          sound: false,
+        };
+        
+        setNotifications(defaultSettings);
+        
+        try {
+          await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(defaultSettings));
+          showAlert({
+            title: 'Success',
+            message: 'All settings have been reset! VALET is now back to its original settings.',
+            type: 'success',
+            icon: 'check-circle',
+            confirmText: 'OK',
+          });
+        } catch (error) {
+          showAlert({
+            title: 'Error',
+            message: 'Something went wrong while resetting. Please try again in a moment.',
+            type: 'warning',
+            icon: 'error',
+            confirmText: 'OK',
+          });
+        }
+        hideAlert();
+      },
+      onCancel: hideAlert,
+    });
+  };
+
+  const CustomAlert = () => {
+    const getIconColor = () => {
+      switch (alert.type) {
+        case 'success': return '#4CAF50';
+        case 'warning': return '#FF9800';
+        case 'confirm': return '#F44336';
+        default: return '#2196F3';
+      }
+    };
+
+    const getIcon = () => {
+      if (alert.icon) return alert.icon;
+      switch (alert.type) {
+        case 'success': return 'check-circle';
+        case 'warning': return 'warning';
+        case 'confirm': return 'help';
+        default: return 'info';
+      }
+    };
+
+    return (
+      <Modal
+        transparent
+        visible={alert.visible}
+        onRequestClose={hideAlert}
+        animationType="none"
+      >
+        <Animated.View 
+          style={[
+            styles.alertOverlay,
+            { opacity: fadeAnim }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.alertBackdrop}
+            activeOpacity={1}
+            onPress={hideAlert}
+          />
+          
+          <Animated.View 
+            style={[
+              styles.alertContainer,
+              { 
+                transform: [{ scale: scaleAnim }],
+                opacity: fadeAnim 
+              }
+            ]}
+          >
+            <View style={styles.alertHeader}>
+              <View style={[styles.alertIconContainer, { backgroundColor: getIconColor() + '20' }]}>
+                <MaterialIcons 
+                  name={getIcon() as any} 
+                  size={32} 
+                  color={getIconColor()} 
+                />
+              </View>
+              <Text style={styles.alertTitle}>{alert.title}</Text>
+            </View>
+            
+            <Text style={styles.alertMessage}>{alert.message}</Text>
+            
+            <View style={styles.alertButtons}>
+              {alert.type === 'confirm' && (
+                <TouchableOpacity 
+                  style={[styles.alertButton, styles.alertCancelButton]}
+                  onPress={alert.onCancel}
+                >
+                  <Text style={styles.alertCancelText}>
+                    {alert.cancelText || 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity 
+                style={[
+                  styles.alertButton, 
+                  styles.alertConfirmButton,
+                  { backgroundColor: getIconColor() }
+                ]}
+                onPress={() => {
+                  if (alert.onConfirm) {
+                    alert.onConfirm();
+                  } else {
+                    hideAlert();
+                  }
+                }}
+              >
+                <Text style={styles.alertConfirmText}>
+                  {alert.confirmText || 'OK'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     );
   };
 
-  return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <Animatable.View animation="fadeInDown" delay={200}>
-        <Card style={styles.headerCard}>
-          <Card.Content>
-            <View style={styles.headerContent}>
-              <MaterialIcons name="settings" size={40} color="#B71C1C" />
-              <Text style={styles.headerTitle}>Settings</Text>
-            </View>
-            <Text style={styles.headerSubtitle}>
-              Customize your VALET experience and notification preferences
-            </Text>
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* Notification Settings */}
-      <Animatable.View animation="fadeInUp" delay={400}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="notifications" size={24} color="#B71C1C" />
-              <Text style={styles.sectionTitle}>Notifications</Text>
-            </View>
-            
-            <List.Item
-              title="Spot Available"
-              description="Get notified when parking spots become available"
-              left={() => <MaterialIcons name="local-parking" size={24} color="#4CAF50" />}
-              right={() => (
-                <Switch
-                  value={notifications.spotAvailable}
-                  onValueChange={() => handleNotificationToggle('spotAvailable')}
-                  trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
-                  thumbColor={notifications.spotAvailable ? '#FFFFFF' : '#F4F3F4'}
-                />
-              )}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Floor Updates"
-              description="Real-time updates about floor occupancy changes"
-              left={() => <MaterialIcons name="update" size={24} color="#2196F3" />}
-              right={() => (
-                <Switch
-                  value={notifications.floorUpdates}
-                  onValueChange={() => handleNotificationToggle('floorUpdates')}
-                  trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
-                  thumbColor={notifications.floorUpdates ? '#FFFFFF' : '#F4F3F4'}
-                />
-              )}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Maintenance Alerts"
-              description="Important maintenance and system updates"
-              left={() => <MaterialIcons name="build" size={24} color="#FF9800" />}
-              right={() => (
-                <Switch
-                  value={notifications.maintenanceAlerts}
-                  onValueChange={() => handleNotificationToggle('maintenanceAlerts')}
-                  trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
-                  thumbColor={notifications.maintenanceAlerts ? '#FFFFFF' : '#F4F3F4'}
-                />
-              )}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Vibration"
-              description="Vibrate device when receiving notifications"
-              left={() => <MaterialIcons name="vibration" size={24} color="#9C27B0" />}
-              right={() => (
-                <Switch
-                  value={notifications.vibration}
-                  onValueChange={() => handleNotificationToggle('vibration')}
-                  trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
-                  thumbColor={notifications.vibration ? '#FFFFFF' : '#F4F3F4'}
-                />
-              )}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Sound"
-              description="Play notification sounds"
-              left={() => <MaterialIcons name="volume-up" size={24} color="#FF5722" />}
-              right={() => (
-                <Switch
-                  value={notifications.sound}
-                  onValueChange={() => handleNotificationToggle('sound')}
-                  trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
-                  thumbColor={notifications.sound ? '#FFFFFF' : '#F4F3F4'}
-                />
-              )}
-            />
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* App Preferences */}
-      <Animatable.View animation="fadeInUp" delay={600}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="tune" size={24} color="#B71C1C" />
-              <Text style={styles.sectionTitle}>App Preferences</Text>
-            </View>
-            
-            <List.Item
-              title="Auto-Refresh Interval"
-              description="Automatically refresh parking data every 30 seconds"
-              left={() => <MaterialIcons name="refresh" size={24} color="#4CAF50" />}
-              onPress={() => Alert.alert(
-                'Auto-Refresh',
-                'Auto-refresh is currently set to 30 seconds.\n\nThis feature ensures you always have the latest parking information.',
-                [{ text: 'OK' }]
-              )}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Data Usage Monitor"
-              description="Track app data consumption"
-              left={() => <MaterialIcons name="data-usage" size={24} color="#2196F3" />}
-              onPress={() => Alert.alert(
-                'Data Usage',
-                'VALET uses minimal data:\n\n• ~1MB per hour of active usage\n• ~5KB per parking data refresh\n• Efficient caching to reduce usage',
-                [{ text: 'OK' }]
-              )}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Cache Management"
-              description="Clear app cache and temporary data"
-              left={() => <MaterialIcons name="clear" size={24} color="#FF9800" />}
-              onPress={() => Alert.alert(
-                'Clear Cache',
-                'This will clear all cached parking data and temporary files.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Clear', onPress: () => Alert.alert('Cache Cleared', 'App cache has been cleared successfully! 🧹') },
-                ]
-              )}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Theme"
-              description="App appearance and theme settings"
-              left={() => <MaterialIcons name="palette" size={24} color="#E91E63" />}
-              onPress={() => Alert.alert(
-                'Theme Settings',
-                'Dark mode and custom themes coming soon! 🌙\n\nCurrently using VALET red theme.',
-                [{ text: 'OK' }]
-              )}
-            />
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* About & Support */}
-      <Animatable.View animation="fadeInUp" delay={800}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="info" size={24} color="#B71C1C" />
-              <Text style={styles.sectionTitle}>About & Support</Text>
-            </View>
-            
-            <List.Item
-              title="About VALET"
-              description="App version and information"
-              left={() => <MaterialIcons name="info-outline" size={24} color="#2196F3" />}
-              onPress={() => Alert.alert(
-                'About VALET',
-                '🚗 VALET v1.0.0\n\n📱 Built with Expo React Native\n🏫 Developed for USJ-R Quadricentennial Campus\n🎯 Smart Parking Made Easy\n\n© 2025 VALET Team'
-              )}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Help & FAQ"
-              description="Get help with using the app"
-              left={() => <MaterialIcons name="help" size={24} color="#4CAF50" />}
-              onPress={() => Alert.alert(
-                'Help & FAQ',
-                '❓ Frequently Asked Questions:\n\n• How do I find a parking spot?\n• Why is my floor showing as full?\n• How accurate are the sensors?\n\nFor detailed help, use the Feedback screen to ask questions.'
-              )}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Contact Support"
-              description="Get in touch with our support team"
-              left={() => <MaterialIcons name="headset-mic" size={24} color="#FF9800" />}
-              onPress={() => Alert.alert(
-                'Contact Support',
-                '📞 Support Options:\n\n📧 Email: support@valet-parking.com\n📱 Phone: +63 123 456 7890\n🕒 Hours: 24/7 Support Available\n\n💬 Or use the Feedback screen in the app!'
-              )}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="Privacy Policy"
-              description="Learn how we protect your data"
-              left={() => <MaterialIcons name="privacy-tip" size={24} color="#9C27B0" />}
-              onPress={() => Alert.alert(
-                'Privacy Policy',
-                '🔒 Your Privacy Matters:\n\n• We only collect anonymous usage data\n• No personal information is stored\n• Data is used to improve parking experience\n• Full compliance with data protection laws'
-              )}
-            />
-
-            <Divider />
-            
-            <List.Item
-              title="App Permissions"
-              description="Review app permissions and access"
-              left={() => <MaterialIcons name="security" size={24} color="#795548" />}
-              onPress={() => Alert.alert(
-                'App Permissions',
-                '🔐 VALET uses these permissions:\n\n📶 Internet: Connect to parking servers\n📳 Notifications: Send parking alerts\n📱 Vibration: Notification feedback\n\nAll permissions are used responsibly.'
-              )}
-            />
-          </Card.Content>
-        </Card>
-      </Animatable.View>
-
-      {/* Action Buttons */}
-      <Animatable.View animation="fadeInUp" delay={1000}>
-        <View style={styles.buttonContainer}>
-          <Button
-            mode="outlined"
-            onPress={resetSettings}
-            style={styles.resetButton}
-            icon={() => <MaterialIcons name="restore" size={20} color="#F44336" />}
-            textColor="#F44336"
-          >
-            Reset to Default
-          </Button>
-          
-          <Button
-            mode="contained"
-            onPress={saveSettings}
-            loading={loading}
-            style={styles.saveButton}
-            buttonColor="#B71C1C"
-            icon={() => <MaterialIcons name="save" size={20} color="#FFFFFF" />}
-          >
-            {loading ? 'Saving...' : 'Save Settings'}
-          </Button>
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingCard}>
+          <MaterialIcons name="settings" size={48} color="#B71C1C" />
+          <Text style={styles.loadingText}>Loading Settings...</Text>
+          <View style={styles.loadingBar}>
+            <View style={styles.loadingProgress} />
+          </View>
         </View>
-      </Animatable.View>
-    </ScrollView>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Notifications Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="notifications" size={20} color="#B71C1C" />
+            <Text style={styles.cardTitle}>Notifications</Text>
+          </View>
+          
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="local-parking" size={20} color="#4CAF50" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Spot Available</Text>
+                <Text style={styles.settingDesc}>Get notified when spots open</Text>
+              </View>
+            </View>
+            <Switch
+              value={notifications.spotAvailable}
+              onValueChange={() => handleNotificationToggle('spotAvailable')}
+              trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="update" size={20} color="#2196F3" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Floor Updates</Text>
+                <Text style={styles.settingDesc}>When floors get busy or free up</Text>
+              </View>
+            </View>
+            <Switch
+              value={notifications.floorUpdates}
+              onValueChange={() => handleNotificationToggle('floorUpdates')}
+              trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.divider} />
+          
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="vibration" size={20} color="#9C27B0" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Vibration</Text>
+                <Text style={styles.settingDesc}>Vibrate when you get notifications</Text>
+              </View>
+            </View>
+            <Switch
+              value={notifications.vibration}
+              onValueChange={() => handleNotificationToggle('vibration')}
+              trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="volume-up" size={20} color="#FF5722" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Sound</Text>
+                <Text style={styles.settingDesc}>Play sounds with notifications</Text>
+              </View>
+            </View>
+            <Switch
+              value={notifications.sound}
+              onValueChange={() => handleNotificationToggle('sound')}
+              trackColor={{ false: '#E0E0E0', true: '#B71C1C' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        {/* App Preferences Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="tune" size={20} color="#B71C1C" />
+            <Text style={styles.cardTitle}>App Preferences</Text>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => showAlert({
+              title: 'Auto-Refresh',
+              message: 'VALET automatically checks for new parking spots every 5 seconds. This means you always see the latest available spots without having to manually refresh the app.',
+              type: 'info',
+              icon: 'refresh',
+              confirmText: 'Got it'
+            })}
+          >
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="refresh" size={20} color="#4CAF50" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Auto-Refresh</Text>
+                <Text style={styles.settingDesc}>Keeps parking info fresh</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color="#999" />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => showAlert({
+              title: 'Clear Cache',
+              message: 'This will clear temporary app data to free up space on your phone. Your notification settings will stay the same.',
+              type: 'confirm',
+              icon: 'clear',
+              confirmText: 'Clear Cache',
+              cancelText: 'Cancel',
+              onConfirm: () => {
+                showAlert({
+                  title: 'Success',
+                  message: 'Cache cleared! VALET will now get fresh parking data.',
+                  type: 'success',
+                  confirmText: 'OK'
+                });
+              },
+              onCancel: hideAlert
+            })}
+          >
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="clear" size={20} color="#FF9800" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Clear Cache</Text>
+                <Text style={styles.settingDesc}>Free up phone storage</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color="#999" />
+          </TouchableOpacity>
+        </View>
+
+        {/* About Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="info" size={20} color="#B71C1C" />
+            <Text style={styles.cardTitle}>About & Support</Text>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => showAlert({
+              title: 'About VALET',
+              message: 'VALET - Your Parking Buddy!\n\n© 2025 VALET Team',
+              type: 'info',
+              icon: 'info',
+              confirmText: 'Cool!'
+            })}
+          >
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="info-outline" size={20} color="#2196F3" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>About VALET</Text>
+                <Text style={styles.settingDesc}>Version 1.0.0</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color="#999" />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => showAlert({
+              title: 'Help & FAQ',
+              message: '❓ Common Questions:\n\n• How do I find parking?\n  Tap on "Floors" to see available spots on each level\n\n• Why does it show "Full"?\n  All parking spots on that floor are taken\n\n• How fresh is the information?\n  VALET updates every 5 seconds to show the latest spots\n\n• What if I need more help?\n  Use the Feedback screen to ask questions!',
+              type: 'info',
+              icon: 'help',
+              confirmText: 'Thanks!'
+            })}
+          >
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="help" size={20} color="#4CAF50" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Help & FAQ</Text>
+                <Text style={styles.settingDesc}>Questions? We have answers!</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color="#999" />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => showAlert({
+              title: 'Contact Support',
+              message: '📞 Need Help?\n\n📧 Email: support@valet-parking.com\n📱 Phone: +63 123 456 7890\n🕒 Available 24/7\n\n💬 Quick Tip: Use the Feedback screen in the app for faster help!\n\nOur friendly support team is here to help with any questions.',
+              type: 'info',
+              icon: 'headset-mic',
+              confirmText: 'Got it'
+            })}
+          >
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="headset-mic" size={20} color="#FF9800" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Contact Support</Text>
+                <Text style={styles.settingDesc}>Need help? We're here!</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color="#999" />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => showAlert({
+              title: 'Privacy Policy',
+              message: '🔒 Your Privacy is Safe:\n\n• We don\'t collect your personal information\n• We only track how the app is used (no names or details)\n• This helps us make VALET better for everyone\n• We follow all privacy laws to protect you\n\nWe respect your privacy and keep your data secure.',
+              type: 'info',
+              icon: 'privacy-tip',
+              confirmText: 'Understood'
+            })}
+          >
+            <View style={styles.settingLeft}>
+              <MaterialIcons name="privacy-tip" size={20} color="#9C27B0" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Privacy Policy</Text>
+                <Text style={styles.settingDesc}>How we keep your info safe</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color="#999" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Reset Button */}
+        <TouchableOpacity style={styles.resetButton} onPress={resetSettings}>
+          <MaterialIcons name="restore" size={20} color="#F44336" />
+          <Text style={styles.resetButtonText}>Reset to Default</Text>
+        </TouchableOpacity>
+
+        {/* Auto-save indicator */}
+        <View style={styles.autoSaveIndicator}>
+          <MaterialIcons name="check-circle" size={16} color="#4CAF50" />
+          <Text style={styles.autoSaveText}>Settings saved automatically</Text>
+        </View>
+      </ScrollView>
+
+      <CustomAlert />
+    </View>
   );
 };
 
@@ -382,55 +577,227 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  headerCard: {
-    margin: 20,
-    elevation: 6,
-    backgroundColor: '#FFEBEE',
-  },
-  headerContent: {
-    flexDirection: 'row',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 20,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  loadingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    width: width * 0.8,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
     color: '#333',
-    marginLeft: 12,
+    fontWeight: '600',
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+  loadingBar: {
+    width: 120,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    marginTop: 20,
+    overflow: 'hidden',
+  },
+  loadingProgress: {
+    width: '70%',
+    height: '100%',
+    backgroundColor: '#B71C1C',
+    borderRadius: 2,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   card: {
-    margin: 20,
-    marginBottom: 10,
-    elevation: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    padding: 20,
+    paddingBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
     color: '#333',
-    marginLeft: 8,
+    marginLeft: 10,
   },
-  buttonContainer: {
+  settingItem: {
     flexDirection: 'row',
-    margin: 20,
-    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  settingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settingText: {
+    marginLeft: 14,
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  settingDesc: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 18,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginLeft: 54,
   },
   resetButton: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 18,
+    marginBottom: 16,
+    borderWidth: 2,
     borderColor: '#F44336',
+    elevation: 2,
+    shadowColor: '#F44336',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  saveButton: {
+  resetButtonText: {
+    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F44336',
+  },
+  autoSaveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#F0F8F0',
+    borderRadius: 12,
+    marginHorizontal: 20,
+  },
+  autoSaveText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  // Alert Styles
+  alertOverlay: {
     flex: 1,
-    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  alertBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  alertContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: width * 0.85,
+    maxWidth: 400,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+  },
+  alertHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  alertIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  alertTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+    textAlign: 'center',
+  },
+  alertMessage: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  alertButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  alertButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertCancelButton: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  alertConfirmButton: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  alertCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  alertConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 
