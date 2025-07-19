@@ -1,4 +1,3 @@
-// src/context/AuthContext.tsx
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import AuthService, { User, LoginCredentials, LoginResponse } from '../services/AuthService';
 
@@ -22,7 +21,6 @@ interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<LoginResponse>;
   logout: () => Promise<void>;
   clearError: () => void;
-  updateUserProfile: (userData: Partial<User>) => Promise<LoginResponse>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +34,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
     case 'LOGIN_SUCCESS':
+      console.log('🎉 Login success in reducer');
       return {
         ...state,
         isAuthenticated: true,
@@ -45,6 +44,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
     case 'LOGIN_FAILURE':
+      console.log('❌ Login failure in reducer:', action.payload);
       return {
         ...state,
         isAuthenticated: false,
@@ -54,6 +54,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: action.payload,
       };
     case 'LOGOUT':
+      console.log('🚪 Logout in reducer');
       return {
         isAuthenticated: false,
         user: null,
@@ -95,27 +96,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const checkStoredAuth = async () => {
       try {
+        console.log('🔍 Checking stored authentication...');
         const { token, user } = await AuthService.getStoredAuthData();
         
         if (token && user) {
-          // Validate token if needed
-          const isValid = await AuthService.validateToken();
-          
-          if (isValid) {
-            dispatch({
-              type: 'LOGIN_SUCCESS',
-              payload: { user, token },
-            });
-          } else {
-            // Token is invalid, clear stored data
-            await AuthService.logout();
-            dispatch({ type: 'LOGOUT' });
-          }
+          console.log('✅ Found stored auth, logging in automatically');
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: { user, token },
+          });
         } else {
+          console.log('❌ No stored auth found');
           dispatch({ type: 'LOGOUT' });
         }
       } catch (error) {
-        console.error('Error checking stored auth:', error);
+        console.error('💥 Error checking stored auth:', error);
         dispatch({ type: 'LOGOUT' });
       }
     };
@@ -124,18 +119,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
+    console.log('🔄 Starting login process...');
     dispatch({ type: 'LOADING' });
 
     try {
-      // Try the proper auth endpoint first
-      let result = await AuthService.login(credentials);
-      
-      // If that fails, try the users list method (fallback)
-      if (!result.success) {
-        result = await AuthService.loginWithUsersList(credentials);
-      }
+      const result = await AuthService.login(credentials);
+      console.log('📊 Login result:', result);
 
       if (result.success && result.user && result.token) {
+        console.log('✅ Login successful, updating state');
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
@@ -144,6 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           },
         });
       } else {
+        console.log('❌ Login failed:', result.message);
         dispatch({
           type: 'LOGIN_FAILURE',
           payload: result.message,
@@ -153,6 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      console.error('💥 Login error:', errorMessage);
       dispatch({
         type: 'LOGIN_FAILURE',
         payload: errorMessage,
@@ -166,11 +160,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async (): Promise<void> => {
     try {
+      console.log('🚪 Starting logout...');
       await AuthService.logout();
       dispatch({ type: 'LOGOUT' });
     } catch (error) {
-      console.error('Logout error:', error);
-      // Still dispatch logout even if there's an error
+      console.error('💥 Logout error:', error);
       dispatch({ type: 'LOGOUT' });
     }
   };
@@ -179,40 +173,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
-  const updateUserProfile = async (userData: Partial<User>): Promise<LoginResponse> => {
-    if (!state.user) {
-      return {
-        success: false,
-        message: 'No user logged in',
-      };
-    }
-
-    try {
-      const result = await AuthService.updateProfile(state.user.id, userData);
-      
-      if (result.success && result.user) {
-        dispatch({
-          type: 'UPDATE_USER',
-          payload: result.user,
-        });
-      }
-
-      return result;
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Update failed',
-      };
-    }
-  };
-
   const value: AuthContextType = {
     ...state,
     login,
     logout,
     clearError,
-    updateUserProfile,
   };
+
+  console.log('🏪 AuthContext state:', {
+    isAuthenticated: state.isAuthenticated,
+    hasUser: !!state.user,
+    loading: state.loading,
+    error: state.error
+  });
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

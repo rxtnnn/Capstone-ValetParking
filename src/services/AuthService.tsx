@@ -1,3 +1,4 @@
+// src/services/AuthService.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface User {
@@ -21,13 +22,6 @@ export interface LoginResponse {
   token?: string;
 }
 
-export interface AuthState {
-  isAuthenticated: boolean;
-  user: User | null;
-  token: string | null;
-  loading: boolean;
-}
-
 class AuthService {
   private baseUrl = 'https://valet.up.railway.app/api';
   
@@ -35,76 +29,90 @@ class AuthService {
   private readonly TOKEN_KEY = 'valet_auth_token';
   private readonly USER_KEY = 'valet_user_data';
 
-  // Login user
-  async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    try {
-      console.log('Attempting login with:', credentials.email);
-      
-      const response = await fetch(`${this.baseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        // Store token and user data
-        if (data.token) {
-          await this.storeAuthData(data.token, data.user);
-        }
-        
-        return {
-          success: true,
-          message: data.message || 'Login successful',
-          user: data.user,
-          token: data.token,
-        };
-      } else {
-        return {
-          success: false,
-          message: data.message || 'Login failed',
-        };
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.',
-      };
-    }
-  }
-
-  // Alternative: Login by verifying user exists (if no auth endpoint)
+  // Login by checking users list (since your admin only provides users API)
   async loginWithUsersList(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      console.log('Attempting login by checking users list...');
+      console.log('🔄 Attempting login for:', credentials.email);
+      console.log('🌐 API URL:', `${this.baseUrl}/users`);
       
+      // Add timeout to fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`${this.baseUrl}/users`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error('❌ API Response not OK:', response.status, response.statusText);
+        
+        if (response.status === 404) {
+          return {
+            success: false,
+            message: 'API endpoint not found. Please check the server.',
+          };
+        } else if (response.status >= 500) {
+          return {
+            success: false,
+            message: 'Server error. Please try again later.',
+          };
+        } else {
+          return {
+            success: false,
+            message: `Server returned error: ${response.status}`,
+          };
+        }
       }
 
-      const users = await response.json();
+      const responseData = await response.json();
+      console.log('📊 Response data structure:', Object.keys(responseData));
       
-      // Find user with matching email (in real app, password should be verified server-side)
-      const user = users.find((u: any) => 
-        u.email.toLowerCase() === credentials.email.toLowerCase()
-      );
+      // Extract users array from the response object
+      const users = responseData.users || responseData;
+      console.log('📊 Users extracted:', users?.length || 'No length property');
+      console.log('📊 Users data type:', typeof users);
+      console.log('📊 First user sample:', users?.[0]);
+      
+      if (!Array.isArray(users)) {
+        console.error('❌ Users data is not an array:', users);
+        return {
+          success: false,
+          message: 'Invalid response format from server.',
+        };
+      }
+
+      // Find user with matching email
+      const user = users.find((u: any) => {
+        const userEmail = u.email?.toLowerCase();
+        const inputEmail = credentials.email.toLowerCase();
+        console.log('🔍 Comparing:', userEmail, 'vs', inputEmail);
+        return userEmail === inputEmail;
+      });
 
       if (user) {
-        // For demo purposes - in production, password verification should be server-side
-        const mockToken = `mock_token_${user.id}_${Date.now()}`;
+        console.log('✅ User found:', user.email);
+        console.log('👤 User details:', { id: user.id, name: user.name, role: user.role });
+        
+        // Check if user is active
+        if (user.is_active === false) {
+          return {
+            success: false,
+            message: 'Your account has been deactivated. Please contact the administrator.',
+          };
+        }
+        
+        // For demo purposes - generate a token
+        const mockToken = `valet_token_${user.id}_${Date.now()}`;
         await this.storeAuthData(mockToken, user);
         
         return {
@@ -114,18 +122,47 @@ class AuthService {
           token: mockToken,
         };
       } else {
+        console.log('❌ User not found with email:', credentials.email);
+        console.log('📋 Available emails:', users.map((u: any) => u.email));
         return {
           success: false,
-          message: 'Invalid email or password',
+          message: 'Invalid email or password. Please check your credentials.',
         };
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.',
-      };
+    } catch (error: any) {
+      console.error('💥 Login error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          message: 'Request timeout. Please check your internet connection.',
+        };
+      } else if (error.message.includes('Network request failed')) {
+        return {
+          success: false,
+          message: 'Network error. Please check your internet connection and try again.',
+        };
+      } else if (error.message.includes('Failed to fetch')) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Please check your internet connection.',
+        };
+      } else {
+        return {
+          success: false,
+          message: `Connection error: ${error.message}`,
+        };
+      }
     }
+  }
+
+  // Main login method
+  async login(credentials: LoginCredentials): Promise<LoginResponse> {
+    return this.loginWithUsersList(credentials);
   }
 
   // Store authentication data
@@ -135,8 +172,9 @@ class AuthService {
         AsyncStorage.setItem(this.TOKEN_KEY, token),
         AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user)),
       ]);
+      console.log('💾 Auth data stored successfully');
     } catch (error) {
-      console.error('Error storing auth data:', error);
+      console.error('💾 Error storing auth data:', error);
     }
   }
 
@@ -149,10 +187,11 @@ class AuthService {
       ]);
 
       const user = userData ? JSON.parse(userData) : null;
+      console.log('📱 Stored auth data:', { hasToken: !!token, hasUser: !!user });
       
       return { token, user };
     } catch (error) {
-      console.error('Error getting stored auth data:', error);
+      console.error('📱 Error getting stored auth data:', error);
       return { token: null, user: null };
     }
   }
@@ -161,32 +200,12 @@ class AuthService {
   async isAuthenticated(): Promise<boolean> {
     try {
       const { token, user } = await this.getStoredAuthData();
-      return !!(token && user);
+      const isAuth = !!(token && user);
+      console.log('🔐 Is authenticated:', isAuth);
+      return isAuth;
     } catch (error) {
-      console.error('Error checking authentication:', error);
+      console.error('🔐 Error checking authentication:', error);
       return false;
-    }
-  }
-
-  // Get current user
-  async getCurrentUser(): Promise<User | null> {
-    try {
-      const { user } = await this.getStoredAuthData();
-      return user;
-    } catch (error) {
-      console.error('Error getting current user:', error);
-      return null;
-    }
-  }
-
-  // Get auth token
-  async getToken(): Promise<string | null> {
-    try {
-      const { token } = await this.getStoredAuthData();
-      return token;
-    } catch (error) {
-      console.error('Error getting token:', error);
-      return null;
     }
   }
 
@@ -197,88 +216,22 @@ class AuthService {
         AsyncStorage.removeItem(this.TOKEN_KEY),
         AsyncStorage.removeItem(this.USER_KEY),
       ]);
+      console.log('🚪 Logged out successfully');
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('🚪 Error during logout:', error);
     }
   }
 
-  // Validate token (check if still valid)
+  // Get current user
+  async getCurrentUser(): Promise<User | null> {
+    const { user } = await this.getStoredAuthData();
+    return user;
+  }
+
+  // Validate token
   async validateToken(): Promise<boolean> {
-    try {
-      const token = await this.getToken();
-      if (!token) return false;
-
-      // You can implement token validation here if your API supports it
-      // For now, we'll just check if token exists
-      return true;
-    } catch (error) {
-      console.error('Error validating token:', error);
-      return false;
-    }
-  }
-
-  // Get all users (for admin or testing purposes)
-  async getAllUsers(): Promise<User[]> {
-    try {
-      const response = await fetch(`${this.baseUrl}/users`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const users = await response.json();
-      return users;
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw new Error('Failed to fetch users');
-    }
-  }
-
-  // Update user profile
-  async updateProfile(userId: number, userData: Partial<User>): Promise<LoginResponse> {
-    try {
-      const token = await this.getToken();
-      
-      const response = await fetch(`${this.baseUrl}/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Update stored user data
-        await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(data.user || userData));
-        
-        return {
-          success: true,
-          message: 'Profile updated successfully',
-          user: data.user || userData,
-        };
-      } else {
-        return {
-          success: false,
-          message: data.message || 'Failed to update profile',
-        };
-      }
-    } catch (error) {
-      console.error('Update profile error:', error);
-      return {
-        success: false,
-        message: 'Network error. Please try again.',
-      };
-    }
+    const { token } = await this.getStoredAuthData();
+    return !!token;
   }
 }
 

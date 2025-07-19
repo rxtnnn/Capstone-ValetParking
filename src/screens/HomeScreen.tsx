@@ -9,14 +9,17 @@ import {
   StatusBar,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
+import { useAuth } from '../context/AuthContext';
 import { styles } from './styles/HomeScreen.style';
+
 type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
@@ -26,6 +29,7 @@ type RootStackParamList = {
   Settings: undefined;
   Profile: undefined;
   ApiTest: undefined;
+  Register: undefined;
 };
 
 type HomeScreenNavigationProp = NavigationProp<RootStackParamList>;
@@ -85,6 +89,7 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const { user, logout, isAuthenticated } = useAuth();
   
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -105,6 +110,15 @@ const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showFullAlert, setShowFullAlert] = useState(false);
 
+  // Check authentication when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isAuthenticated) {
+        navigation.navigate('Register');
+      }
+    }, [isAuthenticated, navigation])
+  );
+
   const getFloorName = (floorNumber: number): string => {
     const suffixes = ['th', 'st', 'nd', 'rd'];
     const remainder = floorNumber % 100;
@@ -123,6 +137,29 @@ const HomeScreen: React.FC = () => {
     } else {
       navigation.navigate('ParkingMap');
     }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+              navigation.navigate('Register');
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const extractFloorFromLocation = (floor_level: string): number => {
@@ -221,6 +258,11 @@ const HomeScreen: React.FC = () => {
     let unsubscribeParkingUpdates: (() => void) | undefined;
     let unsubscribeConnectionStatus: (() => void) | undefined;
     
+    // Only fetch parking data if user is authenticated
+    if (!isAuthenticated) {
+      return;
+    }
+
     try {
       unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => { //register to subscribe to parking updates
         setParkingData(data); 
@@ -249,7 +291,7 @@ const HomeScreen: React.FC = () => {
       console.error('Error setting up service:', error);
       fetchParkingDataDirect();
     }
-  }, [loading]);
+  }, [loading, isAuthenticated]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -299,6 +341,11 @@ const HomeScreen: React.FC = () => {
 
   const floorsToDisplay = prepareFloorsForDisplay(parkingData.floors);
 
+  // Don't render if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
+
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -306,7 +353,7 @@ const HomeScreen: React.FC = () => {
           <Ionicons name="car" size={48} color="#B22020" />
           <Text style={styles.loadingText}>Loading VALET...</Text>
           <Text style={styles.loadingSubtext}>
-            'Fetching real-time parking data'
+            Welcome {user?.name || user?.email}! Fetching real-time parking data...
           </Text>
         </View>
       </View>
@@ -329,7 +376,9 @@ const HomeScreen: React.FC = () => {
             </View>
             <View style={styles.titleSection}>
               <Text style={styles.valetText}>VALET</Text>
-              <Text style={styles.subtitle}>Your Virtual Parking Buddy</Text>
+              <Text style={styles.subtitle}>
+                Welcome, {user?.name || user?.email?.split('@')[0] || 'User'}!
+              </Text>
             </View>
           </View>
           
@@ -339,6 +388,9 @@ const HomeScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Settings')}>
               <Ionicons name="settings-outline" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={24} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -552,6 +604,10 @@ const HomeScreen: React.FC = () => {
         <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Profile')}>
           <Ionicons name="person-outline" size={24} color="white" />
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Feedback')}>
+          <Ionicons name="chatbubble-outline" size={24} color="white" />
+        </TouchableOpacity>
       </View>
 
       {/* Full Alert Modal */}
@@ -561,11 +617,11 @@ const HomeScreen: React.FC = () => {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>No Available Slots</Text>
               <Text style={styles.modalText}>
-                This floor is currently full. Please choose another floor.
+                This floor is currently full. Please choose another floor or wait for someone to leave.
               </Text>
               <View style={styles.modalButtons}>
                 <TouchableOpacity onPress={() => setShowFullAlert(false)} style={styles.cancelButton}>
-                  <Text style={styles.cancelButtonText}>Close</Text>
+                  <Text style={styles.cancelButtonText}>OK</Text>
                 </TouchableOpacity>
               </View>
             </View>

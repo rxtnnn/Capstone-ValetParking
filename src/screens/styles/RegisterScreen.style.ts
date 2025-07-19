@@ -1,6 +1,5 @@
 import { StyleSheet } from 'react-native';
 
-
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -30,6 +29,7 @@ export const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    justifyContent: 'center', // Added for better centering
   },
   imagePlaceholder: {
     height: 150,
@@ -50,17 +50,20 @@ export const styles = StyleSheet.create({
   },
   welcomeSection: {
     marginBottom: 40,
+    alignItems: 'center', // Added for center alignment
   },
   welcomeTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 8,
+    textAlign: 'center', // Added for center alignment
   },
   welcomeSubtitle: {
     fontSize: 16,
     color: '#6B7280',
     fontWeight: '400',
+    textAlign: 'center', // Added for center alignment
   },
   form: {
     flex: 1,
@@ -192,12 +195,89 @@ export const styles = StyleSheet.create({
     color: '#C53030',
     fontWeight: '600',
   },
-  image:{
+  image: {
     width: 300,
     height: 300,
     marginLeft: 35,
     marginTop: 45,
     alignItems: 'center',
     justifyContent: 'center',
-  }
+  },
+
+  // ADDED AUTHENTICATION-RELATED STYLES
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#C53030',
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
+  },
+
+  // Input with icons
+  inputIcon: {
+    position: 'absolute',
+    left: 16,
+    top: 15,
+    zIndex: 1,
+  },
+  textInputWithIcon: {
+    paddingLeft: 48,
+  },
+  passwordInputWithIcon: {
+    paddingLeft: 48,
+    paddingRight: 50,
+  },
+
+  // Loading states
+  loginButtonDisabled: {
+    opacity: 0.7,
+    backgroundColor: '#9CA3AF',
+  },
+  loginButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#F3F4F6',
+  },
+
+  // Test login button (development only)
+  testLoginButton: {
+    height: 40,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  testLoginButtonText: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Additional helper styles
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#374151',
+    marginTop: 16,
+  },
 });
