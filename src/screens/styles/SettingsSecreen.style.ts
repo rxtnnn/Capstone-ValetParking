@@ -1,6 +1,7 @@
 import { StyleSheet, Dimensions} from 'react-native';
 
 const { width } = Dimensions.get('window');
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -31,12 +32,6 @@ export const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
-  loadingSubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
   loadingBar: {
     width: 120,
     height: 4,
@@ -55,97 +50,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
-  },
-  profileCard: {
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 20,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  avatarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  userStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  userType: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    flex: 1,
-  },
-  activeStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  activeText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  userDepartment: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  editButtonText: {
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -169,78 +73,39 @@ export const styles = StyleSheet.create({
     color: '#333',
     marginLeft: 10,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#B71C1C',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  infoText: {
-    marginLeft: 14,
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  actionItem: {
+  settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-  actionLeft: {
+  settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  actionText: {
+  settingText: {
     marginLeft: 14,
     flex: 1,
   },
-  actionTitle: {
+  settingTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 2,
   },
-  actionDesc: {
+  settingDesc: {
     fontSize: 14,
     color: '#666',
+    lineHeight: 18,
   },
   divider: {
     height: 1,
     backgroundColor: '#F0F0F0',
     marginLeft: 54,
   },
-  signOutButton: {
+  resetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -256,23 +121,28 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  signOutButtonText: {
+  resetButtonText: {
     marginLeft: 10,
     fontSize: 16,
     fontWeight: '600',
     color: '#F44336',
   },
-  refreshHint: {
+  autoSaveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#F0F8F0',
+    borderRadius: 12,
+    marginHorizontal: 20,
   },
-  refreshHintText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: '#999',
+  autoSaveText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   // Alert Styles
   alertOverlay: {
@@ -320,9 +190,9 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   alertMessage: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#666',
-    lineHeight: 24,
+    lineHeight: 18,
     textAlign: 'center',
     marginBottom: 24,
   },

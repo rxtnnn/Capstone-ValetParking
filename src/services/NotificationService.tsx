@@ -1,11 +1,9 @@
-// src/services/NotificationService.ts
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ✅ FIXED: Same interface as Settings screen
 interface NotificationSettings {
   spotAvailable: boolean;
   floorUpdates: boolean;
@@ -14,7 +12,6 @@ interface NotificationSettings {
   sound: boolean;
 }
 
-// ✅ FIXED: Same storage key as Settings screen
 const SETTINGS_KEY = '@valet_notification_settings';
 
 class NotificationServiceClass {
@@ -37,14 +34,12 @@ class NotificationServiceClass {
       }
 
       await this.registerForPushNotifications();
-      console.log('✅ NotificationService initialized');
     } catch (error) {
-      console.error('❌ Error initializing NotificationService:', error);
+      console.error('Error initializing NotificationService:', error);
     }
   }
 
   private async createNotificationChannels(): Promise<void> {
-    // Spot Available Channel
     await Notifications.setNotificationChannelAsync('spot-available', {
       name: 'Parking Spots Available',
       description: 'Notifications when new parking spots become available',
@@ -54,7 +49,6 @@ class NotificationServiceClass {
       lightColor: '#4CAF50',
     });
 
-    // Floor Updates Channel
     await Notifications.setNotificationChannelAsync('floor-updates', {
       name: 'Floor Status Updates',
       description: 'Updates about floor occupancy changes',
@@ -64,17 +58,6 @@ class NotificationServiceClass {
       lightColor: '#2196F3',
     });
 
-    // Maintenance Alerts Channel
-    await Notifications.setNotificationChannelAsync('maintenance-alerts', {
-      name: 'Maintenance Alerts',
-      description: 'Important maintenance and system updates',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 200, 100, 200],
-      sound: 'default',
-      lightColor: '#FF9800',
-    });
-
-    // Connection Status Channel
     await Notifications.setNotificationChannelAsync('connection-status', {
       name: 'Connection Status',
       description: 'VALET connection status updates',
@@ -117,7 +100,6 @@ class NotificationServiceClass {
         });
         token = tokenData.data;
         this.expoPushToken = token;
-        console.log('📱 Push token obtained:', token.substring(0, 20) + '...');
       } catch (error) {
         console.error('Error getting push token:', error);
       }
@@ -128,7 +110,6 @@ class NotificationServiceClass {
     return token;
   }
 
-  // ✅ FIXED: Now checks the correct setting for spot notifications
   async showSpotAvailableNotification(
     spotsAvailable: number,
     floor?: number
@@ -136,13 +117,11 @@ class NotificationServiceClass {
     try {
       const settings = await this.getNotificationSettings();
       
-      // Check if spot available notifications are enabled
       if (!settings.spotAvailable) {
-        console.log('🔕 Spot available notifications disabled');
         return;
       }
 
-      const title = '🅿️ Parking Spots Available!';
+      const title = 'Parking Spots Available!';
       const message = floor 
         ? `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}`
         : `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available`;
@@ -159,14 +138,11 @@ class NotificationServiceClass {
         'spot-available',
         settings
       );
-
-      console.log(`🔔 Spot notification sent: ${spotsAvailable} spots`);
     } catch (error) {
-      console.error('❌ Error showing spot notification:', error);
+      console.error('Error showing spot notification:', error);
     }
   }
 
-  // ✅ FIXED: Now checks floorUpdates setting specifically
   async showFloorUpdateNotification(
     floor: number, 
     availableSpots: number,
@@ -175,14 +151,12 @@ class NotificationServiceClass {
     try {
       const settings = await this.getNotificationSettings();
       
-      // Check if floor update notifications are enabled
       if (!settings.floorUpdates) {
-        console.log('🔕 Floor update notifications disabled');
         return;
       }
 
       await this.showLocalNotification(
-        '📊 Floor Update',
+        'Floor Update',
         `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`,
         { 
           type: 'floor-update', 
@@ -195,49 +169,19 @@ class NotificationServiceClass {
         settings
       );
 
-      console.log(`🔔 Floor update sent: Floor ${floor} - ${availableSpots}/${totalSpots}`);
+      console.log(`Floor update sent: Floor ${floor} - ${availableSpots}/${totalSpots}`);
     } catch (error) {
-      console.error('❌ Error showing floor update:', error);
+      console.error('Error showing floor update:', error);
     }
   }
 
-  // ✅ NEW: Maintenance alerts with proper setting check
-  async showMaintenanceAlert(message: string): Promise<void> {
-    try {
-      const settings = await this.getNotificationSettings();
-      
-      // Check if maintenance alerts are enabled
-      if (!settings.maintenanceAlerts) {
-        console.log('🔕 Maintenance alerts disabled');
-        return;
-      }
-
-      await this.showLocalNotification(
-        '🔧 Maintenance Alert',
-        message,
-        { 
-          type: 'maintenance-alert',
-          timestamp: Date.now()
-        },
-        'maintenance-alerts',
-        settings
-      );
-
-      console.log('🔔 Maintenance alert sent:', message);
-    } catch (error) {
-      console.error('❌ Error showing maintenance alert:', error);
-    }
-  }
-
-  // ✅ IMPROVED: Connection status with better logic
   async showConnectionStatusNotification(isConnected: boolean): Promise<void> {
     try {
-      // Always show connection status (not user-configurable)
       const settings = await this.getNotificationSettings();
       
       if (isConnected) {
         await this.showLocalNotification(
-          '🔗 VALET Connected',
+          'VALET Connected',
           'Real-time parking data is now available',
           { 
             type: 'connection-status',
@@ -249,7 +193,7 @@ class NotificationServiceClass {
         );
       } else {
         await this.showLocalNotification(
-          '⚠️ VALET Disconnected',
+          'VALET Disconnected',
           'Trying to reconnect to parking data...',
           { 
             type: 'connection-status',
@@ -261,13 +205,11 @@ class NotificationServiceClass {
         );
       }
 
-      console.log(`🔔 Connection status: ${isConnected ? 'Connected' : 'Disconnected'}`);
     } catch (error) {
-      console.error('❌ Error showing connection status:', error);
+      console.error('Error showing connection status:', error);
     }
   }
 
-  // ✅ CORE: Enhanced notification function with settings respect
   private async showLocalNotification(
     title: string, 
     message: string, 
@@ -289,20 +231,17 @@ class NotificationServiceClass {
       });
 
     } catch (error) {
-      console.error('❌ Error scheduling notification:', error);
+      console.error('Error scheduling notification:', error);
     }
   }
 
-  // ✅ FIXED: Uses same storage key and structure as Settings
   async getNotificationSettings(): Promise<NotificationSettings> {
     try {
       const settings = await AsyncStorage.getItem(SETTINGS_KEY);
       if (settings) {
         const parsed = JSON.parse(settings);
-        console.log('📋 Loaded notification settings:', parsed);
         return parsed;
       } else {
-        // Default settings - same as Settings screen
         const defaultSettings = {
           spotAvailable: true,
           floorUpdates: true,
@@ -310,11 +249,10 @@ class NotificationServiceClass {
           vibration: true,
           sound: true,
         };
-        console.log('📋 Using default notification settings');
         return defaultSettings;
       }
     } catch (error) {
-      console.error('❌ Error loading settings:', error);
+      console.error('Error loading settings:', error);
       return {
         spotAvailable: true,
         floorUpdates: true,
@@ -325,20 +263,18 @@ class NotificationServiceClass {
     }
   }
 
-  // ✅ FIXED: Saves to same location as Settings screen
   async saveNotificationSettings(settings: NotificationSettings): Promise<void> {
     try {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      console.log('💾 Notification settings saved:', settings);
     } catch (error) {
-      console.error('❌ Error saving notification settings:', error);
+      console.error('Error saving notification settings:', error);
     }
   }
 
   async requestPermissions(): Promise<boolean> {
     try {
       if (!Device.isDevice) {
-        console.warn('⚠️ Physical device required for notifications');
+        console.warn('Physical device required for notifications');
         return false;
       }
 
@@ -351,10 +287,10 @@ class NotificationServiceClass {
       }
       
       const granted = finalStatus === 'granted';
-      console.log(`🔔 Notification permissions: ${granted ? 'Granted' : 'Denied'}`);
+      console.log(`Notification permissions: ${granted ? 'Granted' : 'Denied'}`);
       return granted;
     } catch (error) {
-      console.error('❌ Error requesting permissions:', error);
+      console.error('Error requesting permissions:', error);
       return false;
     }
   }
@@ -363,13 +299,11 @@ class NotificationServiceClass {
     return this.expoPushToken;
   }
 
-  // ✅ NEW: Method to test notifications (for debugging)
   async testNotification(): Promise<void> {
     const settings = await this.getNotificationSettings();
-    console.log('🧪 Testing notification with settings:', settings);
     
     await this.showLocalNotification(
-      '🧪 VALET Test',
+      'VALET Test',
       'This is a test notification to verify your settings work!',
       { type: 'test', timestamp: Date.now() },
       'default',
@@ -377,7 +311,6 @@ class NotificationServiceClass {
     );
   }
 
-  // ✅ NEW: Get notification status for debugging
   getStatus() {
     return {
       hasToken: !!this.expoPushToken,

@@ -136,7 +136,7 @@ const LoginScreen: React.FC = () => {
 
   // Test login with demo credentials
   const handleTestLogin = () => {
-    setEmail('testuser@gmail.com');
+    setEmail('user@valet.com');
     setPassword('password123');
   };
 

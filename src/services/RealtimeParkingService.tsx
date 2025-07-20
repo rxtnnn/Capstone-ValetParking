@@ -172,7 +172,7 @@ class RealTimeParkingServiceClass {
       this.setConnectionStatus('connected'); 
       this.retryCount = 0; 
       
-      console.log(`✅ Successfully updated parking data - ${newData.availableSpots}/${newData.totalSpots} spots available`);
+      console.log(`Sucessfully updated parking data - ${newData.availableSpots}/${newData.totalSpots} spots available`);
       
     } catch (error: any) {
       this.retryCount++;
@@ -198,7 +198,7 @@ class RealTimeParkingServiceClass {
           }
         }, delay);
       } else {
-        console.error('🚫 Max retries exceeded, stopping automatic updates');
+        console.error('Max retries exceeded, stopping automatic updates');
         this.stop();
       }
     }
@@ -279,9 +279,9 @@ class RealTimeParkingServiceClass {
     //check new spots
     if (newData.availableSpots > oldData.availableSpots) {
       const increase = newData.availableSpots - oldData.availableSpots; //detects if more spots available
-      console.log(`🎉 ${increase} new spot(s) available!`);
+      console.log(`${increase} new spot(s) available!`);
       
-      // ✅ FIXED: Use correct method for spot notifications
+      // FIXED: Use correct method for spot notifications
       NotificationService.showSpotAvailableNotification(
         newData.availableSpots,
         // Find which floor has the most available spots
@@ -327,7 +327,7 @@ class RealTimeParkingServiceClass {
     if (this.connectionStatus !== status) {
       const oldStatus = this.connectionStatus;
       this.connectionStatus = status;
-      console.log(`🔗 Connection status: ${oldStatus} → ${status}`);
+      console.log(`Connection status: ${oldStatus} → ${status}`);
       
       this.connectionCallbacks.forEach(callback => {
         try {
@@ -347,11 +347,11 @@ class RealTimeParkingServiceClass {
 
   // Manual refresh for user-triggered updates
   async forceUpdate(): Promise<void> {
-    console.log('🔄 Force update requested');
+    console.log('Force update requested');
     if (this.isRunning) {
       await this.fetchAndUpdate();
     } else {
-      console.warn('⚠️ Service not running, cannot force update');
+      console.warn('Service not running, cannot force update');
     }
   }
 

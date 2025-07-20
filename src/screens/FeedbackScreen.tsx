@@ -135,7 +135,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       return false;
     }
 
-    // Email validation if provided
     if (email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) {
@@ -206,7 +205,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
       // Show success message
       Alert.alert(
-        'Thank You! 🙏',
+        'Thank You!',
         'Your feedback has been submitted successfully. We appreciate your input and will use it to improve VALET!\n\nFeedback ID: ' + feedbackId.substring(0, 8),
         [
           { 

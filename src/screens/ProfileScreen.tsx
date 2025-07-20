@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Modal,
@@ -14,8 +13,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
+import { styles } from './styles/ProfileScreen.style';
 
-const { width } = Dimensions.get('window');
 
 type RootStackParamList = {
   Splash: undefined;
@@ -43,13 +43,14 @@ interface User {
   id: number;
   name: string;
   email: string;
-  role: string;
-  role_display: string;
+  role?: string;
+  role_display?: string;
   employee_id?: string;
   student_id?: string;
-  department: string;
-  is_active: boolean;
-  created_at: string;
+  department?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
   phone?: string;
   year_level?: string;
   course?: string;
@@ -79,7 +80,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [alert, setAlert] = useState<AlertConfig>({
     visible: false,
     title: '',
@@ -90,15 +90,12 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const fadeAnim = new Animated.Value(0);
   const scaleAnim = new Animated.Value(0.8);
 
-  useEffect(() => {
-    loadCurrentUser();
-  }, []);
-
-  useEffect(() => {
-    if (currentUserId) {
-      loadUserProfile();
-    }
-  }, [currentUserId]);
+  // Refresh profile data when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCurrentUser();
+    }, [])
+  );
 
   useEffect(() => {
     if (alert.visible) {
@@ -141,36 +138,61 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const loadCurrentUser = async () => {
     try {
-      // Check if specific user ID was passed via navigation
-      const targetUserId = route?.params?.userId;
+      setIsLoading(true);
+      // First, try to get user from route params
+      const routeUserId = route?.params?.userId;
       
-      if (targetUserId) {
-        setCurrentUserId(targetUserId);
+      // If no route user ID, get logged-in user ID from AuthService storage
+      const userData = await AsyncStorage.getItem('valet_user_data');
+      
+      if (!userData && !routeUserId) {
+        showAlert({
+          title: 'Not Logged In',
+          message: 'Please log in to view your profile.',
+          type: 'warning',
+          icon: 'login',
+          confirmText: 'Go to Login',
+          onConfirm: () => {
+            AsyncStorage.multiRemove(['valet_auth_token', 'valet_user_data']);
+            navigation.navigate('Home');
+          }
+        });
         return;
       }
 
-      // Try to get current user ID from storage
-      const storedUserId = await AsyncStorage.getItem('@current_user_id');
-      if (storedUserId) {
-        setCurrentUserId(parseInt(storedUserId));
-        return;
+      let targetUserId: number;
+      
+      if (routeUserId) {
+        targetUserId = routeUserId;
+        console.log('Using user ID from route params:', targetUserId);
+      } else {
+        const loggedInUser = JSON.parse(userData!);
+        targetUserId = loggedInUser.id;
+        console.log('Using logged-in user ID from storage:', targetUserId);
       }
 
-      // Default to first user if no specific ID
-      setCurrentUserId(1);
+      // Fetch latest user data from API
+      await fetchUserFromAPI(targetUserId);
+
     } catch (error) {
-      console.error('Error loading current user ID:', error);
-      setCurrentUserId(1);
+      console.error('Error loading current user:', error);
+      showAlert({
+        title: 'Loading Error',
+        message: 'Couldn\'t load your profile. Please try logging in again.',
+        type: 'warning',
+        icon: 'warning',
+        confirmText: 'OK',
+        onConfirm: () => navigation.navigate('Home')
+      });
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const loadUserProfile = async () => {
+  const fetchUserFromAPI = async (userId: number) => {
     try {
-      setIsLoading(true);
-      console.log(`📡 Fetching profile for user ID: ${currentUserId}`);
-
-      // Fetch user data
-      const userResponse = await fetch('https://valet.up.railway.app/api/users', {
+      const response = await fetch('https://valet.up.railway.app/api/users', {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -179,25 +201,26 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         },
       });
 
-      if (!userResponse.ok) {
-        throw new Error(`HTTP ${userResponse.status}: ${userResponse.statusText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const userData = await userResponse.json();
-      console.log('✅ User data loaded:', userData);
-
-      // Find specific user or use first one
-      let userInfo: User | null = null;
-      if (userData.users && Array.isArray(userData.users)) {
-        userInfo = userData.users.find((u: { id: number | null; }) => u.id === currentUserId) || userData.users[0];
+      const responseData = await response.json();
+      const users = responseData.users || responseData;
+      
+      if (!Array.isArray(users)) {
+        throw new Error('Invalid API response format - users is not an array');
       }
 
-      if (!userInfo) {
-        throw new Error('User not found');
+      const currentUser = users.find((u: any) => u.id === userId);
+
+      if (!currentUser) {
+        throw new Error(`User with ID ${userId} not found in API response`);
       }
 
-      // Check if user is admin - mobile app is for users only
-      if (userInfo.role === 'admin') {
+      console.log('👤 Current user found:', currentUser.name || currentUser.email);
+
+      if (currentUser.role === 'admin') {
         showAlert({
           title: 'Access Restricted',
           message: 'Admin accounts should use the web dashboard. This mobile app is designed for students and staff only.',
@@ -209,34 +232,88 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         return;
       }
 
-      setUser(userInfo);
+      // Check if user account is active
+      if (currentUser.is_active === false) {
+        showAlert({
+          title: 'Account Inactive',
+          message: 'Your account has been deactivated. Please contact the administrator.',
+          type: 'warning',
+          icon: 'block',
+          confirmText: 'OK',
+          onConfirm: () => {
+            handleForceLogout();
+          }
+        });
+        return;
+      }
 
-      // Load user stats (simulated for now - replace with real API call)
-      await loadUserStats(userInfo.id);
+      // Update user data in local storage with latest from API (only if it's the logged-in user)
+      const storedUserData = await AsyncStorage.getItem('valet_user_data');
+      if (storedUserData) {
+        const storedUser = JSON.parse(storedUserData);
+        if (storedUser.id === userId) {
+          await AsyncStorage.setItem('valet_user_data', JSON.stringify(currentUser));
+        }
+      }
+      
+      setUser(currentUser);
+      await loadUserStats(currentUser.id);
 
     } catch (error: any) {
-      console.error('❌ Error loading profile:', error);
-      showAlert({
-        title: 'Loading Error',
-        message: error.message === 'User not found' 
-          ? 'User account not found. Please contact support.'
-          : 'Couldn\'t load profile data. Please check your connection and try again.',
-        type: 'warning',
-        icon: 'warning',
-        confirmText: 'OK',
-      });
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+      if (error.message.includes('not found in API')) {
+        showAlert({
+          title: 'Account Not Found',
+          message: 'Your account was not found in the system. Please contact support or try logging in again.',
+          type: 'warning',
+          icon: 'warning',
+          confirmText: 'Logout',
+          onConfirm: () => handleForceLogout()
+        });
+      } else if (error.message.includes('HTTP 404')) {
+        showAlert({
+          title: 'Service Unavailable',
+          message: 'The user service is currently unavailable. Please try again later.',
+          type: 'warning',
+          icon: 'warning',
+          confirmText: 'OK'
+        });
+      } else if (error.message.includes('Network') || error.message.includes('fetch')) {
+        showAlert({
+          title: 'Connection Error',
+          message: 'Cannot connect to the server. Please check your internet connection and try again.',
+          type: 'warning',
+          icon: 'warning',
+          confirmText: 'Retry',
+          onConfirm: () => loadCurrentUser()
+        });
+      } else {
+        showAlert({
+          title: 'Loading Error',
+          message: `Couldn't load profile data: ${error.message}`,
+          type: 'warning',
+          icon: 'warning',
+          confirmText: 'OK'
+        });
+      }
+    }
+  };
+
+  const handleForceLogout = async () => {
+    try {
+      await AsyncStorage.multiRemove([
+        'valet_auth_token', 
+        'valet_user_data', 
+        '@valet_notification_settings'
+      ]);
+      navigation.navigate('Splash');
+    } catch (error) {
+      console.error('Error during force logout:', error);
+      navigation.navigate('Splash');
     }
   };
 
   const loadUserStats = async (userId: number) => {
     try {
-      // Simulate user stats - replace with actual API call
-      // const statsResponse = await fetch(`https://valet.up.railway.app/api/users/${userId}/stats`);
-      
-      // Mock data for now
       const mockStats: UserStats = {
         totalParkingSessions: Math.floor(Math.random() * 50) + 10,
         hoursParked: Math.floor(Math.random() * 200) + 50,
@@ -245,6 +322,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       };
       
       setUserStats(mockStats);
+      console.log('✅ User stats loaded');
     } catch (error) {
       console.error('Error loading user stats:', error);
       // Stats are optional, don't show error
@@ -253,7 +331,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadUserProfile();
+    loadCurrentUser();
   };
 
   const handleLogout = () => {
@@ -267,9 +345,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       onConfirm: async () => {
         try {
           await AsyncStorage.multiRemove([
-            '@user_token', 
-            '@user_data', 
-            '@current_user_id',
+            'valet_auth_token', 
+            'valet_user_data', 
             '@valet_notification_settings'
           ]);
           
@@ -335,10 +412,11 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const getUserTypeIcon = (role: string) => {
-    switch (role.toLowerCase()) {
+    switch (role?.toLowerCase()) {
       case 'staff': return 'work' as const;
       case 'student': return 'school' as const;
       case 'faculty': return 'person' as const;
+      case 'user': return 'person' as const;
       default: return 'person' as const;
     }
   };
@@ -359,104 +437,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         color: '#2196F3',
         onPress: () => navigation.navigate('Feedback'),
       },
-      {
-        icon: 'history' as const,
-        title: 'Parking History',
-        desc: 'View your parking sessions',
-        color: '#9C27B0',
-        onPress: () => showAlert({
-          title: 'Parking History',
-          message: 'Your parking history will show here soon! Track where and when you\'ve parked on campus.',
-          type: 'info',
-          icon: 'history',
-          confirmText: 'Awesome!'
-        }),
-      },
-      {
-        icon: 'notifications' as const,
-        title: 'Notification Center',
-        desc: 'View recent parking alerts',
-        color: '#FF9800',
-        onPress: () => showAlert({
-          title: 'Notification Center',
-          message: 'Your notification history and parking alerts will appear here. Stay updated on parking availability!',
-          type: 'info',
-          icon: 'notifications',
-          confirmText: 'Got it!'
-        }),
-      },
     ];
-  };
-
-  const getDynamicActions = () => {
-    const baseActions = [
-      {
-        icon: 'settings',
-        title: 'App Settings',
-        desc: 'Manage notifications and preferences',
-        color: '#4CAF50',
-        onPress: () => navigation.navigate('Settings'),
-      },
-      {
-        icon: 'feedback',
-        title: 'Send Feedback',
-        desc: 'Help us improve VALET',
-        color: '#2196F3',
-        onPress: () => navigation.navigate('Feedback'),
-      },
-    ];
-
-    const adminActions = [
-      {
-        icon: 'dashboard',
-        title: 'Admin Dashboard',
-        desc: 'Manage parking and users',
-        color: '#F44336',
-        onPress: () => showAlert({
-          title: 'Admin Dashboard',
-          message: 'Admin dashboard feature coming soon! This will allow you to manage parking spaces, view analytics, and configure system settings.',
-          type: 'info',
-          icon: 'dashboard',
-          confirmText: 'Got it'
-        }),
-      },
-      {
-        icon: 'analytics',
-        title: 'View Analytics',
-        desc: 'Parking usage statistics',
-        color: '#FF9800',
-        onPress: () => showAlert({
-          title: 'Analytics',
-          message: 'Analytics dashboard coming soon! Track parking usage, peak hours, and system performance.',
-          type: 'info',
-          icon: 'analytics',
-          confirmText: 'Cool!'
-        }),
-      },
-    ];
-
-    const studentActions = [
-      {
-        icon: 'history',
-        title: 'Parking History',
-        desc: 'View your parking sessions',
-        color: '#9C27B0',
-        onPress: () => showAlert({
-          title: 'Parking History',
-          message: 'Your parking history will show here soon! Track where and when you\'ve parked on campus.',
-          type: 'info',
-          icon: 'history',
-          confirmText: 'Awesome!'
-        }),
-      },
-    ];
-
-    // Return actions based on user role
-    if (user?.role === 'admin') {
-      return [...baseActions, ...adminActions];
-    } else {
-      return [...baseActions, ...studentActions];
-    }
   };
 
   const renderDynamicFields = () => {
@@ -693,7 +674,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
           <MaterialIcons name="person" size={48} color="#B71C1C" />
-          <Text style={styles.loadingText}>Loading Profile...</Text>
+          <Text style={styles.loadingText}>Loading Your Profile...</Text>
+          <Text style={styles.loadingSubtext}>Fetching latest data from server</Text>
           <View style={styles.loadingBar}>
             <View style={styles.loadingProgress} />
           </View>
@@ -747,7 +729,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.editButton}
             onPress={() => showAlert({
               title: 'Edit Profile',
-              message: 'Profile editing feature is coming soon! For now, contact support if you need to update your information.',
+              message: 'Profile editing is not available in the mobile app. Please contact your administrator to update your information.',
               type: 'info',
               icon: 'edit',
               confirmText: 'Got it'
@@ -757,35 +739,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
         </LinearGradient>
-
-        {/* Parking Stats Card (User's Personal Stats) */}
-        {userStats && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <MaterialIcons name="local-parking" size={20} color="#B71C1C" />
-              <Text style={styles.cardTitle}>My Parking Stats</Text>
-            </View>
-            
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{userStats.totalParkingSessions}</Text>
-                <Text style={styles.statLabel}>Total Visits</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{userStats.hoursParked}h</Text>
-                <Text style={styles.statLabel}>Hours Parked</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>Floor {userStats.favoriteFloor}</Text>
-                <Text style={styles.statLabel}>Most Used</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{formatRelativeTime(userStats.lastParked)}</Text>
-                <Text style={styles.statLabel}>Last Visit</Text>
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* Account Information Card - Dynamic Fields */}
         <View style={styles.card}>
@@ -835,7 +788,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.actionItem}
             onPress={() => showAlert({
               title: 'Privacy & Data',
-              message: 'VALET respects your privacy. We only collect necessary information to provide parking services and improve your experience. Your data is never shared with third parties.',
+              message: 'VALET respects your privacy. We only collect necessary information to provide parking services and improve your experience. Your data is synced securely with our servers.',
               type: 'info',
               icon: 'privacy-tip',
               confirmText: 'Understood'
@@ -857,7 +810,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.actionItem}
             onPress={() => showAlert({
               title: 'About VALET Mobile',
-              message: '🚗 VALET Mobile - Your Parking Buddy!\n\nVersion 1.0.0\n📱 Designed for USJ-R students and staff\n🎯 Find parking spots quickly and easily\n🚫 Admin features available on web only\n\n© 2025 VALET Team',
+              message: 'VALET Mobile - Your Parking Buddy!\nVersion 1.0.0 quickly and easily\n© 2025 VALET Team',
               type: 'info',
               icon: 'info',
               confirmText: 'Cool!'
@@ -883,7 +836,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Refresh hint */}
         <View style={styles.refreshHint}>
           <MaterialIcons name="refresh" size={16} color="#999" />
-          <Text style={styles.refreshHintText}>Pull down to refresh profile</Text>
+          <Text style={styles.refreshHintText}>Pull down to sync with server</Text>
         </View>
       </ScrollView>
 
@@ -891,359 +844,4 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 20,
-  },
-  loadingCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    width: width * 0.8,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 18,
-    color: '#333',
-    fontWeight: '600',
-  },
-  loadingBar: {
-    width: 120,
-    height: 4,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 2,
-    marginTop: 20,
-    overflow: 'hidden',
-  },
-  loadingProgress: {
-    width: '70%',
-    height: '100%',
-    backgroundColor: '#B71C1C',
-    borderRadius: 2,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  profileCard: {
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 20,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  avatarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  userStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  userType: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    flex: 1,
-  },
-  activeStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  activeText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  userDepartment: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  editButtonText: {
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    paddingBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-    marginLeft: 10,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#B71C1C',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  infoText: {
-    marginLeft: 14,
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  actionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  actionText: {
-    marginLeft: 14,
-    flex: 1,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
-  },
-  actionDesc: {
-    fontSize: 14,
-    color: '#666',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F0F0F0',
-    marginLeft: 54,
-  },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 18,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#F44336',
-    elevation: 2,
-    shadowColor: '#F44336',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  signOutButtonText: {
-    marginLeft: 10,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#F44336',
-  },
-  refreshHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 32,
-    paddingVertical: 8,
-  },
-  refreshHintText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: '#999',
-  },
-  // Alert Styles
-  alertOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  alertBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  alertContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    width: width * 0.85,
-    maxWidth: 400,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-  },
-  alertHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  alertIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  alertTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#333',
-    textAlign: 'center',
-  },
-  alertMessage: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  alertButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  alertButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertCancelButton: {
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  alertConfirmButton: {
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  alertCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  alertConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});
-
 export default ProfileScreen;

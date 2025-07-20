@@ -32,9 +32,6 @@ class AuthService {
   // Login by checking users list (since your admin only provides users API)
   async loginWithUsersList(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      console.log('🔄 Attempting login for:', credentials.email);
-      console.log('🌐 API URL:', `${this.baseUrl}/users`);
-      
       // Add timeout to fetch
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -50,11 +47,8 @@ class AuthService {
 
       clearTimeout(timeoutId);
 
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response ok:', response.ok);
-
       if (!response.ok) {
-        console.error('❌ API Response not OK:', response.status, response.statusText);
+        console.error('API Response not OK:', response.status, response.statusText);
         
         if (response.status === 404) {
           return {
@@ -75,16 +69,11 @@ class AuthService {
       }
 
       const responseData = await response.json();
-      console.log('📊 Response data structure:', Object.keys(responseData));
       
-      // Extract users array from the response object
       const users = responseData.users || responseData;
-      console.log('📊 Users extracted:', users?.length || 'No length property');
-      console.log('📊 Users data type:', typeof users);
-      console.log('📊 First user sample:', users?.[0]);
       
       if (!Array.isArray(users)) {
-        console.error('❌ Users data is not an array:', users);
+        console.error('Users data is not an array:', users);
         return {
           success: false,
           message: 'Invalid response format from server.',
@@ -95,13 +84,10 @@ class AuthService {
       const user = users.find((u: any) => {
         const userEmail = u.email?.toLowerCase();
         const inputEmail = credentials.email.toLowerCase();
-        console.log('🔍 Comparing:', userEmail, 'vs', inputEmail);
         return userEmail === inputEmail;
       });
 
       if (user) {
-        console.log('✅ User found:', user.email);
-        console.log('👤 User details:', { id: user.id, name: user.name, role: user.role });
         
         // Check if user is active
         if (user.is_active === false) {
@@ -122,8 +108,6 @@ class AuthService {
           token: mockToken,
         };
       } else {
-        console.log('❌ User not found with email:', credentials.email);
-        console.log('📋 Available emails:', users.map((u: any) => u.email));
         return {
           success: false,
           message: 'Invalid email or password. Please check your credentials.',
@@ -172,9 +156,9 @@ class AuthService {
         AsyncStorage.setItem(this.TOKEN_KEY, token),
         AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user)),
       ]);
-      console.log('💾 Auth data stored successfully');
+      console.log('Auth data stored successfully');
     } catch (error) {
-      console.error('💾 Error storing auth data:', error);
+      console.error('Error storing auth data:', error);
     }
   }
 
@@ -187,11 +171,11 @@ class AuthService {
       ]);
 
       const user = userData ? JSON.parse(userData) : null;
-      console.log('📱 Stored auth data:', { hasToken: !!token, hasUser: !!user });
+      console.log('Stored auth data:', { hasToken: !!token, hasUser: !!user });
       
       return { token, user };
     } catch (error) {
-      console.error('📱 Error getting stored auth data:', error);
+      console.error('Error getting stored auth data:', error);
       return { token: null, user: null };
     }
   }
@@ -201,10 +185,10 @@ class AuthService {
     try {
       const { token, user } = await this.getStoredAuthData();
       const isAuth = !!(token && user);
-      console.log('🔐 Is authenticated:', isAuth);
+      console.log('Is authenticated:', isAuth);
       return isAuth;
     } catch (error) {
-      console.error('🔐 Error checking authentication:', error);
+      console.error('Error checking authentication:', error);
       return false;
     }
   }
@@ -216,9 +200,8 @@ class AuthService {
         AsyncStorage.removeItem(this.TOKEN_KEY),
         AsyncStorage.removeItem(this.USER_KEY),
       ]);
-      console.log('🚪 Logged out successfully');
     } catch (error) {
-      console.error('🚪 Error during logout:', error);
+      console.error('Error during logout:', error);
     }
   }
 

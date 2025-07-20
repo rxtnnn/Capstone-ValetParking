@@ -19,6 +19,7 @@ import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkin
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
 import { useAuth } from '../context/AuthContext';
 import { styles } from './styles/HomeScreen.style';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -27,7 +28,7 @@ type RootStackParamList = {
   ParkingMap: undefined;
   Feedback: undefined;
   Settings: undefined;
-  Profile: undefined;
+  Profile: { userId?: number } | undefined;
   ApiTest: undefined;
   Register: undefined;
 };
@@ -109,15 +110,33 @@ const HomeScreen: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [loading, setLoading] = useState(true);
   const [showFullAlert, setShowFullAlert] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   // Check authentication when screen is focused
   useFocusEffect(
     React.useCallback(() => {
       if (!isAuthenticated) {
         navigation.navigate('Register');
+      } else {
+        // Get current user ID when screen is focused
+        getCurrentUserId();
       }
     }, [isAuthenticated, navigation])
   );
+
+  // Function to get current user ID from storage
+  const getCurrentUserId = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('valet_user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setCurrentUserId(user.id);
+        console.log('📋 Current user ID set:', user.id);
+      }
+    } catch (error) {
+      console.error('Error getting current user ID:', error);
+    }
+  };
 
   const getFloorName = (floorNumber: number): string => {
     const suffixes = ['th', 'st', 'nd', 'rd'];
@@ -601,7 +620,10 @@ const HomeScreen: React.FC = () => {
           <Ionicons name="map" size={24} color="white" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Profile')}>
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => navigation.navigate('Profile', currentUserId ? { userId: currentUserId } : undefined)}
+        >
           <Ionicons name="person-outline" size={24} color="white" />
         </TouchableOpacity>
 
