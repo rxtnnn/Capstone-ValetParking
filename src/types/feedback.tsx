@@ -1,21 +1,20 @@
-// src/types/feedback.ts
-
 export interface FeedbackData {
-  id?: string;
+  id?: number; // Changed from string to number for MySQL
   type: 'general' | 'bug' | 'feature' | 'parking';
   message: string;
   rating?: number;
   email?: string;
   issues?: string[];
-  timestamp: any; // Firestore timestamp (can be Timestamp or string)
   status: 'pending' | 'reviewed' | 'resolved';
-  userId?: string;
+  userId?: number; // Changed from string to number for MySQL
   deviceInfo?: DeviceInfo;
-  createdAt?: string;
-  updatedAt?: any;
+  created_at?: string; // MySQL timestamp format
+  updated_at?: string; // MySQL timestamp format
   adminResponse?: string;
-  adminId?: string;
-  respondedAt?: any;
+  adminId?: number; // Changed from string to number for MySQL
+  responded_at?: string; // MySQL timestamp format
+  feedback_type?: 'parking_experience' | 'app_usage' | 'general';
+  parking_location?: string;
 }
 
 export interface DeviceInfo {
@@ -61,13 +60,26 @@ export interface FeedbackFormData {
   rating?: number;
   email?: string;
   issues?: string[];
+  feedback_type?: 'parking_experience' | 'app_usage' | 'general';
+  parking_location?: string;
 }
 
 export interface FeedbackSubmissionResponse {
   success: boolean;
-  feedbackId?: string;
+  feedbackId?: number;
   message: string;
   error?: string;
+  errors?: any;
+  data?: {
+    feedback_id: number;
+  };
+}
+
+export interface APIResponse<T = any> {
+  success: boolean;
+  message: string;
+  data?: T;
+  errors?: any;
 }
 
 // Constants for feedback types

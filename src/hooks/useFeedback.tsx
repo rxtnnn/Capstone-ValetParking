@@ -1,6 +1,5 @@
-// src/hooks/useFeedback.ts
 import { useState, useEffect, useCallback } from 'react';
-import FirebaseService from '../services/FirebaseService';
+import ApiService from '../services/ApiService';
 import { FeedbackData, FeedbackStats, FeedbackFormData } from '../types/feedback';
 import { getBasicDeviceInfo } from '../utils/deviceInfo';
 
@@ -35,8 +34,9 @@ export const useFeedback = (): UseFeedbackReturn => {
     try {
       const deviceInfo = await getBasicDeviceInfo();
 
-      const feedbackData: Omit<FeedbackData, 'id' | 'status' | 'timestamp'> = {
+      const feedbackData: Omit<FeedbackData, 'id' | 'status' | 'created_at'> = {
         ...data,
+        message: data.message,
         deviceInfo: {
           platform: deviceInfo.platform,
           version: deviceInfo.version,
@@ -47,7 +47,7 @@ export const useFeedback = (): UseFeedbackReturn => {
         },
       };
 
-      const feedbackId = await FirebaseService.submitFeedback(feedbackData);
+      const feedbackId = await ApiService.submitFeedback(feedbackData);
       
       // Refresh feedback list after submission
       await refreshFeedback();
@@ -69,7 +69,7 @@ export const useFeedback = (): UseFeedbackReturn => {
     setError(null);
 
     try {
-      const { feedback: feedbackList } = await FirebaseService.getAllFeedback(20);
+      const { feedback: feedbackList } = await ApiService.getAllFeedback(20);
       setFeedback(feedbackList);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load feedback';
@@ -82,19 +82,19 @@ export const useFeedback = (): UseFeedbackReturn => {
   // Refresh stats
   const refreshStats = useCallback(async () => {
     try {
-      const statsData = await FirebaseService.getFeedbackStats();
+      const statsData = await ApiService.getFeedbackStats();
       setStats(statsData);
     } catch (err) {
       console.error('Error refreshing stats:', err);
     }
   }, []);
 
-  // Test Firebase connection
+  // Test API connection
   const testConnection = useCallback(async (): Promise<boolean> => {
     try {
-      const isConnected = await FirebaseService.testConnection();
+      const isConnected = await ApiService.testConnection();
       if (!isConnected) {
-        setError('Failed to connect to Firebase');
+        setError('Failed to connect to the API server');
       }
       return isConnected;
     } catch (err) {
@@ -138,53 +138,48 @@ export const useFeedback = (): UseFeedbackReturn => {
   };
 };
 
-// Hook for real-time feedback updates (useful for admin dashboard)
-export const useFeedbackRealtime = () => {
+// Hook for real-time feedback updates (polling-based for REST API)
+export const useFeedbackRealtime = (intervalMs: number = 30000) => {
   const [feedback, setFeedback] = useState<FeedbackData[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
+    let intervalId: NodeJS.Timeout;
 
-    const setupRealtimeListener = async () => {
+    const fetchFeedback = async () => {
       try {
-        // Test connection first
-        const isConnected = await FirebaseService.testConnection();
+        const isConnected = await ApiService.testConnection();
         if (!isConnected) {
-          setError('Failed to connect to Firebase');
+          setError('Failed to connect to API server');
+          setConnected(false);
           return;
         }
 
         setConnected(true);
 
-        // Set up real-time listener
-        unsubscribe = FirebaseService.listenToFeedbackUpdates(
-          (feedbackList) => {
-            setFeedback(feedbackList);
-            setError(null);
-          },
-          (err) => {
-            setError(err.message);
-            setConnected(false);
-          }
-        );
+        const { feedback: feedbackList } = await ApiService.getAllFeedback(20);
+        setFeedback(feedbackList);
+        setError(null);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to setup real-time updates';
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch feedback';
         setError(errorMessage);
         setConnected(false);
       }
     };
 
-    setupRealtimeListener();
+    // Initial fetch
+    fetchFeedback();
 
-    // Cleanup subscription
+    // Set up polling
+    intervalId = setInterval(fetchFeedback, intervalMs);
+
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
+      if (intervalId) {
+        clearInterval(intervalId);
       }
     };
-  }, []);
+  }, [intervalMs]);
 
   return {
     feedback,
@@ -193,7 +188,7 @@ export const useFeedbackRealtime = () => {
   };
 };
 
-// Hook for feedback statistics with real-time updates
+// Hook for feedback statistics
 export const useFeedbackStats = () => {
   const [stats, setStats] = useState<FeedbackStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +199,7 @@ export const useFeedbackStats = () => {
     setError(null);
 
     try {
-      const statsData = await FirebaseService.getFeedbackStats();
+      const statsData = await ApiService.getFeedbackStats();
       setStats(statsData);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load statistics';

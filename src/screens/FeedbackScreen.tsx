@@ -21,7 +21,8 @@ import {
   Poppins_600SemiBold,
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
-import FirebaseService, { FeedbackData } from '../services/FirebaseService';
+import ApiService from '../services/ApiService';
+import { FeedbackData } from '../types/feedback';
 import { getBasicDeviceInfo } from '../utils/deviceInfo';
 import { styles } from './styles/FeedbackScreen.style';
 
@@ -64,11 +65,11 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
 
   useEffect(() => {
-    const testFirebaseConnection = async () => {
+    const testApiConnection = async () => {
       try {
-        console.log('Testing Firebase connection...');
-        const isConnected = await FirebaseService.testConnection();
-        console.log('Firebase connection test result:', isConnected);
+        console.log('Testing API connection...');
+        const isConnected = await ApiService.testConnection();
+        console.log('API connection test result:', isConnected);
         
         if (!isConnected) {
           Alert.alert(
@@ -78,11 +79,11 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           );
         }
       } catch (error) {
-        console.error('Firebase connection test failed:', error);
+        console.error('API connection test failed:', error);
       }
     };
 
-    testFirebaseConnection();
+    testApiConnection();
   }, []);
 
   const feedbackTypes: FeedbackType[] = [
@@ -135,6 +136,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       return false;
     }
 
+    // Email validation if provided
     if (email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) {
@@ -167,7 +169,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       // Get device information
       const deviceInfo = await getBasicDeviceInfo();
 
-      // Prepare feedback data - only include defined values
+      // Prepare feedback data
       const feedbackData: any = {
         type: feedbackType,
         message: message.trim(),
@@ -175,7 +177,12 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           platform: deviceInfo.platform,
           version: deviceInfo.version,
           model: deviceInfo.model,
+          systemVersion: deviceInfo.systemVersion,
+          appVersion: deviceInfo.appVersion,
+          buildNumber: deviceInfo.buildNumber,
         },
+        feedback_type: feedbackType === 'parking' ? 'parking_experience' : 'app_usage',
+        parking_location: feedbackType === 'parking' ? 'Mobile App Feedback' : undefined,
       };
 
       // Only add rating if it's for general feedback and has a value
@@ -195,8 +202,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
       console.log('Submitting feedback data:', feedbackData);
 
-      // Submit to Firebase
-      const feedbackId = await FirebaseService.submitFeedback(feedbackData);
+      // Submit to API
+      const feedbackId = await ApiService.submitFeedback(feedbackData);
       
       console.log('Feedback submitted successfully with ID:', feedbackId);
 
@@ -205,8 +212,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
       // Show success message
       Alert.alert(
-        'Thank You!',
-        'Your feedback has been submitted successfully. We appreciate your input and will use it to improve VALET!\n\nFeedback ID: ' + feedbackId.substring(0, 8),
+        'Thank You! 🙏',
+        'Your feedback has been submitted successfully. We appreciate your input and will use it to improve VALET!\n\nFeedback ID: #' + feedbackId,
         [
           { 
             text: 'Submit Another', 
@@ -525,6 +532,5 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
-
 
 export default FeedbackScreen;
