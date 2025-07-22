@@ -23,7 +23,7 @@ export interface LoginResponse {
 }
 
 class AuthService {
-  private baseUrl = 'https://valet.up.railway.app/api';
+  private baseUrl = 'https://valet.up.railway.app/api/users';
   
   // Storage keys
   private readonly TOKEN_KEY = 'valet_auth_token';
