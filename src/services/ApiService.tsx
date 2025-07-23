@@ -1,5 +1,5 @@
 import axios from 'axios';
-import apiClient from '../config/api';
+import apiClient, { feedbackClient, API_CONFIG } from '../config/api';
 import { FeedbackData, FeedbackStats, APIResponse, FeedbackSubmissionResponse } from '../types/feedback';
 
 export interface SubmitFeedbackRequest {
@@ -38,13 +38,21 @@ class ApiService {
         deviceInfo: feedbackData.deviceInfo,
       };
 
-      console.log('Submitting feedback data:', requestData);
+      console.log('Submitting feedback data to:', API_CONFIG.FEEDBACKS_ENDPOINT);
+      console.log('Request data:', requestData);
       
-      const response = await apiClient.post<FeedbackSubmissionResponse>('/feedback', requestData);
+      // Use feedbackClient for the specific feedbacks endpoint
+      const response = await feedbackClient.post('', requestData); // Empty string since base URL includes /feedbacks
+      
+      console.log('API Response:', response.data);
       
       if (response.data.success && response.data.data?.feedback_id) {
         console.log('Feedback submitted with ID:', response.data.data.feedback_id);
         return response.data.data.feedback_id.toString();
+      } else if (response.data.success && response.data.id) {
+        // Alternative response format
+        console.log('Feedback submitted with ID:', response.data.id);
+        return response.data.id.toString();
       } else {
         throw new Error(response.data.message || 'Failed to submit feedback');
       }
@@ -52,11 +60,19 @@ class ApiService {
       console.error('Error submitting feedback:', error);
       
       if (axios.isAxiosError(error)) {
+        // Handle authentication errors
+        if (error.response?.status === 401) {
+          throw new Error('Authentication failed. Please check API token.');
+        }
+        
+        // Handle validation errors
+        if (error.response?.status === 422 && error.response?.data?.errors) {
+          const errorMessages = Object.values(error.response.data.errors).flat();
+          throw new Error('Validation failed: ' + errorMessages.join(', '));
+        }
+        
         if (error.response?.data?.message) {
           throw new Error(error.response.data.message);
-        } else if (error.response?.data?.errors) {
-          const errorMessages = Object.values(error.response.data.errors).flat();
-          throw new Error(errorMessages.join(', '));
         } else if (error.message) {
           throw new Error(error.message);
         }
@@ -82,28 +98,35 @@ class ApiService {
   // Get all feedback with pagination (for admin)
   async getAllFeedback(limitCount: number = 50, page: number = 1): Promise<{feedback: FeedbackData[], hasMore: boolean}> {
     try {
-      const response = await apiClient.get<APIResponse<{
-        data: FeedbackData[],
-        current_page: number,
-        last_page: number,
-        total: number
-      }>>('/feedback', {
+      const response = await feedbackClient.get('', {
         params: {
           limit: limitCount,
           page: page
         }
       });
 
+      console.log('Get all feedback response:', response.data);
+
       if (response.data.success && response.data.data) {
         return {
-          feedback: response.data.data.data || [],
-          hasMore: response.data.data.current_page < response.data.data.last_page
+          feedback: response.data.data.data || response.data.data || [],
+          hasMore: response.data.data.current_page ? response.data.data.current_page < response.data.data.last_page : false
         };
+      }
+
+      // Handle direct array response
+      if (Array.isArray(response.data)) {
+        return { feedback: response.data, hasMore: false };
       }
 
       return { feedback: [], hasMore: false };
     } catch (error) {
       console.error('Error getting feedback:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error('Failed to get feedback data');
     }
   }
@@ -111,16 +134,21 @@ class ApiService {
   // Get feedback by type
   async getFeedbackByType(type: FeedbackData['type'], limitCount: number = 50): Promise<FeedbackData[]> {
     try {
-      const response = await apiClient.get<APIResponse<FeedbackData[]>>('/feedback', {
+      const response = await feedbackClient.get('', {
         params: {
           type: type,
           limit: limitCount
         }
       });
 
-      return response.data.data || [];
+      return Array.isArray(response.data) ? response.data : (response.data.data || []);
     } catch (error) {
       console.error('Error getting feedback by type:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error(`Failed to get ${type} feedback`);
     }
   }
@@ -128,16 +156,21 @@ class ApiService {
   // Get feedback by status
   async getFeedbackByStatus(status: FeedbackData['status'], limitCount: number = 50): Promise<FeedbackData[]> {
     try {
-      const response = await apiClient.get<APIResponse<FeedbackData[]>>('/feedback', {
+      const response = await feedbackClient.get('', {
         params: {
           status: status,
           limit: limitCount
         }
       });
 
-      return response.data.data || [];
+      return Array.isArray(response.data) ? response.data : (response.data.data || []);
     } catch (error) {
       console.error('Error getting feedback by status:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error(`Failed to get ${status} feedback`);
     }
   }
@@ -145,11 +178,16 @@ class ApiService {
   // Update feedback status
   async updateFeedbackStatus(feedbackId: number, status: FeedbackData['status']): Promise<void> {
     try {
-      await apiClient.put(`/feedback/${feedbackId}`, {
+      await feedbackClient.put(`/${feedbackId}`, {
         status: status
       });
     } catch (error) {
       console.error('Error updating feedback status:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error('Failed to update feedback status');
     }
   }
@@ -157,15 +195,25 @@ class ApiService {
   // Get single feedback by ID
   async getFeedbackById(feedbackId: number): Promise<FeedbackData | null> {
     try {
-      const response = await apiClient.get<APIResponse<FeedbackData>>(`/feedback/${feedbackId}`);
+      const response = await feedbackClient.get(`/${feedbackId}`);
       
       if (response.data.success && response.data.data) {
         return response.data.data;
       }
       
+      // Handle direct object response
+      if (response.data.id) {
+        return response.data;
+      }
+      
       return null;
     } catch (error) {
       console.error('Error getting feedback by ID:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error('Failed to get feedback details');
     }
   }
@@ -173,11 +221,15 @@ class ApiService {
   // Get feedback statistics
   async getFeedbackStats(): Promise<FeedbackStats> {
     try {
-      // This would need to be implemented in your Laravel backend
-      const response = await apiClient.get<APIResponse<FeedbackStats>>('/feedback/stats');
-      
-      if (response.data.success && response.data.data) {
-        return response.data.data;
+      // Try to get stats from a dedicated endpoint first
+      try {
+        const response = await apiClient.get('/feedback/stats');
+        
+        if (response.data.success && response.data.data) {
+          return response.data.data;
+        }
+      } catch (statsError) {
+        console.log('Dedicated stats endpoint not available, calculating from feedback data');
       }
 
       // Fallback: calculate stats from regular feedback endpoint
@@ -220,6 +272,11 @@ class ApiService {
       return stats;
     } catch (error) {
       console.error('Error getting feedback stats:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error('Failed to get feedback statistics');
     }
   }
@@ -227,9 +284,14 @@ class ApiService {
   // Delete feedback
   async deleteFeedback(feedbackId: number): Promise<void> {
     try {
-      await apiClient.delete(`/feedback/${feedbackId}`);
+      await feedbackClient.delete(`/${feedbackId}`);
     } catch (error) {
       console.error('Error deleting feedback:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error('Failed to delete feedback');
     }
   }
@@ -237,16 +299,21 @@ class ApiService {
   // Search feedback
   async searchFeedback(searchTerm: string, limitCount: number = 50): Promise<FeedbackData[]> {
     try {
-      const response = await apiClient.get<APIResponse<FeedbackData[]>>('/feedback', {
+      const response = await feedbackClient.get('', {
         params: {
           search: searchTerm,
           limit: limitCount
         }
       });
 
-      return response.data.data || [];
+      return Array.isArray(response.data) ? response.data : (response.data.data || []);
     } catch (error) {
       console.error('Error searching feedback:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error('Failed to search feedback');
     }
   }
@@ -254,13 +321,18 @@ class ApiService {
   // Add admin response
   async addAdminResponse(feedbackId: number, response: string, adminId: number): Promise<void> {
     try {
-      await apiClient.put(`/feedback/${feedbackId}`, {
+      await feedbackClient.put(`/${feedbackId}`, {
         admin_response: response,
         admin_id: adminId,
         status: 'reviewed'
       });
     } catch (error) {
       console.error('Error adding admin response:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        throw new Error('Authentication failed. Please check API token.');
+      }
+      
       throw new Error('Failed to add admin response');
     }
   }
@@ -268,12 +340,29 @@ class ApiService {
   // Test API connection
   async testConnection(): Promise<boolean> {
     try {
-      // Try to hit a simple endpoint to test connection
-      const response = await apiClient.get('/feedback?limit=1');
-      console.log('API connection successful!');
+      console.log('Testing API connection with token authentication...');
+      
+      // Test the feedback endpoint with a minimal request
+      const response = await feedbackClient.get('', { 
+        params: { limit: 1 },
+        timeout: 5000 // Shorter timeout for connection test
+      });
+      
+      console.log('API connection successful!', response.status);
       return true;
     } catch (error) {
       console.error('API connection failed:', error);
+      
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          console.error('Authentication failed - check API token');
+        } else if (error.code === 'ECONNABORTED') {
+          console.error('Connection timeout');
+        } else if (error.code === 'NETWORK_ERROR') {
+          console.error('Network error - check internet connection');
+        }
+      }
+      
       return false;
     }
   }

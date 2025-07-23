@@ -9,21 +9,52 @@ export interface DeviceInformation {
   buildNumber?: string;
 }
 
+// Helper function to safely convert values to strings
+const safeToString = (value: any): string => {
+  if (value === null || value === undefined) {
+    return 'Unknown';
+  }
+  
+  if (typeof value === 'string') {
+    return value;
+  }
+  
+  if (typeof value === 'number') {
+    return value.toString();
+  }
+  
+  if (typeof value === 'object' && value.toString) {
+    try {
+      return value.toString();
+    } catch (error) {
+      return 'Unknown';
+    }
+  }
+  
+  return String(value);
+};
+
 // Simplified version without react-native-device-info dependency
 export const getBasicDeviceInfo = async (): Promise<DeviceInformation> => {
   try {
+    // Safely get platform version
+    const platformVersion = safeToString(Platform.Version);
+    
     return {
-      platform: Platform.OS,
-      version: Platform.Version.toString(),
+      platform: Platform.OS || 'unknown',
+      version: platformVersion,
       model: Platform.OS === 'ios' ? 'iOS Device' : 'Android Device',
-      systemVersion: Platform.Version.toString(),
+      systemVersion: platformVersion,
       appVersion: '1.0.0', // You can get this from your package.json
       buildNumber: '1',
     };
   } catch (error) {
+    console.error('Error getting device info:', error);
+    
+    // Fallback with safe defaults
     return {
-      platform: Platform.OS,
-      version: Platform.Version.toString(),
+      platform: Platform.OS || 'unknown',
+      version: 'Unknown',
       model: 'Unknown Device',
       systemVersion: 'Unknown',
       appVersion: '1.0.0',
@@ -31,31 +62,3 @@ export const getBasicDeviceInfo = async (): Promise<DeviceInformation> => {
     };
   }
 };
-
-// If you want to use react-native-device-info later, install it and use this:
-/*
-import DeviceInfo from 'react-native-device-info';
-
-export const getDetailedDeviceInfo = async (): Promise<DeviceInformation> => {
-  try {
-    const [model, systemVersion, appVersion, buildNumber] = await Promise.all([
-      DeviceInfo.getModel(),
-      DeviceInfo.getSystemVersion(),
-      DeviceInfo.getVersion(),
-      DeviceInfo.getBuildNumber(),
-    ]);
-
-    return {
-      platform: Platform.OS,
-      version: Platform.Version.toString(),
-      model,
-      systemVersion,
-      appVersion,
-      buildNumber,
-    };
-  } catch (error) {
-    console.log('Error getting detailed device info:', error);
-    return getBasicDeviceInfo();
-  }
-};
-*/

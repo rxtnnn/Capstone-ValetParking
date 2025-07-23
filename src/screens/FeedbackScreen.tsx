@@ -166,22 +166,31 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Get device information
-      const deviceInfo = await getBasicDeviceInfo();
+      // Get device information with better error handling
+      let deviceInfo;
+      try {
+        deviceInfo = await getBasicDeviceInfo();
+        console.log('Device info collected:', deviceInfo);
+      } catch (deviceError) {
+        console.error('Failed to get device info:', deviceError);
+        // Use fallback device info
+        deviceInfo = {
+          platform: 'unknown',
+          version: 'unknown',
+          model: 'Unknown Device',
+          systemVersion: 'unknown',
+          appVersion: '1.0.0',
+          buildNumber: '1',
+        };
+      }
 
       // Prepare feedback data
       const feedbackData: any = {
         type: feedbackType,
         message: message.trim(),
-        deviceInfo: {
-          platform: deviceInfo.platform,
-          version: deviceInfo.version,
-          model: deviceInfo.model,
-          systemVersion: deviceInfo.systemVersion,
-          appVersion: deviceInfo.appVersion,
-          buildNumber: deviceInfo.buildNumber,
-        },
-        feedback_type: feedbackType === 'parking' ? 'parking_experience' : 'app_usage',
+        deviceInfo: deviceInfo,
+        feedback_type: feedbackType === 'parking' ? 'parking_experience' : 
+                     (feedbackType === 'general' ? 'general' : 'app_usage'),
         parking_location: feedbackType === 'parking' ? 'Mobile App Feedback' : undefined,
       };
 
@@ -228,9 +237,24 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       );
     } catch (error) {
       console.error('Error submitting feedback:', error);
+      
+      let errorMessage = 'An error occurred while submitting your feedback. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Authentication failed')) {
+          errorMessage = 'Authentication error. Please contact support.';
+        } else if (error.message.includes('Validation failed')) {
+          errorMessage = 'Please check your input and try again.\n\n' + error.message;
+        } else if (error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       Alert.alert(
         'Submission Failed',
-        'An error occurred while submitting your feedback. Please check your internet connection and try again.\n\nError: ' + (error instanceof Error ? error.message : String(error)),
+        errorMessage,
         [
           { text: 'Retry', onPress: handleSubmit },
           { text: 'Cancel', style: 'cancel' }
