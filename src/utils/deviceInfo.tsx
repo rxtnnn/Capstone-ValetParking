@@ -9,54 +9,41 @@ export interface DeviceInformation {
   buildNumber?: string;
 }
 
-// Helper function to safely convert values to strings
 const safeToString = (value: any): string => {
-  if (value === null || value === undefined) {
+  if (value === null || value === undefined) return 'Unknown';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return value.toString();
+  try {
+    return String(value);
+  } catch {
     return 'Unknown';
   }
-  
-  if (typeof value === 'string') {
-    return value;
-  }
-  
-  if (typeof value === 'number') {
-    return value.toString();
-  }
-  
-  if (typeof value === 'object' && value.toString) {
-    try {
-      return value.toString();
-    } catch (error) {
-      return 'Unknown';
-    }
-  }
-  
-  return String(value);
 };
 
-// Simplified version without react-native-device-info dependency
 export const getBasicDeviceInfo = async (): Promise<DeviceInformation> => {
   try {
-    // Safely get platform version
     const platformVersion = safeToString(Platform.Version);
+    const platformOS = Platform.OS || 'unknown';
     
-    return {
-      platform: Platform.OS || 'unknown',
+    const deviceInfo: DeviceInformation = {
+      platform: platformOS,
       version: platformVersion,
-      model: Platform.OS === 'ios' ? 'iOS Device' : 'Android Device',
+      model: platformOS === 'ios' ? 'iOS Device' : 'Android Device',
       systemVersion: platformVersion,
-      appVersion: '1.0.0', // You can get this from your package.json
+      appVersion: '1.0.0',
       buildNumber: '1',
     };
+
+    console.log('📱 Device info:', deviceInfo);
+    return deviceInfo;
   } catch (error) {
-    console.error('Error getting device info:', error);
+    console.error('⚠️ Device info error:', error);
     
-    // Fallback with safe defaults
     return {
-      platform: Platform.OS || 'unknown',
-      version: 'Unknown',
+      platform: 'unknown',
+      version: 'unknown',
       model: 'Unknown Device',
-      systemVersion: 'Unknown',
+      systemVersion: 'unknown',
       appVersion: '1.0.0',
       buildNumber: '1',
     };

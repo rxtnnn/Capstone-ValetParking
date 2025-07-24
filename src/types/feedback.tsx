@@ -1,20 +1,22 @@
 export interface FeedbackData {
-  id?: number; // Changed from string to number for MySQL
+  id?: number;
+  user_id: number;
   type: 'general' | 'bug' | 'feature' | 'parking';
   message: string;
   rating?: number;
   email?: string;
   issues?: string[];
-  status: 'pending' | 'reviewed' | 'resolved';
-  userId?: number; // Changed from string to number for MySQL
-  deviceInfo?: DeviceInfo;
-  created_at?: string; // MySQL timestamp format
-  updated_at?: string; // MySQL timestamp format
-  adminResponse?: string;
-  adminId?: number; // Changed from string to number for MySQL
-  responded_at?: string; // MySQL timestamp format
-  feedback_type?: 'parking_experience' | 'app_usage' | 'general';
-  parking_location?: string;
+  device_info?: DeviceInfo;
+  status?: 'pending' | 'reviewed' | 'resolved';
+  admin_response?: string;
+  admin_id?: number;
+  responded_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Joined fields from sys_users
+  user_name?: string;
+  user_role?: string;
+  user_email?: string;
 }
 
 export interface DeviceInfo {
@@ -26,73 +28,24 @@ export interface DeviceInfo {
   buildNumber?: string;
 }
 
-export interface FeedbackStats {
-  totalFeedback: number;
-  pendingFeedback: number;
-  avgRating: number;
-  feedbackByType: {
-    general: number;
-    bug: number;
-    feature: number;
-    parking: number;
-  };
-  feedbackByStatus: {
-    pending: number;
-    reviewed: number;
-    resolved: number;
-  };
-  recentFeedback: FeedbackData[];
-}
-
-export interface FeedbackFilters {
-  type?: FeedbackData['type'];
-  status?: FeedbackData['status'];
-  dateRange?: {
-    start: Date;
-    end: Date;
-  };
-  search?: string;
-}
-
 export interface FeedbackFormData {
   type: FeedbackData['type'];
   message: string;
   rating?: number;
   email?: string;
   issues?: string[];
-  feedback_type?: 'parking_experience' | 'app_usage' | 'general';
-  parking_location?: string;
-}
-
-export interface FeedbackSubmissionResponse {
-  success: boolean;
-  feedbackId?: number;
-  message: string;
-  error?: string;
-  errors?: any;
-  data?: {
-    feedback_id: number;
-  };
 }
 
 export interface APIResponse<T = any> {
   success: boolean;
-  message: string;
+  message?: string;
   data?: T;
   errors?: any;
+  pagination?: {
+    current_page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+    has_more: boolean;
+  };
 }
-
-// Constants for feedback types
-export const FEEDBACK_TYPES = {
-  GENERAL: 'general' as const,
-  BUG: 'bug' as const,
-  FEATURE: 'feature' as const,
-  PARKING: 'parking' as const,
-};
-
-// Constants for feedback status
-export const FEEDBACK_STATUS = {
-  PENDING: 'pending' as const,
-  REVIEWED: 'reviewed' as const,
-  RESOLVED: 'resolved' as const,
-};
