@@ -24,20 +24,25 @@ export interface ParkingStats {
   }>;
   lastUpdated: string;
   isLive: boolean;
+  sensorData?: ParkingSpace[]; // 🔥 ADD THIS: Include raw sensor data for individual spot updates
 }
 
-type ParkingUpdateCallback = (data: ParkingStats) => void; //notify subscribers for parking update
+type ParkingUpdateCallback = (data: ParkingStats) => void;
 type ConnectionStatusCallback = (status: 'connected' | 'disconnected' | 'error') => void;
 
 class RealTimeParkingServiceClass {
-  private apiUrl = 'https://valet.up.railway.app/api/parking';
+  private apiUrl = 'https://valet.up.railway.app/api/public/parking';
+  
+  // API Token for authentication
+  private readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
+  
   private updateCallbacks: ParkingUpdateCallback[] = [];
   private connectionCallbacks: ConnectionStatusCallback[] = [];
   private updateInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
   private lastData: ParkingStats | null = null;
   private connectionStatus: 'connected' | 'disconnected' | 'error' = 'disconnected';
-  private updateIntervalMs = 5000; // 🔄 Changed from 2000 to 5000 (5 seconds)
+  private updateIntervalMs = 5000; // 5 seconds
   private retryCount = 0;
   private maxRetries = 3;
   private lastFetchTime = 0; // Track last fetch to prevent spam
@@ -50,7 +55,7 @@ class RealTimeParkingServiceClass {
       return;
     }
     
-    console.log('🚀 Starting parking service with 5-second intervals');
+    console.log('🚀 Starting parking service with API token authentication');
     this.isRunning = true;
     this.fetchAndUpdate();
     
@@ -100,15 +105,15 @@ class RealTimeParkingServiceClass {
     return this.updateIntervalMs;
   }
 
-  //to update subscribers abt parking updates
+  // Subscribe to parking updates
   onParkingUpdate(callback: ParkingUpdateCallback): () => void { 
-    this.updateCallbacks.push(callback); //push all the subscribers 
+    this.updateCallbacks.push(callback);
  
     if (this.lastData) {
       callback(this.lastData);
     }
     
-    return () => { //unsubscribe
+    return () => { // Unsubscribe function
       const index = this.updateCallbacks.indexOf(callback);
       if (index > -1) {
         this.updateCallbacks.splice(index, 1);
@@ -143,13 +148,14 @@ class RealTimeParkingServiceClass {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      console.log(`📡 Fetching parking data... (${new Date().toLocaleTimeString()})`);
+      console.log(`📡 Fetching parking data with API token... (${new Date().toLocaleTimeString()})`);
 
       const response = await fetch(this.apiUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.API_TOKEN}`, // 🔐 Added API token authentication
           'Cache-Control': 'no-cache',
           'User-Agent': 'VALET-RealTime/1.0',
         },
@@ -158,13 +164,31 @@ class RealTimeParkingServiceClass {
 
       clearTimeout(timeoutId);
 
+      // Handle authentication errors
+      if (response.status === 401) {
+        console.error('🔒 API token is invalid or expired');
+        throw new Error('Authentication failed: Invalid API token');
+      }
+
+      if (response.status === 403) {
+        console.error('🚫 API token does not have permission to access parking data');
+        throw new Error('Authorization failed: Insufficient permissions');
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const rawData: ParkingSpace[] = await response.json();
       
-      const newData = this.transformRawData(rawData);
+      // Validate response data
+      if (!Array.isArray(rawData)) {
+        console.error('❌ Invalid response format - expected array of parking spaces');
+        throw new Error('Invalid response format from server');
+      }
+      
+      // 🔥 FIXED: Pass the raw sensor data to the transform function
+      const newData = this.transformRawData(rawData, rawData);
       this.checkForChanges(newData);
       
       this.lastData = newData;
@@ -172,11 +196,27 @@ class RealTimeParkingServiceClass {
       this.setConnectionStatus('connected'); 
       this.retryCount = 0; 
       
-      console.log(`Sucessfully updated parking data - ${newData.availableSpots}/${newData.totalSpots} spots available`);
+      console.log(`✅ Successfully updated parking data - ${newData.availableSpots}/${newData.totalSpots} spots available`);
+      console.log(`📊 Sensor data included: ${newData.sensorData?.length || 0} sensors`);
       
     } catch (error: any) {
       this.retryCount++;
       console.error(`❌ Fetch error (attempt ${this.retryCount}/${this.maxRetries}):`, error.message);
+      
+      // Handle specific error types
+      if (error.message.includes('Authentication failed')) {
+        console.error('🔒 API token authentication failed - check token validity');
+        this.setConnectionStatus('error');
+        // Don't retry authentication errors immediately
+        return;
+      }
+      
+      if (error.message.includes('Authorization failed')) {
+        console.error('🚫 API token permissions insufficient');
+        this.setConnectionStatus('error');
+        return;
+      }
+      
       this.setConnectionStatus('error');
       
       if (this.lastData) {
@@ -198,7 +238,7 @@ class RealTimeParkingServiceClass {
           }
         }, delay);
       } else {
-        console.error('Max retries exceeded, stopping automatic updates');
+        console.error('❌ Max retries exceeded, stopping automatic updates');
         this.stop();
       }
     }
@@ -222,17 +262,18 @@ class RealTimeParkingServiceClass {
     return 1;
   };
 
-  private transformRawData(rawData: ParkingSpace[]): ParkingStats {   
+  // 🔥 FIXED: Updated to include raw sensor data in the response
+  private transformRawData(rawData: ParkingSpace[], sensorData: ParkingSpace[]): ParkingStats {   
     const totalSpots = rawData.length;
     const availableSpots = rawData.filter(space => !space.is_occupied).length;
     const occupiedSpots = rawData.filter(space => space.is_occupied).length;
 
     const floorGroups: { [key: number]: ParkingSpace[] } = {};
     
-    rawData.forEach(space => { //to know hw mny space for each floor
+    rawData.forEach(space => {
       const floor = this.extractFloorFromLocation(space.floor_level);
       
-      if (!floorGroups[floor]) { //checks if the floor alrdy exists
+      if (!floorGroups[floor]) {
         floorGroups[floor] = [];
       }
       floorGroups[floor].push(space);
@@ -261,6 +302,7 @@ class RealTimeParkingServiceClass {
       };
     }).sort((a, b) => a.floor - b.floor);
 
+    // 🔥 FIXED: Include the raw sensor data in the response
     return {
       totalSpots,
       availableSpots,
@@ -268,6 +310,7 @@ class RealTimeParkingServiceClass {
       floors,
       lastUpdated: new Date().toLocaleTimeString(),
       isLive: true,
+      sensorData, // Include the raw sensor data for individual spot mapping
     };
   }
 
@@ -276,12 +319,11 @@ class RealTimeParkingServiceClass {
 
     const oldData = this.lastData;
 
-    //check new spots
+    // Check for new available spots
     if (newData.availableSpots > oldData.availableSpots) {
-      const increase = newData.availableSpots - oldData.availableSpots; //detects if more spots available
-      console.log(`${increase} new spot(s) available!`);
+      const increase = newData.availableSpots - oldData.availableSpots;
+      console.log(`🟢 ${increase} new spot(s) available!`);
       
-      // FIXED: Use correct method for spot notifications
       NotificationService.showSpotAvailableNotification(
         newData.availableSpots,
         // Find which floor has the most available spots
@@ -291,13 +333,24 @@ class RealTimeParkingServiceClass {
       );
     }
 
-    // Check if spots decreased significantly
+    // Check if spots decreased
     if (newData.availableSpots < oldData.availableSpots) {
       const decrease = oldData.availableSpots - newData.availableSpots;
-      console.log(`📉 ${decrease} spot(s) taken`);
+      console.log(`🔴 ${decrease} spot(s) taken`);
     }
     
-    newData.floors.forEach(newFloor => { //chck floor status
+    // 🔥 ADDED: Log individual sensor changes for debugging
+    if (newData.sensorData && oldData.sensorData) {
+      newData.sensorData.forEach(newSensor => {
+        const oldSensor = oldData.sensorData?.find(s => s.sensor_id === newSensor.sensor_id);
+        if (oldSensor && oldSensor.is_occupied !== newSensor.is_occupied) {
+          console.log(`🔄 Sensor ${newSensor.sensor_id}: ${oldSensor.is_occupied ? 'OCCUPIED' : 'FREE'} → ${newSensor.is_occupied ? 'OCCUPIED' : 'FREE'}`);
+        }
+      });
+    }
+    
+    // Check floor status changes
+    newData.floors.forEach(newFloor => {
       const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
       
       if (oldFloor && oldFloor.status !== newFloor.status) {
@@ -314,11 +367,11 @@ class RealTimeParkingServiceClass {
   }
 
   private notifyParkingUpdate(data: ParkingStats): void {
-    this.updateCallbacks.forEach(callback => { //notify subscribers fr prking updte
+    this.updateCallbacks.forEach(callback => {
       try {
         callback(data);
       } catch (error) {
-        console.error('Error in parking update callback:', error);
+        console.error('💥 Error in parking update callback:', error);
       }
     });
   }
@@ -327,13 +380,13 @@ class RealTimeParkingServiceClass {
     if (this.connectionStatus !== status) {
       const oldStatus = this.connectionStatus;
       this.connectionStatus = status;
-      console.log(`Connection status: ${oldStatus} → ${status}`);
+      console.log(`🔗 Connection status: ${oldStatus} → ${status}`);
       
       this.connectionCallbacks.forEach(callback => {
         try {
           callback(status);
         } catch (error) {
-          console.error('Error in connection status callback:', error);
+          console.error('💥 Error in connection status callback:', error);
         }
       });
 
@@ -347,11 +400,59 @@ class RealTimeParkingServiceClass {
 
   // Manual refresh for user-triggered updates
   async forceUpdate(): Promise<void> {
-    console.log('Force update requested');
+    console.log('🔄 Force update requested');
     if (this.isRunning) {
       await this.fetchAndUpdate();
     } else {
-      console.warn('Service not running, cannot force update');
+      console.warn('⚠️ Service not running, cannot force update');
+    }
+  }
+
+  // Test API connection with token
+  async testConnection(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🧪 Testing API connection...');
+      
+      const response = await fetch(this.apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.API_TOKEN}`,
+        },
+      });
+
+      if (response.status === 401) {
+        return {
+          success: false,
+          message: 'API token is invalid or expired',
+        };
+      }
+
+      if (response.status === 403) {
+        return {
+          success: false,
+          message: 'API token does not have permission to access parking data',
+        };
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          success: true,
+          message: `Connection successful! Found ${Array.isArray(data) ? data.length : 0} parking spaces.`,
+        };
+      }
+
+      return {
+        success: false,
+        message: `Server error: ${response.status} ${response.statusText}`,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Connection failed: ${error.message}`,
+      };
     }
   }
 
@@ -364,7 +465,33 @@ class RealTimeParkingServiceClass {
       lastUpdate: this.lastData?.lastUpdated || 'Never',
       subscriberCount: this.updateCallbacks.length,
       retryCount: this.retryCount,
+      apiEndpoint: this.apiUrl,
+      hasValidToken: !!this.API_TOKEN,
+      sensorCount: this.lastData?.sensorData?.length || 0,
     };
+  }
+
+  // Update API token if needed (for future use)
+  updateApiToken(newToken: string): void {
+    console.log('🔑 API token updated');
+    // Note: This would require making API_TOKEN non-readonly
+    // For now, restart the service to use the new token
+    if (this.isRunning) {
+      this.stop();
+      setTimeout(() => {
+        this.start();
+      }, 1000);
+    }
+  }
+
+  // 🔥 ADDED: Method to get raw sensor data for debugging
+  getRawSensorData(): ParkingSpace[] | null {
+    return this.lastData?.sensorData || null;
+  }
+
+  // 🔥 ADDED: Method to get sensor data for a specific sensor ID
+  getSensorById(sensorId: number): ParkingSpace | null {
+    return this.lastData?.sensorData?.find(sensor => sensor.sensor_id === sensorId) || null;
   }
 }
 

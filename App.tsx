@@ -17,7 +17,7 @@ import ParkingMapScreen from './src/screens/ParkingMapScreen';
 import FeedbackScreen from './src/screens/FeedbackScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import RegisterScreen from './src/screens/RegisterScreen';
+import RegisterScreen from './src/screens/LoginScreen';
 import { NotificationService } from './src/services/NotificationService';
 import { theme } from './src/theme/theme';
 
@@ -64,12 +64,20 @@ const AppNavigator: React.FC = () => {
       Alert.alert('Parking Update', 'Notification tapped!');
     });
 
-    // Welcome notification (delayed to avoid showing during login)
-    const welcomeTimer = setTimeout(() => {
-      NotificationService.showLocalNotification(
-        'VALET Connected! 🚗',
-        'Your parking assistant is ready to help you find spots.'
-      );
+    // 🔥 FIXED: Welcome notification using the simple method
+    const welcomeTimer = setTimeout(async () => {
+      try {
+        await NotificationService.showSimpleNotification(
+          'VALET Connected! 🚗',
+          'Your parking assistant is ready to help you find spots.',
+          { 
+            type: 'welcome',
+            timestamp: Date.now()
+          }
+        );
+      } catch (error) {
+        console.error('Error showing welcome notification:', error);
+      }
     }, 5000); // Increased delay
 
     return () => {

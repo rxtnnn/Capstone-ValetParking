@@ -1,4 +1,4 @@
-// src/services/AuthService.ts - Updated for API Token Authentication
+// src/services/AuthService.ts - Production Authentication with bcrypt
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface User {
@@ -26,198 +26,18 @@ export interface LoginResponse {
 }
 
 class AuthService {
-  private baseUrl = 'https://valet.up.railway.app/api';
+  // 🔥 PRODUCTION: Use proper endpoints
+  private baseUrl = 'https://valet.up.railway.app/api/public';
+  private usersUrl = 'https://valet.up.railway.app/api/public/users';
   
   // API Token provided by your admin
-  private readonly API_TOKEN = '8|HncMi9QI3CvmrT68pANh64bqBBj47Vw8DPWozeGe61cea8b0';
+  private readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
   
   // Storage keys for user authentication
   private readonly USER_TOKEN_KEY = 'valet_user_auth_token';
   private readonly USER_KEY = 'valet_user_data';
 
-  // Try to authenticate with the proper login endpoint first
-  async loginWithAuthEndpoint(credentials: LoginCredentials): Promise<LoginResponse> {
-    try {
-      console.log('🔐 Attempting login with auth endpoint');
-      
-      // Try the correct auth endpoint URL
-      const response = await fetch(`${this.baseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_TOKEN}`, // Use API token for access
-        },
-        body: JSON.stringify({
-          email: credentials.email.trim().toLowerCase(),
-          password: credentials.password,
-        }),
-      });
-
-      console.log('📡 Auth endpoint response status:', response.status);
-
-      if (response.ok) {
-        const responseData = await response.json();
-        
-        if (responseData.success && responseData.user && responseData.token) {
-          await this.storeAuthData(responseData.token, responseData.user);
-          
-          return {
-            success: true,
-            message: responseData.message || 'Login successful',
-            user: responseData.user,
-            token: responseData.token,
-          };
-        }
-      }
-
-      // Check if it's a 404 (endpoint doesn't exist)
-      if (response.status === 404) {
-        console.log('⚠️ Auth endpoint not found, will use fallback');
-        return {
-          success: false,
-          message: 'auth_endpoint_unavailable', // Special flag for fallback
-        };
-      }
-
-      // If we get here, the auth endpoint exists but login failed
-      const errorData = await response.json().catch(() => ({ message: 'Login failed' }));
-      return {
-        success: false,
-        message: errorData.message || 'Invalid email or password',
-      };
-
-    } catch (error: any) {
-      console.log('⚠️ Auth endpoint error:', error.message);
-      
-      // If it's a network error or 404, treat as endpoint unavailable
-      if (error.message.includes('404') || error.message.includes('not found')) {
-        console.log('⚠️ Auth endpoint does not exist, using fallback');
-        return {
-          success: false,
-          message: 'auth_endpoint_unavailable', // Special flag for fallback
-        };
-      }
-      
-      return {
-        success: false,
-        message: 'auth_endpoint_unavailable', // Special flag for fallback
-      };
-    }
-  }
-
-  // Fallback: Check user existence and validate (temporary solution)
-  async loginWithUserCheck(credentials: LoginCredentials): Promise<LoginResponse> {
-    try {
-      console.log('🔄 Using user check authentication for:', credentials.email);
-      
-      const response = await fetch(`${this.baseUrl}/users`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_TOKEN}`, // Use API token for access
-        },
-      });
-
-      console.log('📡 Users API response status:', response.status);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          return {
-            success: false,
-            message: 'API access denied. Please contact administrator.',
-          };
-        } else if (response.status === 403) {
-          return {
-            success: false,
-            message: 'API token invalid. Please contact administrator.',
-          };
-        }
-        
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const responseData = await response.json();
-      console.log('📊 Users API response structure:', Object.keys(responseData));
-      
-      // Extract users array
-      const users = responseData.users || responseData;
-      
-      if (!Array.isArray(users)) {
-        console.error('❌ Users data is not an array:', users);
-        return {
-          success: false,
-          message: 'Invalid response from server.',
-        };
-      }
-
-      console.log('👥 Found', users.length, 'users in system');
-
-      // Find user by email
-      const user = users.find((u: any) => 
-        u.email?.toLowerCase() === credentials.email.toLowerCase()
-      );
-
-      if (!user) {
-        console.log('❌ User not found:', credentials.email);
-        console.log('📋 Available emails:', users.map(u => u.email));
-        return {
-          success: false,
-          message: 'Invalid email or password',
-        };
-      }
-
-      // Check if user is active
-      if (user.is_active === false) {
-        return {
-          success: false,
-          message: 'Your account has been deactivated. Please contact the administrator.',
-        };
-      }
-
-      console.log('✅ User found and active:', user.email);
-
-      // For fallback mode, we'll accept any password that's not empty
-      // In production, ask your admin to implement proper password validation
-      if (!credentials.password.trim()) {
-        return {
-          success: false,
-          message: 'Password is required',
-        };
-      }
-
-      // Generate a session token for this login
-      const sessionToken = `session_${user.id}_${Date.now()}`;
-      await this.storeAuthData(sessionToken, user);
-      
-      console.log('⚠️ Login successful with fallback method (ask admin to implement POST /api/auth/login)');
-      
-      return {
-        success: true,
-        message: 'Login successful',
-        user,
-        token: sessionToken,
-      };
-
-    } catch (error: any) {
-      console.error('💥 User check login error:', error);
-      
-      if (error.message.includes('Failed to fetch')) {
-        return {
-          success: false,
-          message: 'Unable to connect to server. Please check your internet connection.',
-        };
-      }
-      
-      return {
-        success: false,
-        message: 'Authentication error. Please try again.',
-      };
-    }
-  }
-
-  // Main login method
+  // 🔥 MAIN LOGIN METHOD - Production Ready
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     // Validate input
     if (!credentials.email?.trim()) {
@@ -243,39 +63,254 @@ class AuthService {
 
     console.log('🚀 Starting login process for:', credentials.email);
 
-    // Try proper authentication endpoint first
-    const authResult = await this.loginWithAuthEndpoint(credentials);
+    // 🔥 STEP 1: Try server-side authentication endpoints (REQUIRED for bcrypt)
+    const serverAuthResult = await this.loginWithServerAuth(credentials);
+    if (serverAuthResult.success || serverAuthResult.message !== 'server_auth_unavailable') {
+      return serverAuthResult;
+    }
+
+    // 🔥 STEP 2: If no server auth, return error (bcrypt cannot be validated on client)
+    console.error('❌ No authentication endpoint found - bcrypt requires server-side validation');
     
-    if (authResult.success) {
-      console.log('✅ Authentication successful via auth endpoint');
-      return authResult;
-    }
-
-    // If auth endpoint is not available, fall back to user check
-    if (authResult.message === 'auth_endpoint_unavailable') {
-      console.log('🔄 Auth endpoint not available, using fallback method');
-      console.log('📧 Admin needs to implement: POST /api/auth/login');
-      
-      const fallbackResult = await this.loginWithUserCheck(credentials);
-      
-      if (fallbackResult.success) {
-        // Add a note that this is temporary
-        fallbackResult.message = 'Login successful (temporary authentication mode)';
-      }
-      
-      return fallbackResult;
-    }
-
-    // Auth endpoint exists but login failed
-    return authResult;
+    return {
+      success: false,
+      message: 'Authentication endpoint not available. Please contact your administrator to implement POST /api/public/auth/login for secure password validation.',
+    };
   }
 
-  // Test API connectivity with the token
+  // 🔥 SERVER-SIDE AUTHENTICATION (Required for bcrypt)
+  private async loginWithServerAuth(credentials: LoginCredentials): Promise<LoginResponse> {
+    // Try multiple possible authentication endpoints
+    const authEndpoints = [
+      `${this.baseUrl}/auth/login`,
+      `${this.baseUrl}/login`, 
+      `${this.baseUrl}/authenticate`,
+      'https://valet.up.railway.app/api/auth/login',
+      'https://valet.up.railway.app/api/login',
+      'https://valet.up.railway.app/api/public/authenticate',
+    ];
+
+    for (const endpoint of authEndpoints) {
+      try {
+        console.log(`🔐 Trying server auth endpoint: ${endpoint}`);
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.API_TOKEN}`,
+          },
+          body: JSON.stringify({
+            email: credentials.email.trim().toLowerCase(),
+            password: credentials.password,
+          }),
+        });
+
+        console.log(`📡 ${endpoint} response status:`, response.status);
+
+        // If 404, try next endpoint
+        if (response.status === 404) {
+          console.log(`⚠️ ${endpoint} not found, trying next...`);
+          continue;
+        }
+
+        // If successful response
+        if (response.ok) {
+          const responseData = await response.json();
+          console.log('✅ Server authentication successful');
+          
+          if (responseData.success && responseData.user) {
+            const token = responseData.token || `server_auth_${responseData.user.id}_${Date.now()}`;
+            await this.storeAuthData(token, responseData.user);
+            
+            return {
+              success: true,
+              message: responseData.message || 'Login successful',
+              user: responseData.user,
+              token: token,
+            };
+          } else {
+            return {
+              success: false,
+              message: responseData.message || 'Authentication failed',
+            };
+          }
+        }
+
+        // Handle authentication errors (401, 422, etc.)
+        if (response.status === 401 || response.status === 422) {
+          try {
+            const errorData = await response.json();
+            return {
+              success: false,
+              message: errorData.message || 'Invalid email or password',
+            };
+          } catch {
+            return {
+              success: false,
+              message: 'Invalid email or password',
+            };
+          }
+        }
+
+        // Handle other errors (500, 403, etc.)
+        if (response.status === 500) {
+          return {
+            success: false,
+            message: 'Server error. Please try again later.',
+          };
+        }
+
+        if (response.status === 403) {
+          return {
+            success: false,
+            message: 'Access denied. Please contact your administrator.',
+          };
+        }
+
+        // Other status codes - continue to next endpoint
+        console.log(`⚠️ ${endpoint} returned ${response.status}, trying next...`);
+        
+      } catch (error: any) {
+        console.log(`⚠️ Network error with ${endpoint}:`, error.message);
+        
+        // If it's a network error, continue to next endpoint
+        if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
+          continue;
+        }
+        
+        // Other errors - continue
+        continue;
+      }
+    }
+
+    // No server auth endpoints worked
+    console.log('❌ No server authentication endpoints available');
+    return {
+      success: false,
+      message: 'server_auth_unavailable',
+    };
+  }
+
+  // 🔥 FIND USER IN API (for debugging/user verification only)
+  async findUserInAPI(email: string): Promise<{ success: boolean; user?: User; message?: string }> {
+    try {
+      console.log(`🔍 Looking up user: ${email}`);
+      
+      const response = await fetch(this.usersUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.API_TOKEN}`,
+        },
+      });
+
+      console.log(`📡 Users API response status:`, response.status);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return {
+            success: false,
+            message: 'API access denied. Please contact administrator.',
+          };
+        } else if (response.status === 403) {
+          return {
+            success: false,
+            message: 'API token invalid. Please contact administrator.',
+          };
+        } else if (response.status === 404) {
+          return {
+            success: false,
+            message: 'Users API not found. Please contact administrator.',
+          };
+        }
+        
+        return {
+          success: false,
+          message: `Server error: ${response.status}`,
+        };
+      }
+
+      const responseData = await response.json();
+      console.log('📊 Users API response received');
+      
+      // Handle different response formats
+      let users: any[] = [];
+      if (Array.isArray(responseData)) {
+        users = responseData;
+      } else if (responseData.users && Array.isArray(responseData.users)) {
+        users = responseData.users;
+      } else if (responseData.data && Array.isArray(responseData.data)) {
+        users = responseData.data;
+      } else {
+        console.error('❌ Cannot find users array in response');
+        return {
+          success: false,
+          message: 'Invalid response from server.',
+        };
+      }
+
+      console.log('👥 Found', users.length, 'users in system');
+
+      if (users.length === 0) {
+        return {
+          success: false,
+          message: 'No users found in the system.',
+        };
+      }
+
+      // Find user by email
+      const user = users.find((u: any) => 
+        u.email?.toLowerCase() === email.toLowerCase()
+      );
+
+      if (!user) {
+        console.log('❌ User not found:', email);
+        return {
+          success: false,
+          message: 'User not found',
+        };
+      }
+
+      // Check if user is active
+      if (user.is_active === false) {
+        return {
+          success: false,
+          message: 'Your account has been deactivated. Please contact the administrator.',
+        };
+      }
+
+      console.log('✅ User found and active:', user.email);
+      return {
+        success: true,
+        user: user,
+      };
+
+    } catch (error: any) {
+      console.error('💥 Error finding user:', error);
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
+        return {
+          success: false,
+          message: 'Unable to connect to server. Please check your internet connection.',
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'Error connecting to user database.',
+      };
+    }
+  }
+
+  // 🔥 TEST API CONNECTION
   async testAPIConnection(): Promise<{ success: boolean; message: string; userCount?: number }> {
     try {
-      console.log('🧪 Testing API connection with token...');
+      console.log('🧪 Testing API connection...');
       
-      const response = await fetch(`${this.baseUrl}/users`, {
+      const response = await fetch(this.usersUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -288,8 +323,18 @@ class AuthService {
 
       if (response.ok) {
         const data = await response.json();
-        const users = data.users || data;
-        const userCount = Array.isArray(users) ? users.length : 0;
+        
+        // Handle different response formats
+        let users: any[] = [];
+        if (Array.isArray(data)) {
+          users = data;
+        } else if (data.users && Array.isArray(data.users)) {
+          users = data.users;
+        } else if (data.data && Array.isArray(data.data)) {
+          users = data.data;
+        }
+        
+        const userCount = users.length;
         
         return {
           success: true,
@@ -306,6 +351,11 @@ class AuthService {
           success: false,
           message: 'API token does not have permission to access users.',
         };
+      } else if (response.status === 404) {
+        return {
+          success: false,
+          message: 'Users API endpoint not found. Contact administrator.',
+        };
       } else {
         return {
           success: false,
@@ -321,7 +371,62 @@ class AuthService {
     }
   }
 
-  // Store user authentication data
+  // 🔥 GET AVAILABLE USERS (for UI display only)
+  async getAvailableUsers(): Promise<{ success: boolean; users: string[]; message: string }> {
+    try {
+      const response = await fetch(this.usersUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.API_TOKEN}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        let users: any[] = [];
+        if (Array.isArray(data)) {
+          users = data;
+        } else if (data.users && Array.isArray(data.users)) {
+          users = data.users;
+        } else if (data.data && Array.isArray(data.data)) {
+          users = data.data;
+        }
+
+        if (users.length > 0) {
+          const emails = users.map(u => u.email).filter(Boolean);
+          
+          return {
+            success: true,
+            users: emails,
+            message: `Found ${emails.length} users`,
+          };
+        } else {
+          return {
+            success: false,
+            users: [],
+            message: 'No users found in the system',
+          };
+        }
+      } else {
+        return {
+          success: false,
+          users: [],
+          message: `Cannot fetch users: HTTP ${response.status}`,
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        users: [],
+        message: `Error fetching users: ${error.message}`,
+      };
+    }
+  }
+
+  // 🔥 STORAGE METHODS
   private async storeAuthData(token: string, user: User): Promise<void> {
     try {
       await Promise.all([
@@ -334,7 +439,6 @@ class AuthService {
     }
   }
 
-  // Get stored user authentication data
   async getStoredAuthData(): Promise<{ token: string | null; user: User | null }> {
     try {
       const [token, userData] = await Promise.all([
@@ -350,7 +454,6 @@ class AuthService {
     }
   }
 
-  // Check if user is authenticated
   async isAuthenticated(): Promise<boolean> {
     try {
       const { token, user } = await this.getStoredAuthData();
@@ -361,7 +464,6 @@ class AuthService {
     }
   }
 
-  // Logout user
   async logout(): Promise<void> {
     try {
       await Promise.all([
@@ -374,22 +476,38 @@ class AuthService {
     }
   }
 
-  // Get current user
   async getCurrentUser(): Promise<User | null> {
     const { user } = await this.getStoredAuthData();
     return user;
   }
 
-  // Get current user token
   async getUserToken(): Promise<string | null> {
     const { token } = await this.getStoredAuthData();
     return token;
   }
 
-  // Validate token (basic check)
   async validateToken(): Promise<boolean> {
     const { token, user } = await this.getStoredAuthData();
     return !!(token && user);
+  }
+
+  // 🔥 GET SERVER INFO FOR DEBUGGING
+  getServerInfo(): { 
+    usersEndpoint: string; 
+    authEndpoints: string[]; 
+    hasToken: boolean;
+    recommendation: string;
+  } {
+    return {
+      usersEndpoint: this.usersUrl,
+      authEndpoints: [
+        `${this.baseUrl}/auth/login`,
+        `${this.baseUrl}/login`,
+        `${this.baseUrl}/authenticate`,
+      ],
+      hasToken: !!this.API_TOKEN,
+      recommendation: 'Implement POST /api/public/auth/login endpoint on your server for secure bcrypt authentication',
+    };
   }
 }
 

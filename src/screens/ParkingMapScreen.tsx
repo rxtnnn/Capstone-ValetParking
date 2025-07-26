@@ -8,6 +8,7 @@ import {
   ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { PanGestureHandler, PinchGestureHandler } from 'react-native-gesture-handler';
 import Animated, {
@@ -18,6 +19,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
 import { styles } from './styles/ParkingMapScreen.style';
+
+// 🔥 Import the RealTimeParkingService
+import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
+
+type RootStackParamList = {
+  Home: undefined;
+}
+type ParkingMapScreenNavigationProp = NavigationProp<RootStackParamList>;
 interface ParkingSpot {
   id: string;
   isOccupied: boolean;
@@ -35,24 +44,19 @@ interface ParkingSection {
   isFull: boolean;
 }
 
-interface ApiParkingData {
-  id: number;
-  sensor_id: number;
-  is_occupied: number;
-  distance_cm: number;
-  created_at: string;
-  updated_at: string;
-  floor_level: string;
-}
-
 const ParkingMapScreen: React.FC = () => {
+  const navigation = useNavigation<ParkingMapScreenNavigationProp>();
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [parkingData, setParkingData] = useState<ParkingSpot[]>([]);
   const [highlightedSection, setHighlightedSection] = useState<string | null>(null);
   const [navigationPath, setNavigationPath] = useState<{x: number, y: number}[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  
+  // 🔄 Updated state management for real-time service
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
+  const [parkingStats, setParkingStats] = useState<ParkingStats | null>(null);
+  const [isServiceRunning, setIsServiceRunning] = useState(false);
+  
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -66,9 +70,7 @@ const ParkingMapScreen: React.FC = () => {
       Poppins_600SemiBold,
     });
 
-  const API_URL = 'https://valet.up.railway.app/api/parking';
-  const UPDATE_INTERVAL = 5000;
-
+  // 🗺️ Sensor to spot mapping (same as before)
   const sensorToSpotMapping: { [key: number]: string } = {
     7: 'A1',   1: 'B1',   2: 'B2',   3: 'B3',   4: 'B4',
     5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
@@ -84,112 +86,144 @@ const ParkingMapScreen: React.FC = () => {
   const computeInitialSections = (): ParkingSection[] => {
     const sectionMap: { [key: string]: number } = {};
 
-    // Count how many slots exist per section (e.g., A1, B1...)
     Object.values(sensorToSpotMapping).forEach(spotId => {
-      const section = spotId.charAt(0); // A, B, C, etc.
+      const section = spotId.charAt(0);
       sectionMap[section] = (sectionMap[section] || 0) + 1;
     });
 
-    // Build ParkingSection objects
     return Object.entries(sectionMap).map(([section, total]) => ({
       id: section,
       label: section,
       totalSlots: total,
-      availableSlots: total, // Assume all available initially
+      availableSlots: total,
       isFull: false,
-    })).sort((a, b) => a.id.localeCompare(b.id)); // Sort alphabetically
+    })).sort((a, b) => a.id.localeCompare(b.id));
   };
 
- const [parkingSections, setParkingSections] = useState<ParkingSection[]>(computeInitialSections());
+  const [parkingSections, setParkingSections] = useState<ParkingSection[]>(computeInitialSections());
 
-  const fetchParkingData = async () => {
-    try {
-      const response = await fetch(API_URL, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-        },
-      });
+ // 🔄 Fixed function to properly map API sensor data to parking spots
+const updateParkingSpotsFromService = (stats: ParkingStats) => {
+  console.log('📊 Updating parking spots from service data');
+  
+  // Update parking stats
+  setParkingStats(stats);
+  
+  const sensorToSpotMap: { [key: number]: string } = {
+    7: 'A1',   1: 'B1',   2: 'B2',   3: 'B3',   4: 'B4',
+    5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
+    11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
+    16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
+    21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
+    26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
+    31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
+    36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
+    41: 'J4',  42: 'J5'
+  };
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  // Create a map of spot occupancy from the API data
+  const spotOccupancyMap: { [key: string]: boolean } = {};
+  
+  // If stats has sensor data array, use it to map occupancy
+  if (stats.sensorData && Array.isArray(stats.sensorData)) {
+    stats.sensorData.forEach((sensor: any) => {
+      const spotId = sensorToSpotMap[sensor.sensor_id];
+      if (spotId) {
+        // Convert is_occupied (0 or 1) to boolean
+        spotOccupancyMap[spotId] = sensor.is_occupied === 1;
+        console.log(`📍 Sensor ${sensor.sensor_id} -> Spot ${spotId}: ${sensor.is_occupied === 1 ? 'OCCUPIED' : 'AVAILABLE'}`);
       }
+    });
+  }
 
-      const apiData: ApiParkingData[] = await response.json();
+  // Update individual parking spots with actual sensor data
+  setParkingData(prevSpots => {
+    return prevSpots.map(spot => {
+      // Check if we have sensor data for this spot
+      const isOccupied = spotOccupancyMap.hasOwnProperty(spot.id) 
+        ? spotOccupancyMap[spot.id] 
+        : spot.isOccupied; // Keep current state if no sensor data
       
-      updateParkingSpots(apiData);
-      setIsConnected(true);
-      setLastUpdated(new Date().toLocaleTimeString());
-      
-    } catch (error) {
-      setIsConnected(false);
-      Alert.alert(
-        'Connection Error', 
-        'Unable to fetch real-time parking data. Showing last known status.',
-        [{ text: 'OK', style: 'default' }]
-      );
-    }
-  };
+      return {
+        ...spot,
+        isOccupied
+      };
+    });
+  });
 
-  const updateParkingSpots = (apiData: ApiParkingData[]) => {
-    setParkingData(prevSpots => {
-      return prevSpots.map(spot => {
-        // Find the sensor_id that maps to this spot.id
-        const matchingSensorEntry = Object.entries(sensorToSpotMapping).find(
-          ([sensorId, mappedSpotId]) => mappedSpotId === spot.id
+  // Update sections based on actual spot occupancy
+  setParkingSections(prevSections => {
+    return prevSections.map(section => {
+      // Count spots in this section
+      const sectionSpots = Object.values(sensorToSpotMap)
+        .filter(spotId => spotId.startsWith(section.id));
+
+      const totalSlots = sectionSpots.length;
+      
+      // Count available spots (those that are not occupied)
+      const availableSlots = sectionSpots.filter(spotId => 
+        !spotOccupancyMap[spotId] // Not occupied or no data (assume available)
+      ).length;
+
+      return {
+        ...section,
+        totalSlots,
+        availableSlots,
+        isFull: availableSlots === 0
+      };
+    });
+  });
+
+  console.log('✅ Parking spots updated with real sensor data');
+};
+  // 🚀 Initialize the service
+  useEffect(() => {
+    console.log('🚀 Initializing RealTimeParkingService');
+    
+    // Test connection first
+    const testConnection = async () => {
+      const result = await RealTimeParkingService.testConnection();
+      console.log('🧪 Connection test result:', result);
+      
+      if (result.success) {
+        console.log('✅ Starting parking service');
+        RealTimeParkingService.start();
+        setIsServiceRunning(true);
+      } else {
+        console.error('Connection test failed:', result.message);
+        Alert.alert(
+          'Connection Error',
+          `Unable to connect to parking service: ${result.message}`,
+          [{ text: 'Retry', onPress: testConnection }, { text: 'OK' }]
         );
+      }
+    };
 
-        if (matchingSensorEntry) {
-          const sensorId = parseInt(matchingSensorEntry[0]);
-          const sensorData = apiData.find(s => s.sensor_id === sensorId);
+    testConnection();
 
-          if (sensorData) {
-            return {
-              ...spot,
-              isOccupied: sensorData.is_occupied === 1
-            };
-          }
-        }
-
-        return spot; // no match found, return original spot
-      });
+    // Subscribe to parking updates
+    const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
+      console.log('Received parking update:', data);
+      updateParkingSpotsFromService(data);
     });
 
-    updateSectionIndicators(apiData);
-  };
-
-
-  const updateSectionIndicators = (apiData: ApiParkingData[]) => {
-    setParkingSections(prevSections => {
-      return prevSections.map(section => {
-        const sectionSpots = Object.entries(sensorToSpotMapping)
-          .filter(([_, spotId]) => spotId.startsWith(section.id))
-          .map(([sensorId, _]) => parseInt(sensorId));
-
-        const totalSlots = sectionSpots.length;
-        let availableSlots = 0;
-
-        sectionSpots.forEach(sensorId => {
-          const sensorData = apiData.find(data => data.sensor_id === sensorId);
-          if (sensorData && sensorData.is_occupied === 0) {
-            availableSlots++;
-          } else if (!sensorData) {
-            availableSlots++;
-          }
-        });
-
-        return {
-          ...section,
-          totalSlots,
-          availableSlots,
-          isFull: availableSlots === 0
-        };
-      });
+    // Subscribe to connection status
+    const unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
+      console.log('Connection status changed:', status);
+      setConnectionStatus(status);
     });
-  };
 
+    // Cleanup on unmount
+    return () => {
+      console.log('Cleaning up RealTimeParkingService');
+      unsubscribeParkingUpdates();
+      unsubscribeConnectionStatus();
+      RealTimeParkingService.stop();
+      setIsServiceRunning(false);
+    };
+  }, []);
+
+  // 🔄 Initialize parking spots layout
   useEffect(() => {
     const spots: ParkingSpot[] = [
       { id: 'A1', isOccupied: false, position: { x: 680, y: 110 }, width: 35, height: 35 },
@@ -237,17 +271,9 @@ const ParkingMapScreen: React.FC = () => {
     ];
 
     setParkingData(spots);
-    fetchParkingData();
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(fetchParkingData, UPDATE_INTERVAL);
-    
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
-
+  // 🎯 Gesture handlers (same as before)
   const panGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
       context.startX = translateX.value;
@@ -329,24 +355,34 @@ const ParkingMapScreen: React.FC = () => {
     };
   });
 
-  const clearNavigation = () => {
-    setShowNavigation(false);
-    setNavigationPath([]);
-    setSelectedSpot(null);
-  };
-
   const bottomPanelAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateY: bottomPanelY.value }],
     };
   });
 
+  // 🔄 Updated refresh handler
+  const handleRefresh = async () => {
+    console.log('🔄 Manual refresh requested');
+    try {
+      await RealTimeParkingService.forceUpdate();
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+      Alert.alert('Refresh Failed', 'Unable to refresh parking data. Please try again.');
+    }
+  };
+
+  // 🎯 Event handlers (same as before)
+  const clearNavigation = () => {
+    setShowNavigation(false);
+    setNavigationPath([]);
+    setSelectedSpot(null);
+  };
+
   const handleSectionPress = (sectionId: string) => {
     if (highlightedSection === sectionId) {
-      // If already highlighted, unhighlight
       setHighlightedSection(null);
     } else {
-      // Highlight the selected section
       setHighlightedSection(sectionId);
     }
   };
@@ -373,10 +409,7 @@ const ParkingMapScreen: React.FC = () => {
     );
   };
 
-  const handleRefresh = () => {
-    fetchParkingData();
-  };
-
+  // 🎨 Render functions (same as before)
   const renderParkingSpot = (spot: ParkingSpot) => {
     const isSelected = selectedSpot === spot.id;
     const spotSection = spot.id.charAt(0); 
@@ -384,7 +417,6 @@ const ParkingMapScreen: React.FC = () => {
     
     return (
       <TouchableOpacity
-      //turn red if occupied spot
         key={spot.id}
         style={[
           styles.parkingSpot,
@@ -484,9 +516,14 @@ const ParkingMapScreen: React.FC = () => {
       </>
     );
   };
+ const navigateHome = () => {
+    navigation.navigate('Home');
+  }
+  // Calculate total available spots from service data or fallback to sections
+  const totalAvailableSpots = parkingStats?.availableSpots || 
+    parkingSections.reduce((sum, section) => sum + section.availableSlots, 0);
 
-  const totalAvailableSpots = parkingSections.reduce((sum, section) => sum + section.availableSlots, 0);
-
+  // 🎨 Render the UI
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -504,20 +541,10 @@ const ParkingMapScreen: React.FC = () => {
         >
           {parkingSections.map(renderSectionIndicator)}
         </ScrollView>
-        
-        {/* Connection Status Indicator */}
-        <View style={styles.connectionStatus}>
-          <View style={[
-            styles.connectionDot, 
-            { backgroundColor: isConnected ? '#4CAF50' : '#ff4444' }
-          ]} />
-          <Text style={styles.connectionText}>
-            {isConnected ? 'LIVE' : 'OFFLINE'}
-          </Text>
-        </View>
+
       </LinearGradient>
 
-      {/* Refresh Button */}
+      {/* 🔄 Enhanced Refresh Button */}
       <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
         <Ionicons name="refresh" size={20} color="white" />
         <Text style={styles.refreshText}>Refresh</Text>
@@ -544,7 +571,7 @@ const ParkingMapScreen: React.FC = () => {
                   {parkingData.map(renderParkingSpot)}
                   {renderNavigationPath()}
                   
-                  {/* Structural elements */}
+                  {/* Structural elements (same as before) */}
                   <View style={styles.elevator1}>
                     <Text style={styles.elevatorText}>Elevator</Text>
                   </View>
@@ -567,7 +594,7 @@ const ParkingMapScreen: React.FC = () => {
                     <Text style={styles.exitText}>EXIT</Text>
                   </View>
                   
-                  {/* Direction arrows */}
+                  {/* Direction arrows (same as before) */}
                   <View style={styles.arrow1}>
                     <Ionicons name="arrow-up" size={28} color="white" />
                   </View>
@@ -657,17 +684,16 @@ const ParkingMapScreen: React.FC = () => {
                 </View>
               </View>
               
-              {/* Last Updated Info */}
               <View style={styles.lastUpdated}>
                 <Text style={styles.lastUpdatedText}>
-                  Last updated: {lastUpdated || 'Loading...'}
+                  Last updated: {parkingStats?.lastUpdated || 'Loading...'}
                 </Text>
               </View>
             </View>
             
             <View style={styles.bottomButtons}>
               <TouchableOpacity style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>View other levels</Text>
+                <Text style={styles.secondaryButtonText} onPress={navigateHome}>View other levels</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.primaryButton}>
@@ -675,14 +701,13 @@ const ParkingMapScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             
-            <TouchableOpacity style={styles.closeButton}>
+            <TouchableOpacity style={styles.closeButton} onPress={navigateHome}>
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </LinearGradient>
         </Animated.View>
       </PanGestureHandler>
       
-      {/* clear route btn */}
       {showNavigation && (
         <TouchableOpacity style={styles.clearRouteButton} onPress={clearNavigation}>
           <Ionicons name="close-circle" size={20} color="white" />

@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NotificationManager } from '../services/NotifManager';
 
 interface NotificationSettings {
   spotAvailable: boolean;
@@ -66,6 +67,15 @@ class NotificationServiceClass {
       sound: 'default',
       lightColor: '#B71C1C',
     });
+
+    await Notifications.setNotificationChannelAsync('feedback-replies', {
+      name: 'Feedback Replies',
+      description: 'Admin replies to your feedback',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: 'default',
+      lightColor: '#B22020',
+    });
   }
 
   private async registerForPushNotifications(): Promise<string | null> {
@@ -110,6 +120,7 @@ class NotificationServiceClass {
     return token;
   }
 
+  // 🔥 ENHANCED: Now also adds to NotificationManager for in-app display
   async showSpotAvailableNotification(
     spotsAvailable: number,
     floor?: number
@@ -126,6 +137,10 @@ class NotificationServiceClass {
         ? `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}`
         : `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available`;
 
+      // Add to NotificationManager for in-app display
+      await NotificationManager.addSpotAvailableNotification(spotsAvailable, floor);
+
+      // Show push notification
       await this.showLocalNotification(
         title,
         message,
@@ -143,6 +158,7 @@ class NotificationServiceClass {
     }
   }
 
+  // 🔥 ENHANCED: Now also adds to NotificationManager for in-app display
   async showFloorUpdateNotification(
     floor: number, 
     availableSpots: number,
@@ -155,9 +171,16 @@ class NotificationServiceClass {
         return;
       }
 
+      const title = 'Floor Update';
+      const message = `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`;
+
+      // Add to NotificationManager for in-app display
+      await NotificationManager.addFloorUpdateNotification(floor, availableSpots, totalSpots);
+
+      // Show push notification
       await this.showLocalNotification(
-        'Floor Update',
-        `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`,
+        title,
+        message,
         { 
           type: 'floor-update', 
           floor, 
@@ -175,42 +198,58 @@ class NotificationServiceClass {
     }
   }
 
+  // 🔥 Connection status notifications - DISABLED for in-app notifications
   async showConnectionStatusNotification(isConnected: boolean): Promise<void> {
+    // Connection status notifications are completely disabled
+    // We don't want to show these to users in any form
+    console.log(`Connection status: ${isConnected ? 'connected' : 'disconnected'} - no notification shown`);
+    return;
+  }
+
+  // 🔥 NEW: Method to show feedback reply notification
+  async showFeedbackReplyNotification(
+    feedbackId: number,
+    originalFeedback: string,
+    adminReply: string,
+    adminName?: string
+  ): Promise<void> {
     try {
       const settings = await this.getNotificationSettings();
       
-      if (isConnected) {
-        await this.showLocalNotification(
-          'VALET Connected',
-          'Real-time parking data is now available',
-          { 
-            type: 'connection-status',
-            connected: true,
-            timestamp: Date.now()
-          },
-          'connection-status',
-          settings
-        );
-      } else {
-        await this.showLocalNotification(
-          'VALET Disconnected',
-          'Trying to reconnect to parking data...',
-          { 
-            type: 'connection-status',
-            connected: false,
-            timestamp: Date.now()
-          },
-          'connection-status',
-          settings
-        );
-      }
+      const title = 'Admin Reply Received';
+      const message = `Your feedback has been responded to by ${adminName || 'Admin'}`;
 
+      // Add to NotificationManager for in-app display
+      await NotificationManager.addFeedbackReplyNotification(
+        feedbackId,
+        originalFeedback,
+        adminReply,
+        adminName
+      );
+
+      // Show push notification
+      await this.showLocalNotification(
+        title,
+        message,
+        { 
+          type: 'feedback-reply',
+          feedbackId,
+          originalFeedback: originalFeedback.substring(0, 50) + '...',
+          adminReply: adminReply.substring(0, 50) + '...',
+          adminName,
+          timestamp: Date.now()
+        },
+        'feedback-replies',
+        settings
+      );
+
+      console.log(`Feedback reply notification sent for feedback ${feedbackId}`);
     } catch (error) {
-      console.error('Error showing connection status:', error);
+      console.error('Error showing feedback reply notification:', error);
     }
   }
 
-  private async showLocalNotification(
+  public async showLocalNotification(
     title: string, 
     message: string, 
     data: any,
@@ -232,6 +271,37 @@ class NotificationServiceClass {
 
     } catch (error) {
       console.error('Error scheduling notification:', error);
+    }
+  }
+
+  // 🔥 ENHANCED: Simple notification now also adds to NotificationManager
+  public async showSimpleNotification(
+    title: string, 
+    message: string,
+    data?: any
+  ): Promise<void> {
+    try {
+      const settings = await this.getNotificationSettings();
+      
+      // Add to NotificationManager for in-app display
+      await NotificationManager.addNotification({
+        type: 'general',
+        title,
+        message,
+        priority: 'normal',
+        data: data || { type: 'general' },
+      });
+      
+      // Show push notification
+      await this.showLocalNotification(
+        title,
+        message,
+        data || { type: 'general', timestamp: Date.now() },
+        'default',
+        settings
+      );
+    } catch (error) {
+      console.error('Error showing simple notification:', error);
     }
   }
 
@@ -299,16 +369,40 @@ class NotificationServiceClass {
     return this.expoPushToken;
   }
 
+  // 🔥 FIXED: Use the simple notification method for testing
   async testNotification(): Promise<void> {
-    const settings = await this.getNotificationSettings();
-    
-    await this.showLocalNotification(
+    await this.showSimpleNotification(
       'VALET Test',
       'This is a test notification to verify your settings work!',
-      { type: 'test', timestamp: Date.now() },
-      'default',
-      settings
+      { type: 'test', timestamp: Date.now() }
     );
+  }
+
+  // 🔥 NEW: Initialize notification manager integration
+  async initializeWithManager(): Promise<void> {
+    await this.initialize();
+    console.log('📱 NotificationService initialized with NotificationManager integration');
+  }
+
+  // 🔥 NEW: Method to simulate feedback reply (for testing)
+  async simulateFeedbackReply(
+    feedbackId: number = 1,
+    originalFeedback: string = 'Test feedback message',
+    adminReply: string = 'Thank you for your feedback! We are working on this issue.',
+    adminName: string = 'Admin Team'
+  ): Promise<void> {
+    await this.showFeedbackReplyNotification(feedbackId, originalFeedback, adminReply, adminName);
+  }
+
+  // 🔥 NEW: Method to simulate parking notifications (for testing)
+  async simulateParkingNotifications(): Promise<void> {
+    // Simulate spot available
+    await this.showSpotAvailableNotification(3, 4);
+    
+    // Simulate floor update after 2 seconds
+    setTimeout(async () => {
+      await this.showFloorUpdateNotification(4, 5, 42);
+    }, 2000);
   }
 
   getStatus() {
@@ -317,7 +411,47 @@ class NotificationServiceClass {
       token: this.expoPushToken?.substring(0, 20) + '...',
       platform: Platform.OS,
       isDevice: Device.isDevice,
+      managerIntegration: true,
     };
+  }
+
+  // 🔥 NEW: Get notification statistics
+  getNotificationStats() {
+    return {
+      service: 'NotificationService',
+      pushToken: !!this.expoPushToken,
+      platform: Platform.OS,
+      deviceSupport: Device.isDevice,
+      channels: Platform.OS === 'android' ? 4 : 0, // Android channels created
+      integrations: ['NotificationManager', 'AsyncStorage', 'Expo'],
+    };
+  }
+
+  // 🔥 NEW: Clear all notification channels (Android only)
+  async clearNotificationChannels(): Promise<void> {
+    if (Platform.OS === 'android') {
+      try {
+        await Notifications.deleteNotificationChannelAsync('spot-available');
+        await Notifications.deleteNotificationChannelAsync('floor-updates');
+        await Notifications.deleteNotificationChannelAsync('connection-status');
+        await Notifications.deleteNotificationChannelAsync('feedback-replies');
+        console.log('🗑️ Notification channels cleared');
+      } catch (error) {
+        console.error('Error clearing notification channels:', error);
+      }
+    }
+  }
+
+  // 🔥 NEW: Reset notification service
+  async reset(): Promise<void> {
+    try {
+      await this.clearNotificationChannels();
+      await AsyncStorage.removeItem(SETTINGS_KEY);
+      this.expoPushToken = null;
+      console.log('🔄 NotificationService reset complete');
+    } catch (error) {
+      console.error('Error resetting NotificationService:', error);
+    }
   }
 }
 

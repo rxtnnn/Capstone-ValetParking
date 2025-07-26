@@ -360,4 +360,23 @@ export const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 15,
   },
+  serviceIndicator: {
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    borderRadius: 8,
+  },
+  serviceText: {
+    color: '#4CAF50',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  serviceStatsText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: 'Poppins_400Regular',
+  },
+
 });

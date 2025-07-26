@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
+import { View,
   Text,
-  StyleSheet,
   ScrollView,
   Switch,
   TouchableOpacity,
   Modal,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -62,7 +59,6 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     vibration: true,
     sound: true,
   });
-  const [loading, setLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [alert, setAlert] = useState<AlertConfig>({
     visible: false,
