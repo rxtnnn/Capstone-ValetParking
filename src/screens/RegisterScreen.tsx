@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   StatusBar,
   SafeAreaView,
   Image,
@@ -12,6 +11,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -89,6 +89,7 @@ const LoginScreen: React.FC = () => {
         // Navigate to home (this will be handled by useEffect above)
         console.log('Login successful');
       } else {
+        // Show specific error message from server
         Alert.alert(
           'Login Failed',
           result.message || 'Invalid email or password. Please try again.',
@@ -106,18 +107,6 @@ const LoginScreen: React.FC = () => {
     }
   };
 
-  const handleGoogleLogin = () => {
-    Alert.alert('Coming Soon', 'Google login will be available in a future update.');
-  };
-
-  const handleFacebookLogin = () => {
-    Alert.alert('Coming Soon', 'Facebook login will be available in a future update.');
-  };
-
-  const handleAppleLogin = () => {
-    Alert.alert('Coming Soon', 'Apple login will be available in a future update.');
-  };
-
   const handleForgotPassword = () => {
     Alert.alert(
       'Forgot Password',
@@ -132,12 +121,6 @@ const LoginScreen: React.FC = () => {
       'New accounts are created by administrators only. Please contact your administrator for access.',
       [{ text: 'OK' }]
     );
-  };
-
-  // Test login with demo credentials
-  const handleTestLogin = () => {
-    setEmail('user@valet.com');
-    setPassword('password123');
   };
 
   // Show loading screen if checking authentication
@@ -160,163 +143,127 @@ const LoginScreen: React.FC = () => {
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Main content */}
-        <View style={styles.content}>
-          <View>
-            <Image 
-              source={require('../../assets/logo.png')} 
-              style={styles.image} 
-            />
-          </View>
-
-          {/* Welcome */}
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeTitle}>Welcome back</Text>
-            <Text style={styles.welcomeSubtitle}>Login to your VALET account</Text>
-          </View>
-
-          {/* Error display */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle" size={16} color="#B22020" />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          {/* Form starts here */}
-          <View style={styles.form}>
-            {/* Email starts here*/}
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.textInput, styles.textInputWithIcon]}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                editable={!isSubmitting}
-                placeholderTextColor="#9CA3AF"
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+          {/* Main content */}
+          <View style={styles.content}>
+            <View>
+              <Image 
+                source={require('../../assets/logo.png')} 
+                style={styles.image} 
               />
             </View>
 
-            {/* Password starts here */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.textInput, styles.passwordInputWithIcon]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter your password"
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                editable={!isSubmitting}
-                placeholderTextColor="#9CA3AF"
-              />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowPassword(!showPassword)}
-                disabled={isSubmitting}
-              >
-                <Ionicons 
-                  name={showPassword ? "eye-off" : "eye"} 
-                  size={20} 
-                  color="#9CA3AF" 
-                />
-              </TouchableOpacity>
+            {/* Welcome */}
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeTitle}>Welcome back</Text>
+              <Text style={styles.welcomeSubtitle}>Login to your VALET account</Text>
             </View>
 
-            {/* Remember me and Forgot password */}
-            <View style={styles.optionsRow}>
-              <TouchableOpacity 
-                style={styles.rememberMeContainer}
-                onPress={() => setRememberMe(!rememberMe)}
-                disabled={isSubmitting}
-              >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && (
-                    <Ionicons name="checkmark" size={12} color="white" />
-                  )}
-                </View>
-                <Text style={styles.rememberMeText}>Remember me</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity onPress={handleForgotPassword} disabled={isSubmitting}>
-                <Text style={styles.forgotPasswordText}>Forgot Password ?</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Login button */}
-            <TouchableOpacity 
-              style={[styles.loginButton, isSubmitting && styles.loginButtonDisabled]} 
-              onPress={handleLogin}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <View style={styles.loginButtonContent}>
-                  <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
-                  <Text style={styles.loginButtonText}>Signing In...</Text>
-                </View>
-              ) : (
-                <Text style={styles.loginButtonText}>Login</Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Test login button (for development) */}
-            {__DEV__ && (
-              <TouchableOpacity 
-                style={styles.testLoginButton} 
-                onPress={handleTestLogin}
-                disabled={isSubmitting}
-              >
-                <Text style={styles.testLoginButtonText}>Fill Test Credentials</Text>
-              </TouchableOpacity>
+            {/* Error display */}
+            {error && (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={16} color="#B22020" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
             )}
 
-            {/* OR line */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
+            {/* Form starts here */}
+            <View style={styles.form}>
+              {/* Email input */}
+              <View style={styles.inputContainer}>
+                <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.textInput, styles.textInputWithIcon]}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Enter your email"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  editable={!isSubmitting}
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
 
-            {/* Social login buttons */}
-            <View style={styles.socialButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.socialButton, isSubmitting && styles.socialButtonDisabled]} 
-                onPress={handleGoogleLogin}
-                disabled={isSubmitting}
-              >
-                <Text style={styles.socialButtonText}>G</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.socialButton, isSubmitting && styles.socialButtonDisabled]} 
-                onPress={handleFacebookLogin}
-                disabled={isSubmitting}
-              >
-                <Text style={styles.socialButtonTextFacebook}>f</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.socialButton, isSubmitting && styles.socialButtonDisabled]} 
-                onPress={handleAppleLogin}
-                disabled={isSubmitting}
-              >
-                <Ionicons name="logo-apple" size={24} color="#000000" />
-              </TouchableOpacity>
-            </View>
+              {/* Password input */}
+              <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.textInput, styles.passwordInputWithIcon]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter your password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!isSubmitting}
+                  placeholderTextColor="#9CA3AF"
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={isSubmitting}
+                >
+                  <Ionicons 
+                    name={showPassword ? "eye-off" : "eye"} 
+                    size={20} 
+                    color="#9CA3AF" 
+                  />
+                </TouchableOpacity>
+              </View>
 
-            {/* Create account */}
-            <View style={styles.createAccountContainer}>
-              <Text style={styles.createAccountText}>Need an account? </Text>
-              <TouchableOpacity onPress={handleCreateAccount} disabled={isSubmitting}>
-                <Text style={styles.createAccountLink}>Contact Administrator</Text>
+              {/* Remember me and Forgot password */}
+              <View style={styles.optionsRow}>
+                <TouchableOpacity 
+                  style={styles.rememberMeContainer}
+                  onPress={() => setRememberMe(!rememberMe)}
+                  disabled={isSubmitting}
+                >
+                  <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                    {rememberMe && (
+                      <Ionicons name="checkmark" size={12} color="white" />
+                    )}
+                  </View>
+                  <Text style={styles.rememberMeText}>Remember me</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity onPress={handleForgotPassword} disabled={isSubmitting}>
+                  <Text style={styles.forgotPasswordText}>Forgot Password ?</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Login button */}
+              <TouchableOpacity 
+                style={[styles.loginButton, isSubmitting && styles.loginButtonDisabled]} 
+                onPress={handleLogin}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <View style={styles.loginButtonContent}>
+                    <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
+                    <Text style={styles.loginButtonText}>Signing In...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
               </TouchableOpacity>
+
+              {/* OR divider */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Create account */}
+              <View style={styles.createAccountContainer}>
+                <Text style={styles.createAccountText}>Need an account? </Text>
+                <TouchableOpacity onPress={handleCreateAccount} disabled={isSubmitting}>
+                  <Text style={styles.createAccountLink}>Contact Administrator</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
