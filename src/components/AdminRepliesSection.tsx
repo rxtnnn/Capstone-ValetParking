@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedback } from '../hooks/useFeedback';
 import { FeedbackData } from '../types/feedback';
+import { FeedbackNotificationHelper } from '../utils/feedbackNotif';
 import { adminRepliesStyles } from './styles/AdminRepliesSection.style';
 
 interface AdminRepliesSectionProps {
@@ -23,8 +24,22 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
     item.admin_response && item.admin_response.trim().length > 0
   );
 
+  // ✅ NEW: Process feedback for notifications whenever feedback data changes
+  useEffect(() => {
+    if (feedback && feedback.length > 0) {
+      // Process feedback replies to create notifications for admin responses
+      FeedbackNotificationHelper.processFeedbackArray(feedback);
+    }
+  }, [feedback]);
+
   const handleRefresh = async () => {
     await refreshFeedback();
+    
+    // ✅ NEW: After refreshing feedback, process for new notifications
+    if (feedback && feedback.length > 0) {
+      await FeedbackNotificationHelper.processFeedbackArray(feedback);
+    }
+    
     onRefresh?.();
   };
 
@@ -75,6 +90,12 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
     }
   };
 
+  // ✅ NEW: Manual test function to create notification
+  const handleTestNotification = async () => {
+    await FeedbackNotificationHelper.createTestNotification();
+    console.log('🧪 Test feedback notification created manually');
+  };
+
   if (feedbackWithReplies.length === 0) {
     return (
       <View style={adminRepliesStyles.container}>
@@ -90,8 +111,26 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
           <Ionicons name="mail-open-outline" size={48} color="#D1D5DB" />
           <Text style={adminRepliesStyles.emptyStateTitle}>No replies yet</Text>
           <Text style={adminRepliesStyles.emptyStateText}>
-            When admins respond to your feedback, their replies will appear here
+            When admins respond to your feedback, their replies will appear here and you'll get a notification
           </Text>
+          
+          {/* ✅ NEW: Test button for development */}
+          {__DEV__ && (
+            <TouchableOpacity 
+              onPress={handleTestNotification}
+              style={{
+                marginTop: 16,
+                backgroundColor: '#B22020',
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 12 }}>
+                🧪 Test Notification
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -117,6 +156,29 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* ✅ NEW: Development test button */}
+        {__DEV__ && (
+          <View style={{ padding: 16, backgroundColor: '#f8f9fa', margin: 16, borderRadius: 8 }}>
+            <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+              🧪 Development Tools
+            </Text>
+            <TouchableOpacity 
+              onPress={handleTestNotification}
+              style={{
+                backgroundColor: '#B22020',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 6,
+                alignSelf: 'flex-start',
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 11 }}>
+                Test Feedback Notification
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {feedbackWithReplies.map((item, index) => (
           <View key={item.id || index} style={adminRepliesStyles.replyCard}>
             {/* Original Feedback Header */}
@@ -169,6 +231,26 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
               <Text style={adminRepliesStyles.adminReplyText}>
                 {item.admin_response}
               </Text>
+
+              {/* ✅ NEW: Notification indicator */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 8,
+                paddingTop: 8,
+                borderTopWidth: 1,
+                borderTopColor: '#f0f0f0',
+              }}>
+                <Ionicons name="notifications-outline" size={14} color="#B22020" />
+                <Text style={{
+                  fontSize: 11,
+                  color: '#666',
+                  marginLeft: 4,
+                  fontStyle: 'italic',
+                }}>
+                  You were notified about this reply
+                </Text>
+              </View>
             </View>
 
             {/* Show rating if it exists */}

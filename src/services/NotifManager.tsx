@@ -1,8 +1,10 @@
-// src/services/NotificationManager.ts
+// src/services/NotifManager.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppNotification, BaseNotification } from '../types/NotifTypes';
+import { FeedbackData } from '../types/feedback';
 
 const NOTIFICATIONS_STORAGE_KEY = '@valet_notifications';
+const LAST_FEEDBACK_CHECK_KEY = '@valet_last_feedback_check';
 const MAX_NOTIFICATIONS = 50; // Keep only last 50 notifications
 
 type NotificationListener = (notifications: AppNotification[]) => void;
@@ -46,17 +48,28 @@ class NotificationManagerClass {
     }
   }
 
-  // 🔥 UPDATED: Only add parking and feedback notifications (no general/welcome messages)
+  // ✅ FIXED: Allow feedback replies along with parking notifications
   async addNotification(notification: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>): Promise<void> {
-    // 🚫 FILTER OUT: Do not add general notifications (welcome messages, connection status, etc.)
-    if (notification.type === 'general') {
-      console.log('🚫 General notification filtered out (not added to overlay):', notification.title);
+    // 🎯 ONLY ALLOW: parking updates and feedback replies (no maintenance for now)
+    // 🚫 EXCLUDE: general notifications (connection status, welcome messages, etc.)
+    const allowedTypes = ['spot_available', 'floor_update', 'feedback_reply'];
+    
+    if (!allowedTypes.includes(notification.type)) {
+      console.log('🚫 Notification type filtered out from overlay:', notification.type, notification.title);
       return;
     }
 
-    // ✅ ONLY ALLOW: parking updates and feedback replies
-    if (!['spot_available', 'floor_update', 'feedback_reply'].includes(notification.type)) {
-      console.log('🚫 Notification type not supported in overlay:', notification.type);
+    // 🚫 EXTRA FILTER: Block specific unwanted messages by title/content
+    const blockedTitles = [
+      'VALET Connected!',
+      'Connection Established',
+      'Welcome to VALET',
+      'System Ready',
+      'App Initialized'
+    ];
+    
+    if (blockedTitles.some(blocked => notification.title.includes(blocked))) {
+      console.log('🚫 Blocked notification by title:', notification.title);
       return;
     }
 
@@ -88,9 +101,9 @@ class NotificationManagerClass {
     console.log(`📱 New notification added to overlay: ${newNotification.title}`);
   }
 
-  // Add feedback reply notification
+  // ✅ FIXED: Handle optional feedback ID
   async addFeedbackReplyNotification(
-    feedbackId: number,
+    feedbackId: number | undefined,
     originalFeedback: string,
     adminReply: string,
     adminName?: string
@@ -101,7 +114,7 @@ class NotificationManagerClass {
       message: `Your feedback has been responded to by ${adminName || 'Admin'}`,
       priority: 'high',
       data: {
-        feedbackId,
+        feedbackId: feedbackId || 0, // ✅ FIXED: Handle undefined ID
         originalFeedback: originalFeedback.substring(0, 100) + (originalFeedback.length > 100 ? '...' : ''),
         adminReply,
         adminName,
@@ -110,7 +123,64 @@ class NotificationManagerClass {
     });
   }
 
-  // 🔥 UPDATED: Only add spot notifications when NEW spots become available
+  // ✅ NEW: Process feedback array and create notifications for new replies
+  async processFeedbackReplies(feedbackArray: FeedbackData[]): Promise<void> {
+    try {
+      // Get last check time
+      const lastCheckTime = await this.getLastFeedbackCheckTime();
+      const currentTime = Date.now();
+
+      // Filter feedback that has admin responses added after last check
+      const newReplies = feedbackArray.filter(feedback => {
+        if (!feedback.admin_response || !feedback.responded_at) {
+          return false;
+        }
+
+        const responseTime = new Date(feedback.responded_at).getTime();
+        return responseTime > lastCheckTime;
+      });
+
+      console.log(`📱 Found ${newReplies.length} new feedback replies since last check`);
+
+      // Create notifications for new replies
+      for (const feedback of newReplies) {
+        await this.addFeedbackReplyNotification(
+          feedback.id, // ✅ FIXED: Can handle undefined ID now
+          feedback.message,
+          feedback.admin_response!,
+          'Admin Team' // You can extract this from your API if available
+        );
+      }
+
+      // Update last check time
+      await this.updateLastFeedbackCheckTime(currentTime);
+
+    } catch (error) {
+      console.error('Error processing feedback replies:', error);
+    }
+  }
+
+  // Get last feedback check time
+  private async getLastFeedbackCheckTime(): Promise<number> {
+    try {
+      const stored = await AsyncStorage.getItem(LAST_FEEDBACK_CHECK_KEY);
+      return stored ? parseInt(stored, 10) : 0;
+    } catch (error) {
+      console.error('Error getting last feedback check time:', error);
+      return 0;
+    }
+  }
+
+  // Update last feedback check time
+  private async updateLastFeedbackCheckTime(timestamp: number): Promise<void> {
+    try {
+      await AsyncStorage.setItem(LAST_FEEDBACK_CHECK_KEY, timestamp.toString());
+    } catch (error) {
+      console.error('Error updating last feedback check time:', error);
+    }
+  }
+
+  // Add spot available notification
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
     // Only create notification if spots are actually available (> 0)
     if (spotsAvailable <= 0) {
@@ -133,7 +203,7 @@ class NotificationManagerClass {
     });
   }
 
-  // 🔥 UPDATED: Only add floor update notifications when there are meaningful changes
+  // Add floor update notification
   async addFloorUpdateNotification(
     floor: number, 
     availableSpots: number, 
@@ -172,8 +242,8 @@ class NotificationManagerClass {
     });
   }
 
-  // 🔥 REMOVED: Connection status notifications completely removed
-  // These will never appear in the notification overlay
+  // ✅ REMOVED: Maintenance alert method to avoid TypeScript errors
+  // Only keeping parking and feedback notifications for now
 
   // Mark notification as read
   async markAsRead(notificationId: string): Promise<void> {
@@ -222,14 +292,14 @@ class NotificationManagerClass {
     this.notifyListeners();
   }
 
-  // Get all notifications (only parking and feedback)
+  // Get all notifications (parking and feedback only)
   getNotifications(): AppNotification[] {
     return [...this.notifications]
       .filter(n => ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type))
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  // Get unread count (only parking and feedback)
+  // Get unread count (parking and feedback only)
   getUnreadCount(): number {
     return this.notifications
       .filter(n => !n.isRead && ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type))
@@ -252,7 +322,7 @@ class NotificationManagerClass {
     };
   }
 
-  // Update unread count (only parking and feedback)
+  // Update unread count (parking and feedback only)
   private updateUnreadCount(): void {
     this.unreadCount = this.notifications
       .filter(n => !n.isRead && ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type))
@@ -271,7 +341,7 @@ class NotificationManagerClass {
     });
   }
 
-  // Get notifications by type (only parking and feedback)
+  // Get notifications by type (parking and feedback only)
   getNotificationsByType(type: AppNotification['type']): AppNotification[] {
     if (!['spot_available', 'floor_update', 'feedback_reply'].includes(type)) {
       return [];
@@ -279,30 +349,28 @@ class NotificationManagerClass {
     return this.notifications.filter(n => n.type === type);
   }
 
-  // Check for new feedback replies (call this when app becomes active)
-  async checkForFeedbackReplies(userId: number): Promise<void> {
+  // ✅ ENHANCED: Check for new feedback replies with better integration
+  async checkForFeedbackReplies(userId: number, feedbackArray?: FeedbackData[]): Promise<void> {
     try {
-      // This would typically call your API to check for new feedback replies
       console.log(`✅ Checking for feedback replies for user ${userId}`);
       
-      // Example API call structure:
-      // const response = await fetch(`https://valet.up.railway.app/api/feedback/replies/${userId}`);
-      // const replies = await response.json();
-      // 
-      // replies.forEach(reply => {
-      //   this.addFeedbackReplyNotification(
-      //     reply.feedback_id,
-      //     reply.original_feedback,
-      //     reply.admin_reply,
-      //     reply.admin_name
-      //   );
-      // });
+      if (feedbackArray) {
+        // If feedback array is provided, process it directly
+        await this.processFeedbackReplies(feedbackArray);
+      } else {
+        // If no array provided, you could make an API call here
+        // Example API call structure:
+        // const response = await fetch(`https://valet.up.railway.app/api/feedback/replies/${userId}`);
+        // const replies = await response.json();
+        // await this.processFeedbackReplies(replies);
+        console.log('💡 Tip: Pass feedbackArray to checkForFeedbackReplies() for immediate processing');
+      }
     } catch (error) {
       console.error('Error checking for feedback replies:', error);
     }
   }
 
-  // Get summary for display (only parking and feedback)
+  // Get summary for display (parking and feedback only)
   getSummary(): { total: number; unread: number; recent: number } {
     const validNotifications = this.notifications.filter(n => 
       ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type)
@@ -318,21 +386,31 @@ class NotificationManagerClass {
     };
   }
 
-  // 🔥 NEW: Method to test parking notifications (for development)
+  // Method to test parking notifications (for development)
   async createTestParkingNotification(): Promise<void> {
     await this.addSpotAvailableNotification(3, 4);
     console.log('🧪 Test parking notification created');
   }
 
-  // 🔥 NEW: Method to test feedback notifications (for development)  
+  // Method to test feedback notifications (for development)  
   async createTestFeedbackNotification(): Promise<void> {
     await this.addFeedbackReplyNotification(
-      123,
+      123, // ✅ FIXED: Now explicitly pass a number
       'Test feedback about parking sensors not working properly',
       'Thank you for your feedback! We have fixed the sensor issue on Floor 4.',
       'Admin Team'
     );
     console.log('🧪 Test feedback notification created');
+  }
+
+  // ✅ NEW: Reset last feedback check time (useful for testing)
+  async resetFeedbackCheckTime(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(LAST_FEEDBACK_CHECK_KEY);
+      console.log('🔄 Feedback check time reset');
+    } catch (error) {
+      console.error('Error resetting feedback check time:', error);
+    }
   }
 }
 

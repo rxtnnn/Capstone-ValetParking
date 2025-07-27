@@ -242,13 +242,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
       Alert.alert(
         'Thank You! 🙏',
-        `Your feedback has been submitted successfully.\n\nFeedback ID: #${feedbackId}`,
+        `Your feedback has been submitted successfully.\n\n`,
         [
-          { 
-            text: 'View Replies', 
-            style: 'default',
-            onPress: () => setShowReplies(true)
-          },
           { 
             text: 'Submit Another', 
             style: 'default'
