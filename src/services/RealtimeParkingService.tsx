@@ -24,7 +24,7 @@ export interface ParkingStats {
   }>;
   lastUpdated: string;
   isLive: boolean;
-  sensorData?: ParkingSpace[]; // 🔥 ADD THIS: Include raw sensor data for individual spot updates
+  sensorData?: ParkingSpace[];
 }
 
 type ParkingUpdateCallback = (data: ParkingStats) => void;
@@ -45,7 +45,14 @@ class RealTimeParkingServiceClass {
   private updateIntervalMs = 5000; // 5 seconds
   private retryCount = 0;
   private maxRetries = 3;
-  private lastFetchTime = 0; // Track last fetch to prevent spam
+  private lastFetchTime = 0;
+  
+  // 🔥 NEW: Prevent multiple simultaneous requests
+  private isFetching = false;
+  private fetchController: AbortController | null = null;
+  private shouldStop = false; // Flag to indicate service should stop
+  private consecutiveErrors = 0;
+  private maxConsecutiveErrors = 5;
 
   constructor() {}
 
@@ -57,10 +64,20 @@ class RealTimeParkingServiceClass {
     
     console.log('🚀 Starting parking service with API token authentication');
     this.isRunning = true;
+    this.shouldStop = false;
+    this.consecutiveErrors = 0;
+    this.retryCount = 0;
+    
+    // Initial fetch
     this.fetchAndUpdate();
     
+    // Set up interval
     this.updateInterval = setInterval(() => {
-      this.fetchAndUpdate();
+      if (!this.shouldStop && this.isRunning && !this.isFetching) {
+        this.fetchAndUpdate();
+      } else if (this.isFetching) {
+        console.log('⏭️ Skipping interval fetch - request already in progress');
+      }
     }, this.updateIntervalMs);
   }
 
@@ -68,20 +85,29 @@ class RealTimeParkingServiceClass {
     if (!this.isRunning) return;
     
     console.log('⏹️ Stopping parking service');
+    this.shouldStop = true;
     this.isRunning = false;
+    
+    // Cancel any ongoing request
+    if (this.fetchController) {
+      this.fetchController.abort();
+      this.fetchController = null;
+    }
     
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
     }
+    
+    this.isFetching = false;
     this.setConnectionStatus('disconnected');
   }
 
   // Allow dynamic refresh rate changes
   setRefreshRate(intervalMs: number): void {
-    if (intervalMs < 1000) {
-      console.warn('⚠️ Minimum refresh rate is 1 second, setting to 1000ms');
-      intervalMs = 1000;
+    if (intervalMs < 2000) {
+      console.warn('⚠️ Minimum refresh rate is 2 seconds, setting to 2000ms');
+      intervalMs = 2000;
     }
     
     if (intervalMs > 60000) {
@@ -96,7 +122,9 @@ class RealTimeParkingServiceClass {
     if (this.isRunning && this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = setInterval(() => {
-        this.fetchAndUpdate();
+        if (!this.shouldStop && this.isRunning && !this.isFetching) {
+          this.fetchAndUpdate();
+        }
       }, this.updateIntervalMs);
     }
   }
@@ -110,7 +138,11 @@ class RealTimeParkingServiceClass {
     this.updateCallbacks.push(callback);
  
     if (this.lastData) {
-      callback(this.lastData);
+      try {
+        callback(this.lastData);
+      } catch (error) {
+        console.error('💥 Error in initial callback:', error);
+      }
     }
     
     return () => { // Unsubscribe function
@@ -123,7 +155,12 @@ class RealTimeParkingServiceClass {
 
   onConnectionStatus(callback: ConnectionStatusCallback): () => void {
     this.connectionCallbacks.push(callback);
-    callback(this.connectionStatus);
+    
+    try {
+      callback(this.connectionStatus);
+    } catch (error) {
+      console.error('💥 Error in connection status callback:', error);
+    }
     
     return () => {
       const index = this.connectionCallbacks.indexOf(callback);
@@ -133,46 +170,82 @@ class RealTimeParkingServiceClass {
     };
   }
 
+  // 🔥 FIXED: Enhanced fetch method with better loop prevention
   private async fetchAndUpdate(): Promise<void> {
+    // Prevent multiple simultaneous requests
+    if (this.isFetching) {
+      console.log('⏭️ Fetch already in progress, skipping');
+      return;
+    }
+
+    // Check if service should stop
+    if (this.shouldStop || !this.isRunning) {
+      console.log('⏹️ Service stopping, aborting fetch');
+      return;
+    }
+
     const now = Date.now();
     
-    // Prevent rapid consecutive requests
-    if (now - this.lastFetchTime < 1000) {
+    // Prevent rapid consecutive requests (minimum 2 seconds between requests)
+    if (now - this.lastFetchTime < 2000) {
       console.log('⏭️ Skipping fetch - too soon since last request');
       return;
     }
+
+    // Check consecutive errors limit
+    if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+      console.error(`❌ Too many consecutive errors (${this.consecutiveErrors}), stopping service`);
+      this.stop();
+      return;
+    }
     
+    this.isFetching = true;
     this.lastFetchTime = now;
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // Create new abort controller for this request
+    this.fetchController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      if (this.fetchController) {
+        this.fetchController.abort();
+      }
+    }, 8000); // 8 second timeout
 
-      console.log(`📡 Fetching parking data with API token... (${new Date().toLocaleTimeString()})`);
+    try {
+      console.log(`📡 Fetching parking data... (${new Date().toLocaleTimeString()})`);
 
       const response = await fetch(this.apiUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_TOKEN}`, // 🔐 Added API token authentication
+          'Authorization': `Bearer ${this.API_TOKEN}`,
           'Cache-Control': 'no-cache',
           'User-Agent': 'VALET-RealTime/1.0',
         },
-        signal: controller.signal,
+        signal: this.fetchController.signal,
       });
 
       clearTimeout(timeoutId);
 
+      // Check if request was aborted
+      if (this.fetchController.signal.aborted) {
+        console.log('🛑 Request was aborted');
+        return;
+      }
+
       // Handle authentication errors
       if (response.status === 401) {
         console.error('🔒 API token is invalid or expired');
-        throw new Error('Authentication failed: Invalid API token');
+        this.setConnectionStatus('error');
+        this.consecutiveErrors++;
+        return;
       }
 
       if (response.status === 403) {
         console.error('🚫 API token does not have permission to access parking data');
-        throw new Error('Authorization failed: Insufficient permissions');
+        this.setConnectionStatus('error');
+        this.consecutiveErrors++;
+        return;
       }
 
       if (!response.ok) {
@@ -187,32 +260,39 @@ class RealTimeParkingServiceClass {
         throw new Error('Invalid response format from server');
       }
       
-      // 🔥 FIXED: Pass the raw sensor data to the transform function
+      // Check if service was stopped while fetching
+      if (this.shouldStop || !this.isRunning) {
+        console.log('⏹️ Service stopped during fetch, discarding data');
+        return;
+      }
+
       const newData = this.transformRawData(rawData, rawData);
       this.checkForChanges(newData);
       
       this.lastData = newData;
       this.notifyParkingUpdate(newData);
       this.setConnectionStatus('connected'); 
-      this.retryCount = 0; 
+      this.retryCount = 0;
+      this.consecutiveErrors = 0; // Reset consecutive errors on success
       
-      console.log(`✅ Successfully updated parking data - ${newData.availableSpots}/${newData.totalSpots} spots available`);
-      console.log(`📊 Sensor data included: ${newData.sensorData?.length || 0} sensors`);
+      console.log(`✅ Successfully updated - ${newData.availableSpots}/${newData.totalSpots} spots available`);
       
     } catch (error: any) {
-      this.retryCount++;
-      console.error(`❌ Fetch error (attempt ${this.retryCount}/${this.maxRetries}):`, error.message);
+      clearTimeout(timeoutId);
       
-      // Handle specific error types
-      if (error.message.includes('Authentication failed')) {
-        console.error('🔒 API token authentication failed - check token validity');
-        this.setConnectionStatus('error');
-        // Don't retry authentication errors immediately
+      // Don't log errors if the request was aborted (service stopping)
+      if (error.name === 'AbortError' || this.shouldStop) {
+        console.log('🛑 Request aborted (service stopping)');
         return;
       }
+
+      this.retryCount++;
+      this.consecutiveErrors++;
+      console.error(`❌ Fetch error (attempt ${this.retryCount}/${this.maxRetries}, consecutive: ${this.consecutiveErrors}):`, error.message);
       
-      if (error.message.includes('Authorization failed')) {
-        console.error('🚫 API token permissions insufficient');
+      // Handle specific error types
+      if (error.message.includes('Authentication failed') || error.message.includes('Authorization failed')) {
+        console.error('🔒 API authentication/authorization failed');
         this.setConnectionStatus('error');
         return;
       }
@@ -228,19 +308,24 @@ class RealTimeParkingServiceClass {
         this.notifyParkingUpdate(staleData);
       }
       
-      if (this.retryCount <= this.maxRetries) {
-        const delay = Math.min(1000 * Math.pow(2, this.retryCount), 30000);
+      // Only retry if we haven't exceeded limits and service is still running
+      if (this.retryCount <= this.maxRetries && this.consecutiveErrors < this.maxConsecutiveErrors && this.isRunning && !this.shouldStop) {
+        const delay = Math.min(2000 * Math.pow(2, this.retryCount), 30000);
         console.log(`🔄 Retrying in ${delay}ms...`);
         
         setTimeout(() => {
-          if (this.isRunning) {
+          if (this.isRunning && !this.shouldStop) {
             this.fetchAndUpdate();
           }
         }, delay);
       } else {
-        console.error('❌ Max retries exceeded, stopping automatic updates');
+        console.error('❌ Max retries or consecutive errors exceeded, stopping automatic updates');
         this.stop();
       }
+    } finally {
+      this.isFetching = false;
+      this.fetchController = null;
+      clearTimeout(timeoutId);
     }
   }
 
@@ -262,7 +347,6 @@ class RealTimeParkingServiceClass {
     return 1;
   };
 
-  // 🔥 FIXED: Updated to include raw sensor data in the response
   private transformRawData(rawData: ParkingSpace[], sensorData: ParkingSpace[]): ParkingStats {   
     const totalSpots = rawData.length;
     const availableSpots = rawData.filter(space => !space.is_occupied).length;
@@ -302,7 +386,6 @@ class RealTimeParkingServiceClass {
       };
     }).sort((a, b) => a.floor - b.floor);
 
-    // 🔥 FIXED: Include the raw sensor data in the response
     return {
       totalSpots,
       availableSpots,
@@ -310,60 +393,61 @@ class RealTimeParkingServiceClass {
       floors,
       lastUpdated: new Date().toLocaleTimeString(),
       isLive: true,
-      sensorData, // Include the raw sensor data for individual spot mapping
+      sensorData,
     };
   }
 
+  // 🔥 FIXED: Better change detection with throttling
   private checkForChanges(newData: ParkingStats): void {
     if (!this.lastData) return;
 
     const oldData = this.lastData;
 
-    // Check for new available spots
-    if (newData.availableSpots > oldData.availableSpots) {
-      const increase = newData.availableSpots - oldData.availableSpots;
-      console.log(`🟢 ${increase} new spot(s) available!`);
-      
-      NotificationService.showSpotAvailableNotification(
-        newData.availableSpots,
-        // Find which floor has the most available spots
-        newData.floors.reduce((prev, current) => 
-          prev.available > current.available ? prev : current
-        ).floor
-      );
-    }
-
-    // Check if spots decreased
-    if (newData.availableSpots < oldData.availableSpots) {
-      const decrease = oldData.availableSpots - newData.availableSpots;
-      console.log(`🔴 ${decrease} spot(s) taken`);
-    }
-    
-    // 🔥 ADDED: Log individual sensor changes for debugging
-    if (newData.sensorData && oldData.sensorData) {
-      newData.sensorData.forEach(newSensor => {
-        const oldSensor = oldData.sensorData?.find(s => s.sensor_id === newSensor.sensor_id);
-        if (oldSensor && oldSensor.is_occupied !== newSensor.is_occupied) {
-          console.log(`🔄 Sensor ${newSensor.sensor_id}: ${oldSensor.is_occupied ? 'OCCUPIED' : 'FREE'} → ${newSensor.is_occupied ? 'OCCUPIED' : 'FREE'}`);
-        }
-      });
-    }
-    
-    // Check floor status changes
-    newData.floors.forEach(newFloor => {
-      const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-      
-      if (oldFloor && oldFloor.status !== newFloor.status) {
-        if (newFloor.status === 'available' && oldFloor.status !== 'available') {
-          console.log(`🏢 Floor ${newFloor.floor} status changed to available`);
-          NotificationService.showFloorUpdateNotification(
-            newFloor.floor,
-            newFloor.available,
-            newFloor.total
+    try {
+      // Check for new available spots (only notify if significant increase)
+      if (newData.availableSpots > oldData.availableSpots) {
+        const increase = newData.availableSpots - oldData.availableSpots;
+        console.log(`🟢 ${increase} new spot(s) available!`);
+        
+        // Only send notification for significant changes (1+ spots)
+        if (increase >= 1) {
+          const bestFloor = newData.floors.reduce((prev, current) => 
+            prev.available > current.available ? prev : current
+          );
+          
+          NotificationService.showSpotAvailableNotification(
+            newData.availableSpots,
+            bestFloor.floor
           );
         }
       }
-    });
+
+      // Log spot decreases (but don't send notifications)
+      if (newData.availableSpots < oldData.availableSpots) {
+        const decrease = oldData.availableSpots - newData.availableSpots;
+        console.log(`🔴 ${decrease} spot(s) taken`);
+      }
+      
+      // Check floor status changes (throttle these notifications)
+      newData.floors.forEach(newFloor => {
+        const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
+        
+        if (oldFloor && oldFloor.available !== newFloor.available) {
+          // Only notify if there's an increase in available spots
+          if (newFloor.available > oldFloor.available) {
+            console.log(`🏢 Floor ${newFloor.floor}: ${oldFloor.available} → ${newFloor.available} spots`);
+            NotificationService.showFloorUpdateNotification(
+              newFloor.floor,
+              newFloor.available,
+              newFloor.total,
+              oldFloor.available
+            );
+          }
+        }
+      });
+    } catch (error) {
+      console.error('💥 Error checking for changes:', error);
+    }
   }
 
   private notifyParkingUpdate(data: ParkingStats): void {
@@ -390,28 +474,39 @@ class RealTimeParkingServiceClass {
         }
       });
 
-      if (status === 'connected' && oldStatus !== 'connected') {
-        NotificationService.showConnectionStatusNotification(true);
-      } else if (status === 'error') {
-        NotificationService.showConnectionStatusNotification(false);
-      }
+      // Don't send connection status notifications (these are disabled)
+      // NotificationService.showConnectionStatusNotification is not called
     }
   }
 
-  // Manual refresh for user-triggered updates
+  // 🔥 FIXED: Force update with safety checks
   async forceUpdate(): Promise<void> {
     console.log('🔄 Force update requested');
-    if (this.isRunning) {
-      await this.fetchAndUpdate();
-    } else {
+    
+    if (!this.isRunning) {
       console.warn('⚠️ Service not running, cannot force update');
+      return;
     }
+
+    if (this.isFetching) {
+      console.log('⚠️ Fetch already in progress, waiting...');
+      return;
+    }
+
+    // Reset error counters for manual refresh
+    this.consecutiveErrors = 0;
+    this.retryCount = 0;
+    
+    await this.fetchAndUpdate();
   }
 
   // Test API connection with token
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
       console.log('🧪 Testing API connection...');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       const response = await fetch(this.apiUrl, {
         method: 'GET',
@@ -420,7 +515,10 @@ class RealTimeParkingServiceClass {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.API_TOKEN}`,
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.status === 401) {
         return {
@@ -460,38 +558,39 @@ class RealTimeParkingServiceClass {
   getServiceStats() {
     return {
       isRunning: this.isRunning,
+      isFetching: this.isFetching,
       refreshRate: this.updateIntervalMs,
       connectionStatus: this.connectionStatus,
       lastUpdate: this.lastData?.lastUpdated || 'Never',
       subscriberCount: this.updateCallbacks.length,
       retryCount: this.retryCount,
+      consecutiveErrors: this.consecutiveErrors,
       apiEndpoint: this.apiUrl,
       hasValidToken: !!this.API_TOKEN,
       sensorCount: this.lastData?.sensorData?.length || 0,
     };
   }
 
-  // Update API token if needed (for future use)
-  updateApiToken(newToken: string): void {
-    console.log('🔑 API token updated');
-    // Note: This would require making API_TOKEN non-readonly
-    // For now, restart the service to use the new token
-    if (this.isRunning) {
-      this.stop();
-      setTimeout(() => {
-        this.start();
-      }, 1000);
-    }
-  }
-
-  // 🔥 ADDED: Method to get raw sensor data for debugging
   getRawSensorData(): ParkingSpace[] | null {
     return this.lastData?.sensorData || null;
   }
 
-  // 🔥 ADDED: Method to get sensor data for a specific sensor ID
   getSensorById(sensorId: number): ParkingSpace | null {
     return this.lastData?.sensorData?.find(sensor => sensor.sensor_id === sensorId) || null;
+  }
+
+  // 🔥 NEW: Method to reset error counters
+  resetErrorCounters(): void {
+    this.retryCount = 0;
+    this.consecutiveErrors = 0;
+    console.log('🔄 Error counters reset');
+  }
+
+  // 🔥 NEW: Check if service is healthy
+  isHealthy(): boolean {
+    return this.isRunning && 
+           this.consecutiveErrors < this.maxConsecutiveErrors && 
+           this.connectionStatus !== 'error';
   }
 }
 

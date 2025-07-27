@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useRef } from 'react';
 import AuthService, { User, LoginCredentials, LoginResponse } from '../services/AuthService';
 
 export interface AuthState {
@@ -15,12 +15,14 @@ type AuthAction =
   | { type: 'LOGIN_FAILURE'; payload: string }
   | { type: 'LOGOUT' }
   | { type: 'CLEAR_ERROR' }
-  | { type: 'UPDATE_USER'; payload: User };
+  | { type: 'UPDATE_USER'; payload: User }
+  | { type: 'INIT_COMPLETE' }; // 🔥 NEW: Mark initialization as complete
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<LoginResponse>;
   logout: () => Promise<void>;
   clearError: () => void;
+  isInitialized: boolean; // 🔥 NEW: Track if auth has been initialized
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,6 +74,11 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         ...state,
         user: action.payload,
       };
+    case 'INIT_COMPLETE':
+      return {
+        ...state,
+        loading: false,
+      };
     default:
       return state;
   }
@@ -91,10 +98,20 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const initializationRef = useRef(false); // 🔥 NEW: Prevent multiple initializations
+  const logoutInProgressRef = useRef(false); // 🔥 NEW: Prevent multiple logout calls
 
-  // Check for stored authentication on app start
+  // 🔥 FIXED: Check for stored authentication on app start with protection against multiple calls
   useEffect(() => {
     const checkStoredAuth = async () => {
+      // Prevent multiple initialization calls
+      if (initializationRef.current) {
+        console.log('⚠️ Auth initialization already in progress, skipping');
+        return;
+      }
+
+      initializationRef.current = true;
+
       try {
         console.log('🔍 Checking stored authentication...');
         const { token, user } = await AuthService.getStoredAuthData();
@@ -112,11 +129,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } catch (error) {
         console.error('💥 Error checking stored auth:', error);
         dispatch({ type: 'LOGOUT' });
+      } finally {
+        // Mark initialization as complete
+        dispatch({ type: 'INIT_COMPLETE' });
       }
     };
 
     checkStoredAuth();
-  }, []);
+  }, []); // Empty dependency array to run only once
 
   const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
     console.log('🔄 Starting login process...');
@@ -158,14 +178,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // 🔥 FIXED: Logout with protection against multiple calls and race conditions
   const logout = async (): Promise<void> => {
+    // Prevent multiple logout calls
+    if (logoutInProgressRef.current) {
+      console.log('⚠️ Logout already in progress, skipping');
+      return;
+    }
+
+    logoutInProgressRef.current = true;
+
     try {
       console.log('🚪 Starting logout...');
-      await AuthService.logout();
+      
+      // First update the state to prevent components from continuing to run
       dispatch({ type: 'LOGOUT' });
+      
+      // Then clear storage
+      await AuthService.logout();
+      
+      console.log('✅ Logout completed successfully');
     } catch (error) {
       console.error('💥 Logout error:', error);
+      // Even if there's an error, make sure we're logged out
       dispatch({ type: 'LOGOUT' });
+    } finally {
+      // Reset the logout flag after a short delay
+      setTimeout(() => {
+        logoutInProgressRef.current = false;
+      }, 1000);
     }
   };
 
@@ -178,14 +219,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     clearError,
+    isInitialized: !state.loading, // 🔥 NEW: Expose initialization status
   };
 
-  console.log('🏪 AuthContext state:', {
-    isAuthenticated: state.isAuthenticated,
-    hasUser: !!state.user,
-    loading: state.loading,
-    error: state.error
-  });
+  // 🔥 REDUCED LOGGING: Only log when state actually changes
+  const prevStateRef = useRef(state);
+  if (
+    prevStateRef.current.isAuthenticated !== state.isAuthenticated ||
+    prevStateRef.current.loading !== state.loading ||
+    prevStateRef.current.error !== state.error
+  ) {
+    console.log('🏪 AuthContext state changed:', {
+      isAuthenticated: state.isAuthenticated,
+      hasUser: !!state.user,
+      loading: state.loading,
+      error: state.error,
+      isInitialized: !state.loading,
+    });
+    prevStateRef.current = state;
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
