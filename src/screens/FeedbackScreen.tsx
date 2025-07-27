@@ -101,57 +101,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     { value: 'suggestion', label: 'Suggestions', icon: 'bulb-outline' },
   ];
 
-<<<<<<< HEAD
-  // 🔥 UPDATED: More specific and relevant issues
-  const getIssuesForType = (type: FeedbackData['type']): string[] => {
-    switch (type) {
-      case 'parking':
-        return [
-          'Sensor shows wrong status',
-          'Spot marked occupied but empty',
-          'Spot marked available but occupied',
-          'Floor map not updating',
-          'Cannot find parking spot',
-          'Incorrect floor information',
-          'Navigation to spot unclear',
-          'Real-time data not working'
-        ];
-      case 'technical':
-        return [
-          'App crashes frequently',
-          'Slow loading times',
-          'Login/logout issues',
-          'Notifications not working',
-          'Map not loading properly',
-          'Internet connection problems',
-          'App freezes or hangs',
-          'Data not syncing properly'
-        ];
-      case 'suggestion':
-        return [
-          'Better navigation features',
-          'Improved spot reservation',
-          'More detailed floor maps',
-          'Better notification system',
-          'Dark mode option',
-          'Offline mode support',
-          'Integration with calendar',
-          'Voice guidance features'
-        ];
-      default:
-        return [
-          'User interface design',
-          'App performance',
-          'Feature availability',
-          'Ease of use',
-          'Information accuracy',
-          'Response time',
-          'Overall satisfaction',
-          'Recommendation likelihood'
-        ];
-    }
-  };
-=======
   const commonIssues = [
     'Sensor not working',
     'App performance',
@@ -162,7 +111,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     'Connection problems',
     'Data not updating',
   ];
->>>>>>> updates3
 
   // Get feedback with admin replies
   const feedbackWithReplies = feedback.filter(item => 
@@ -321,10 +269,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-<<<<<<< HEAD
-  // 🔥 UPDATED: Get appropriate placeholder text
-=======
->>>>>>> updates3
   const getPlaceholderText = (): string => {
     switch (feedbackType) {
       case 'general':
@@ -340,37 +284,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-<<<<<<< HEAD
-  // 🔥 UPDATED: Get section title for issues
-  const getIssuesSectionTitle = (): string => {
-    switch (feedbackType) {
-      case 'parking':
-        return 'Common Parking Issues (Optional)';
-      case 'technical':
-        return 'Technical Problems (Optional)';
-      case 'suggestion':
-        return 'Improvement Areas (Optional)';
-      default:
-        return 'Related Issues (Optional)';
-    }
-  };
-
-  // 🔥 UPDATED: Get section subtitle for issues
-  const getIssuesSectionSubtitle = (): string => {
-    switch (feedbackType) {
-      case 'parking':
-        return 'Select any parking-related issues you experienced';
-      case 'technical':
-        return 'Select any technical problems you encountered';
-      case 'suggestion':
-        return 'Select areas where you think VALET could improve';
-      default:
-        return 'Select any that apply to help us understand your feedback better';
-    }
-  };
-
-  // Render star rating component
-=======
   const formatTimeAgo = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
@@ -418,7 +331,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
->>>>>>> updates3
   const renderStarRating = () => {
     return (
       <View style={styles.ratingContainer}>
@@ -563,45 +475,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
       
-<<<<<<< HEAD
-      <KeyboardAvoidingView
-        style={styles.contentContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <ScrollView 
-          style={styles.scrollView} 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollViewContent}
-        >
-          
-          {/* Feedback Type Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>What type of feedback do you have?</Text>
-            <View style={styles.feedbackTypesContainer}>
-              {feedbackTypes.map((type) => (
-                <TouchableOpacity
-                  key={type.value}
-                  style={[
-                    styles.feedbackTypeCard,
-                    feedbackType === type.value && styles.selectedFeedbackTypeCard
-                  ]}
-                  onPress={() => {
-                    setFeedbackType(type.value);
-                    setSelectedIssues([]); // Reset issues when changing type
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View style={[
-                    styles.feedbackTypeIcon,
-                    feedbackType === type.value && styles.selectedFeedbackTypeIcon
-                  ]}>
-                    <Ionicons 
-                      name={type.icon as any} 
-                      size={24} 
-                      color={feedbackType === type.value ? 'white' : '#B22020'} 
-                    />
-=======
       {/* Header */}
       <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
         <View style={styles.headerContent}>
@@ -753,79 +626,11 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                         </Text>
                       </TouchableOpacity>
                     ))}
->>>>>>> updates3
                   </View>
                 </View>
               </View>
             )}
 
-<<<<<<< HEAD
-          {/* Issues Section (for all types except general) */}
-          {feedbackType !== 'general' && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{getIssuesSectionTitle()}</Text>
-              <Text style={styles.sectionSubtitle}>
-                {getIssuesSectionSubtitle()}
-              </Text>
-              <View style={styles.card}>
-                <View style={styles.chipsContainer}>
-                  {getIssuesForType(feedbackType).map((issue) => (
-                    <TouchableOpacity
-                      key={issue}
-                      style={[
-                        styles.chip,
-                        selectedIssues.includes(issue) && styles.selectedChip
-                      ]}
-                      onPress={() => handleIssueToggle(issue)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[
-                        styles.chipText,
-                        selectedIssues.includes(issue) && styles.selectedChipText
-                      ]}>
-                        {issue}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Message Input */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Message *</Text>
-            <Text style={styles.sectionSubtitle}>
-              Please provide detailed feedback to help us understand your experience
-            </Text>
-            <View style={styles.card}>
-              <TextInput
-                placeholder={getPlaceholderText()}
-                value={message}
-                onChangeText={setMessage}
-                multiline
-                numberOfLines={6}
-                style={styles.textInput}
-                placeholderTextColor="#999"
-                textAlignVertical="top"
-                maxLength={1000}
-              />
-              <Text style={styles.characterCount}>
-                {message.length}/1000 characters
-              </Text>
-            </View>
-          </View>
-
-          {/* Email Input */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Email (Optional)</Text>
-            <Text style={styles.sectionSubtitle}>
-              Leave your email if you'd like us to follow up with you
-            </Text>
-            <View style={styles.emailCard}>
-              <View style={styles.emailInputContainer}>
-                <Ionicons name="mail-outline" size={20} color="#666" style={styles.emailIcon} />
-=======
             {/* Message Input */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Your Message *</Text>
@@ -833,7 +638,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 Please provide detailed feedback to help us understand your experience
               </Text>
               <View style={styles.card}>
->>>>>>> updates3
                 <TextInput
                   placeholder={getPlaceholderText()}
                   value={message}
@@ -906,30 +710,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-<<<<<<< HEAD
-          {/* Contact Info Card */}
-          <View style={styles.section}>
-            <View style={[styles.card, styles.contactCard]}>
-              <View style={styles.contactHeader}>
-                <Ionicons name="headset" size={24} color="#B22020" />
-                <Text style={styles.contactTitle}>Need immediate assistance?</Text>
-              </View>
-              <Text style={styles.contactText}>
-                Contact our support team for urgent parking issues:
-              </Text>
-              <View style={styles.contactMethods}>
-                <TouchableOpacity style={styles.contactMethod} activeOpacity={0.7}>
-                  <Ionicons name="mail" size={16} color="#666" />
-                  <Text style={styles.contactMethodText}>support@valet-parking.com</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.contactMethod} activeOpacity={0.7}>
-                  <Ionicons name="call" size={16} color="#666" />
-                  <Text style={styles.contactMethodText}>+63 919 929 6588</Text>
-                </TouchableOpacity>
-                <View style={styles.contactMethod}>
-                  <Ionicons name="time" size={16} color="#666" />
-                  <Text style={styles.contactMethodText}>24/7 Support Available</Text>
-=======
             {/* Contact Info Card */}
             <View style={styles.section}>
               <View style={[styles.card, styles.contactCard]}>
@@ -953,7 +733,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                     <Ionicons name="time" size={16} color="#666" />
                     <Text style={styles.contactMethodText}>24/7 Support Available</Text>
                   </View>
->>>>>>> updates3
                 </View>
               </View>
             </View>
@@ -970,13 +749,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                   Your email will only be used to follow up on your feedback if requested.
                 </Text>
               </View>
-<<<<<<< HEAD
-              <Text style={styles.privacyText}>
-                Your feedback helps us improve VALET. We collect basic device information to help diagnose issues. 
-                Your email will only be used to follow up on your feedback if you request it.
-              </Text>
-=======
->>>>>>> updates3
             </View>
 
           </ScrollView>
