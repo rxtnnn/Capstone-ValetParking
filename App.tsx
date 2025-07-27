@@ -175,7 +175,7 @@ const AppNavigator: React.FC = () => {
           name="Feedback" 
           component={FeedbackScreen}
           options={({ navigation }) => ({
-            headerShown: true,
+            headerShown: false,
             header: () => (
               <GradientHeader 
                 title="Feedback" 

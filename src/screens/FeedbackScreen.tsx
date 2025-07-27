@@ -49,6 +49,7 @@ interface FeedbackType {
   value: FeedbackData['type'];
   label: string;
   icon: string;
+  description: string;
 }
 
 const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
@@ -93,23 +94,43 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     testApiConnection();
   }, []);
 
-  // 🔥 UPDATED: More appropriate feedback types for parking app
+  // 🔥 UPDATED: More descriptive feedback types
   const feedbackTypes: FeedbackType[] = [
-    { value: 'general', label: 'App Experience', icon: 'star-outline' },
-    { value: 'parking', label: 'Parking Issues', icon: 'car-outline' },
-    { value: 'technical', label: 'Technical Problems', icon: 'settings-outline' },
-    { value: 'suggestion', label: 'Suggestions', icon: 'bulb-outline' },
+    { 
+      value: 'general', 
+      label: 'Rate Experience', 
+      icon: 'star-outline',
+      description: 'Share your overall app experience'
+    },
+    { 
+      value: 'parking', 
+      label: 'Parking Issues', 
+      icon: 'car-outline',
+      description: 'Report parking spot or navigation problems'
+    },
+    { 
+      value: 'technical', 
+      label: 'Bug Reports', 
+      icon: 'bug-outline',
+      description: 'Technical issues or app crashes'
+    },
+    { 
+      value: 'suggestion', 
+      label: 'Suggestions', 
+      icon: 'bulb-outline',
+      description: 'Ideas for new features'
+    },
   ];
 
   const commonIssues = [
-    'Sensor not working',
-    'App performance',
-    'Incorrect spot status',
-    'Navigation issues',
-    'Notification problems',
-    'UI/UX concerns',
-    'Connection problems',
-    'Data not updating',
+    'Sensor accuracy',
+    'App crashes',
+    'Slow loading',
+    'Wrong spot status',
+    'Map navigation',
+    'Notifications',
+    'Login issues',
+    'Data sync',
   ];
 
   // Get feedback with admin replies
@@ -131,24 +152,24 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
   const validateForm = (): boolean => {
     if (!message.trim()) {
-      Alert.alert('Error', 'Please enter your feedback message');
+      Alert.alert('Required Field', 'Please share your feedback with us');
       return false;
     }
 
     if (message.trim().length < 10) {
-      Alert.alert('Error', 'Please provide more detailed feedback (at least 10 characters)');
+      Alert.alert('More Details Needed', 'Please provide more detailed feedback (at least 10 characters)');
       return false;
     }
 
     if (feedbackType === 'general' && rating === 0) {
-      Alert.alert('Error', 'Please provide a rating for your experience');
+      Alert.alert('Rating Required', 'Please rate your experience');
       return false;
     }
 
     if (email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) {
-        Alert.alert('Error', 'Please enter a valid email address');
+        Alert.alert('Invalid Email', 'Please enter a valid email address');
         return false;
       }
     }
@@ -217,11 +238,11 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       console.log('Feedback submitted successfully with ID:', feedbackId);
 
       resetForm();
-      await refreshFeedback(); // Refresh the feedback list
+      await refreshFeedback();
 
       Alert.alert(
         'Thank You! 🙏',
-        'Your feedback has been submitted successfully. We appreciate your input and will use it to improve VALET!\n\nFeedback ID: #' + feedbackId,
+        `Your feedback has been submitted successfully.\n\nFeedback ID: #${feedbackId}`,
         [
           { 
             text: 'View Replies', 
@@ -242,17 +263,15 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     } catch (error) {
       console.error('Error submitting feedback:', error);
       
-      let errorMessage = 'An error occurred while submitting your feedback. Please try again.';
+      let errorMessage = 'Failed to submit your feedback. Please try again.';
       
       if (error instanceof Error) {
         if (error.message.includes('Authentication failed')) {
           errorMessage = 'Authentication error. Please contact support.';
         } else if (error.message.includes('Validation failed')) {
-          errorMessage = 'Please check your input and try again.\n\n' + error.message;
+          errorMessage = 'Please check your input and try again.';
         } else if (error.message.includes('Network')) {
-          errorMessage = 'Network error. Please check your internet connection and try again.';
-        } else {
-          errorMessage = error.message;
+          errorMessage = 'Network error. Please check your connection.';
         }
       }
       
@@ -272,15 +291,15 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const getPlaceholderText = (): string => {
     switch (feedbackType) {
       case 'general':
-        return "How was your experience with VALET? What did you like or dislike about the app?";
+        return "Tell us about your experience with VALET. What did you like? What could be improved?";
       case 'parking':
-        return "Describe the parking issue you encountered. Which floor or section was affected? When did this happen?";
+        return "Describe the parking issue you encountered. Which floor or area was affected?";
       case 'technical':
-        return "What technical problem did you experience? Please describe what happened and when it occurred.";
+        return "What technical problem did you experience? When did it happen?";
       case 'suggestion':
-        return "What feature or improvement would you like to see in VALET? How would it make your parking experience better?";
+        return "What new feature would you like to see? How would it improve your experience?";
       default:
-        return "Please share your feedback with us...";
+        return "Share your thoughts with us...";
     }
   };
 
@@ -293,11 +312,11 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
 
     if (diffInDays > 0) {
-      return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+      return `${diffInDays}d ago`;
     } else if (diffInHours > 0) {
-      return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+      return `${diffInHours}h ago`;
     } else if (diffInMinutes > 0) {
-      return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+      return `${diffInMinutes}m ago`;
     } else {
       return 'Just now';
     }
@@ -319,22 +338,22 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'general':
-        return 'chatbubble-outline';
-      case 'bug':
+        return 'star-outline';
+      case 'technical':
         return 'bug-outline';
-      case 'feature':
+      case 'suggestion':
         return 'bulb-outline';
       case 'parking':
         return 'car-outline';
       default:
-        return 'document-outline';
+        return 'chatbubble-outline';
     }
   };
 
   const renderStarRating = () => {
     return (
       <View style={styles.ratingContainer}>
-        <Text style={styles.ratingLabel}>How would you rate your overall experience with VALET?</Text>
+        <Text style={styles.ratingLabel}>Rate your experience</Text>
         <View style={styles.starsContainer}>
           {[1, 2, 3, 4, 5].map((star) => (
             <TouchableOpacity
@@ -345,22 +364,20 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             >
               <Ionicons
                 name={star <= rating ? 'star' : 'star-outline'}
-                size={32}
-                color={star <= rating ? '#FFD700' : '#DDD'}
+                size={28}
+                color={star <= rating ? '#FFD700' : '#E5E7EB'}
               />
             </TouchableOpacity>
           ))}
         </View>
         {rating > 0 && (
-          <View style={styles.ratingTextContainer}>
-            <Text style={styles.ratingText}>
-              {rating === 1 && '😞 Very Poor'}
-              {rating === 2 && '😐 Poor'}
-              {rating === 3 && '🙂 Average'}
-              {rating === 4 && '😊 Good'}
-              {rating === 5 && '🤩 Excellent'}
-            </Text>
-          </View>
+          <Text style={styles.ratingFeedback}>
+            {rating === 1 && 'Very Poor 😞'}
+            {rating === 2 && 'Poor 😐'}
+            {rating === 3 && 'Average 🙂'}
+            {rating === 4 && 'Good 😊'}
+            {rating === 5 && 'Excellent 🤩'}
+          </Text>
         )}
       </View>
     );
@@ -369,18 +386,19 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const renderAdminReplies = () => {
     if (feedbackWithReplies.length === 0) {
       return (
-        <View style={styles.emptyRepliesContainer}>
-          <Ionicons name="mail-open-outline" size={64} color="#D1D5DB" />
-          <Text style={styles.emptyRepliesTitle}>No replies yet</Text>
-          <Text style={styles.emptyRepliesText}>
-            When admins respond to your feedback, their replies will appear here
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconContainer}>
+            <Ionicons name="chatbubbles-outline" size={48} color="#B22020" />
+          </View>
+          <Text style={styles.emptyTitle}>No replies yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Admin responses to your feedback will appear here
           </Text>
           <TouchableOpacity 
-            style={styles.newFeedbackButton}
+            style={styles.emptyAction}
             onPress={() => setShowReplies(false)}
           >
-            <Ionicons name="add-circle-outline" size={20} color="#B22020" />
-            <Text style={styles.newFeedbackButtonText}>Submit New Feedback</Text>
+            <Text style={styles.emptyActionText}>Submit New Feedback</Text>
           </TouchableOpacity>
         </View>
       );
@@ -388,78 +406,67 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
     return (
       <ScrollView 
-        style={styles.repliesScrollView}
+        style={styles.repliesContainer}
         refreshControl={
           <RefreshControl refreshing={repliesLoading} onRefresh={refreshFeedback} />
         }
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.repliesScrollViewContent}
+        contentContainerStyle={styles.repliesContent}
       >
         {feedbackWithReplies.map((item, index) => (
           <View key={item.id || index} style={styles.replyCard}>
-            {/* Original Feedback Header */}
-            <View style={styles.originalFeedbackHeader}>
-              <View style={styles.feedbackTypeContainer}>
+            <View style={styles.replyHeader}>
+              <View style={styles.replyTypeContainer}>
                 <Ionicons 
                   name={getTypeIcon(item.type) as any} 
                   size={16} 
-                  color="#6B7280" 
+                  color="#B22020" 
                 />
-                <Text style={styles.feedbackTypeText}>
-                  {item.type.charAt(0).toUpperCase() + item.type.slice(1)} Feedback
+                <Text style={styles.replyTypeText}>
+                  {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                 </Text>
               </View>
-              
               <View style={[
-                styles.statusBadge,
+                styles.replyStatus,
                 { backgroundColor: getStatusColor(item.status || 'pending') }
               ]}>
-                <Text style={styles.statusText}>
+                <Text style={styles.replyStatusText}>
                   {(item.status || 'pending').charAt(0).toUpperCase() + (item.status || 'pending').slice(1)}
                 </Text>
               </View>
             </View>
 
-            {/* Original Message Preview */}
-            <View style={styles.originalMessageContainer}>
-              <Text style={styles.originalMessageLabel}>Your feedback:</Text>
-              <Text 
-                style={styles.originalMessage}
-                numberOfLines={2}
-                ellipsizeMode="tail"
-              >
+            <View style={styles.originalFeedback}>
+              <Text style={styles.originalLabel}>Your feedback:</Text>
+              <Text style={styles.originalText} numberOfLines={2}>
                 {item.message}
               </Text>
             </View>
 
-            {/* Admin Reply */}
-            <View style={styles.adminReplyContainer}>
-              <View style={styles.adminReplyHeader}>
-                <Ionicons name="person-circle-outline" size={20} color="#B22020" />
-                <Text style={styles.adminReplyLabel}>Admin Response</Text>
+            <View style={styles.adminResponse}>
+              <View style={styles.adminHeader}>
+                <Ionicons name="shield-checkmark" size={16} color="#059669" />
+                <Text style={styles.adminLabel}>Admin Response</Text>
                 {item.responded_at && (
-                  <Text style={styles.replyTime}>
+                  <Text style={styles.responseTime}>
                     {formatTimeAgo(item.responded_at)}
                   </Text>
                 )}
               </View>
-              
-              <Text style={styles.adminReplyText}>
+              <Text style={styles.adminText}>
                 {item.admin_response}
               </Text>
             </View>
 
-            {/* Show rating if it exists */}
             {item.rating && item.type === 'general' && (
-              <View style={styles.ratingDisplayContainer}>
+              <View style={styles.ratingDisplay}>
                 <Text style={styles.ratingDisplayLabel}>Your rating: </Text>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Ionicons
                     key={star}
                     name={star <= item.rating! ? 'star' : 'star-outline'}
-                    size={14}
-                    color={star <= item.rating! ? '#FFD700' : '#D1D5DB'}
-                    style={styles.ratingDisplayStar}
+                    size={12}
+                    color={star <= item.rating! ? '#FFD700' : '#E5E7EB'}
                   />
                 ))}
                 <Text style={styles.ratingDisplayValue}>({item.rating}/5)</Text>
@@ -477,63 +484,54 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       
       {/* Header */}
       <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
-        <View style={styles.headerContent}>
+        <View style={styles.headerTop}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()} 
             style={styles.backButton}
-            activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={24} color="white" />
           </TouchableOpacity>
           
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>
-              {showReplies ? 'Admin Replies' : 'Feedback'}
-            </Text>
-          </View>
+          <Text style={styles.headerTitle}>Feedback</Text>
           
           <TouchableOpacity 
             onPress={() => setShowReplies(!showReplies)}
-            style={styles.tabButton}
-            activeOpacity={0.7}
+            style={styles.toggleButton}
           >
             <Ionicons 
               name={showReplies ? "create-outline" : "chatbubbles-outline"} 
               size={20} 
               color="white" 
             />
-            {feedbackWithReplies.length > 0 && showReplies && (
-              <View style={styles.replyBadge}>
-                <Text style={styles.replyBadgeText}>{feedbackWithReplies.length}</Text>
+            {feedbackWithReplies.length > 0 && !showReplies && (
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>{feedbackWithReplies.length}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
         
-        <View style={styles.headerDescriptionContainer}>
-          <Text style={styles.headerDescription}>
-            {showReplies 
-              ? 'View responses from our admin team'
-              : 'Help us improve VALET by sharing your thoughts and experiences'
-            }
-          </Text>
-        </View>
+        <Text style={styles.headerSubtitle}>
+          {showReplies 
+            ? 'View admin responses to your feedback'
+            : 'Help us improve VALET with your insights'
+          }
+        </Text>
 
-        {/* Tab Indicator */}
-        <View style={styles.tabIndicatorContainer}>
+        <View style={styles.tabContainer}>
           <TouchableOpacity 
-            style={[styles.tabIndicator, !showReplies && styles.activeTabIndicator]}
+            style={[styles.tab, !showReplies && styles.activeTab]}
             onPress={() => setShowReplies(false)}
           >
-            <Text style={[styles.tabIndicatorText, !showReplies && styles.activeTabIndicatorText]}>
+            <Text style={[styles.tabText, !showReplies && styles.activeTabText]}>
               New Feedback
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.tabIndicator, showReplies && styles.activeTabIndicator]}
+            style={[styles.tab, showReplies && styles.activeTab]}
             onPress={() => setShowReplies(true)}
           >
-            <Text style={[styles.tabIndicatorText, showReplies && styles.activeTabIndicatorText]}>
+            <Text style={[styles.tabText, showReplies && styles.activeTabText]}>
               Replies {feedbackWithReplies.length > 0 && `(${feedbackWithReplies.length})`}
             </Text>
           </TouchableOpacity>
@@ -547,50 +545,55 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         <KeyboardAvoidingView
           style={styles.contentContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
           <ScrollView 
-            style={styles.scrollView} 
+            style={styles.scrollContainer} 
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollViewContent}
+            contentContainerStyle={styles.scrollContent}
           >
             
             {/* Feedback Type Selection */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What type of feedback do you have?</Text>
-              <View style={styles.feedbackTypesContainer}>
+              <Text style={styles.sectionTitle}>What would you like to share?</Text>
+              <View style={styles.typeGrid}>
                 {feedbackTypes.map((type) => (
                   <TouchableOpacity
                     key={type.value}
                     style={[
-                      styles.feedbackTypeCard,
-                      feedbackType === type.value && styles.selectedFeedbackTypeCard
+                      styles.typeCard,
+                      feedbackType === type.value && styles.selectedTypeCard
                     ]}
                     onPress={() => setFeedbackType(type.value)}
                     activeOpacity={0.8}
                   >
                     <View style={[
-                      styles.feedbackTypeIcon,
-                      feedbackType === type.value && styles.selectedFeedbackTypeIcon
+                      styles.typeIcon,
+                      feedbackType === type.value && styles.selectedTypeIcon
                     ]}>
                       <Ionicons 
                         name={type.icon as any} 
-                        size={24} 
+                        size={20} 
                         color={feedbackType === type.value ? 'white' : '#B22020'} 
                       />
                     </View>
                     <Text style={[
-                      styles.feedbackTypeLabel,
-                      feedbackType === type.value && styles.selectedFeedbackTypeLabel
+                      styles.typeLabel,
+                      feedbackType === type.value && styles.selectedTypeLabel
                     ]}>
                       {type.label}
+                    </Text>
+                    <Text style={[
+                      styles.typeDescription,
+                      feedbackType === type.value && styles.selectedTypeDescription
+                    ]}>
+                      {type.description}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            {/* Rating Section (only for general feedback) */}
+            {/* Rating Section */}
             {feedbackType === 'general' && (
               <View style={styles.section}>
                 <View style={styles.card}>
@@ -599,12 +602,12 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
 
-            {/* Common Issues (for bug reports and parking issues) */}
+            {/* Common Issues */}
             {(feedbackType === 'technical' || feedbackType === 'parking') && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Related Issues (Optional)</Text>
+                <Text style={styles.sectionTitle}>Related Issues</Text>
                 <Text style={styles.sectionSubtitle}>
-                  Select any that apply to help us understand your issue better
+                  Select any that apply (optional)
                 </Text>
                 <View style={styles.card}>
                   <View style={styles.chipsContainer}>
@@ -616,7 +619,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                           selectedIssues.includes(issue) && styles.selectedChip
                         ]}
                         onPress={() => handleIssueToggle(issue)}
-                        activeOpacity={0.7}
                       >
                         <Text style={[
                           styles.chipText,
@@ -633,9 +635,9 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
             {/* Message Input */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Your Message *</Text>
+              <Text style={styles.sectionTitle}>Your Message</Text>
               <Text style={styles.sectionSubtitle}>
-                Please provide detailed feedback to help us understand your experience
+                Share your detailed feedback
               </Text>
               <View style={styles.card}>
                 <TextInput
@@ -643,15 +645,18 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                   value={message}
                   onChangeText={setMessage}
                   multiline
-                  numberOfLines={6}
+                  numberOfLines={4}
                   style={styles.textInput}
-                  placeholderTextColor="#999"
+                  placeholderTextColor="#9CA3AF"
                   textAlignVertical="top"
                   maxLength={1000}
                 />
-                <Text style={styles.characterCount}>
-                  {message.length}/1000 characters
-                </Text>
+                <View style={styles.inputFooter}>
+                  <Text style={styles.characterCount}>
+                    {message.length}/1000
+                  </Text>
+                  <Text style={styles.requiredIndicator}>Required</Text>
+                </View>
               </View>
             </View>
 
@@ -659,11 +664,11 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Email (Optional)</Text>
               <Text style={styles.sectionSubtitle}>
-                Leave your email if you'd like us to follow up with you
+                For follow-up responses
               </Text>
-              <View style={styles.emailCard}>
+              <View style={styles.emailInputCard}>
                 <View style={styles.emailInputContainer}>
-                  <Ionicons name="mail-outline" size={20} color="#666" style={styles.emailIcon} />
+                  <Ionicons name="mail-outline" size={18} color="#6B7280" />
                   <TextInput
                     placeholder="your.email@example.com"
                     value={email}
@@ -672,7 +677,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                     autoCapitalize="none"
                     autoCorrect={false}
                     style={styles.emailInput}
-                    placeholderTextColor="#999"
+                    placeholderTextColor="#9CA3AF"
                     maxLength={100}
                   />
                 </View>
@@ -680,74 +685,48 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             {/* Submit Button */}
-            <View style={styles.submitSection}>
+            <View style={styles.submitContainer}>
               <TouchableOpacity
                 onPress={handleSubmit}
                 disabled={loading}
                 style={[styles.submitButton, loading && styles.disabledButton]}
-                activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={loading ? ['#999', '#666'] : ['#B22020', '#4C0E0E']}
-                  style={styles.submitButtonGradient}
+                  colors={loading ? ['#9CA3AF', '#6B7280'] : ['#B22020', '#8B1917']}
+                  style={styles.submitGradient}
                 >
-                  <View style={styles.submitButtonContent}>
-                    {loading ? (
-                      <ActivityIndicator size="small" color="white" style={styles.submitButtonIcon} />
-                    ) : (
-                      <Ionicons 
-                        name="send" 
-                        size={20} 
-                        color="white" 
-                        style={styles.submitButtonIcon}
-                      />
-                    )}
-                    <Text style={styles.submitButtonText}>
-                      {loading ? 'Submitting...' : 'Submit Feedback'}
-                    </Text>
-                  </View>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Ionicons name="send" size={18} color="white" />
+                  )}
+                  <Text style={styles.submitText}>
+                    {loading ? 'Submitting...' : 'Submit Feedback'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
 
-            {/* Contact Info Card */}
+            {/* Quick Contact */}
             <View style={styles.section}>
-              <View style={[styles.card, styles.contactCard]}>
+              <View style={styles.contactCard}>
                 <View style={styles.contactHeader}>
-                  <Ionicons name="headset" size={24} color="#B22020" />
-                  <Text style={styles.contactTitle}>Need immediate assistance?</Text>
+                  <Ionicons name="headset" size={20} color="#B22020" />
+                  <Text style={styles.contactTitle}>Need immediate help?</Text>
                 </View>
-                <Text style={styles.contactText}>
-                  Contact our support team for urgent issues:
+                <Text style={styles.contactSubtitle}>
+                  Contact support for urgent issues
                 </Text>
-                <View style={styles.contactMethods}>
-                  <TouchableOpacity style={styles.contactMethod} activeOpacity={0.7}>
-                    <Ionicons name="mail" size={16} color="#666" />
-                    <Text style={styles.contactMethodText}>support@valet-parking.com</Text>
+                <View style={styles.contactOptions}>
+                  <TouchableOpacity style={styles.contactOption}>
+                    <Ionicons name="mail" size={14} color="#6B7280" />
+                    <Text style={styles.contactText}>support@valet-parking.com</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.contactMethod} activeOpacity={0.7}>
-                    <Ionicons name="call" size={16} color="#666" />
-                    <Text style={styles.contactMethodText}>+63 919 929 6588</Text>
+                  <TouchableOpacity style={styles.contactOption}>
+                    <Ionicons name="call" size={14} color="#6B7280" />
+                    <Text style={styles.contactText}>+63 919 929 6588</Text>
                   </TouchableOpacity>
-                  <View style={styles.contactMethod}>
-                    <Ionicons name="time" size={16} color="#666" />
-                    <Text style={styles.contactMethodText}>24/7 Support Available</Text>
-                  </View>
                 </View>
-              </View>
-            </View>
-
-            {/* Privacy Notice */}
-            <View style={styles.section}>
-              <View style={[styles.card, styles.privacyCard]}>
-                <View style={styles.privacyHeader}>
-                  <Ionicons name="shield-checkmark" size={20} color="#059669" />
-                  <Text style={styles.privacyTitle}>Privacy Notice</Text>
-                </View>
-                <Text style={styles.privacyText}>
-                  Your feedback is important to us. We collect device information to help us improve our service. 
-                  Your email will only be used to follow up on your feedback if requested.
-                </Text>
               </View>
             </View>
 
