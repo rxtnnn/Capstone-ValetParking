@@ -600,7 +600,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             )}
 
             {/* Common Issues (for bug reports and parking issues) */}
-            {(feedbackType === 'bug' || feedbackType === 'parking') && (
+            {(feedbackType === 'technical' || feedbackType === 'parking') && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Issues (Optional)</Text>
                 <Text style={styles.sectionSubtitle}>
