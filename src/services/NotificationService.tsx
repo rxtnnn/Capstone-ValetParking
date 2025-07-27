@@ -59,15 +59,6 @@ class NotificationServiceClass {
       lightColor: '#2196F3',
     });
 
-    await Notifications.setNotificationChannelAsync('connection-status', {
-      name: 'Connection Status',
-      description: 'VALET connection status updates',
-      importance: Notifications.AndroidImportance.LOW,
-      vibrationPattern: [0, 100],
-      sound: 'default',
-      lightColor: '#B71C1C',
-    });
-
     await Notifications.setNotificationChannelAsync('feedback-replies', {
       name: 'Feedback Replies',
       description: 'Admin replies to your feedback',
@@ -76,6 +67,8 @@ class NotificationServiceClass {
       sound: 'default',
       lightColor: '#B22020',
     });
+
+    // 🔥 REMOVED: connection-status channel - no longer needed
   }
 
   private async registerForPushNotifications(): Promise<string | null> {
@@ -128,7 +121,7 @@ class NotificationServiceClass {
     try {
       const settings = await this.getNotificationSettings();
       
-      if (!settings.spotAvailable) {
+      if (!settings.spotAvailable || spotsAvailable <= 0) {
         return;
       }
 
@@ -162,12 +155,19 @@ class NotificationServiceClass {
   async showFloorUpdateNotification(
     floor: number, 
     availableSpots: number,
-    totalSpots: number
+    totalSpots: number,
+    previousAvailable?: number
   ): Promise<void> {
     try {
       const settings = await this.getNotificationSettings();
       
-      if (!settings.floorUpdates) {
+      if (!settings.floorUpdates || availableSpots <= 0) {
+        return;
+      }
+
+      // Only proceed if there's an actual increase in available spots
+      if (previousAvailable !== undefined && availableSpots <= previousAvailable) {
+        console.log(`Floor ${floor}: No increase in spots, notification skipped`);
         return;
       }
 
@@ -175,7 +175,7 @@ class NotificationServiceClass {
       const message = `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`;
 
       // Add to NotificationManager for in-app display
-      await NotificationManager.addFloorUpdateNotification(floor, availableSpots, totalSpots);
+      await NotificationManager.addFloorUpdateNotification(floor, availableSpots, totalSpots, previousAvailable);
 
       // Show push notification
       await this.showLocalNotification(
@@ -198,15 +198,14 @@ class NotificationServiceClass {
     }
   }
 
-  // 🔥 Connection status notifications - DISABLED for in-app notifications
+  // 🔥 CONNECTION STATUS: Completely disabled - no notifications created
   async showConnectionStatusNotification(isConnected: boolean): Promise<void> {
     // Connection status notifications are completely disabled
-    // We don't want to show these to users in any form
     console.log(`Connection status: ${isConnected ? 'connected' : 'disconnected'} - no notification shown`);
     return;
   }
 
-  // 🔥 NEW: Method to show feedback reply notification
+  // Feedback reply notification
   async showFeedbackReplyNotification(
     feedbackId: number,
     originalFeedback: string,
@@ -274,7 +273,7 @@ class NotificationServiceClass {
     }
   }
 
-  // 🔥 ENHANCED: Simple notification now also adds to NotificationManager
+  // 🔥 UPDATED: Simple notification - does NOT add to NotificationManager anymore
   public async showSimpleNotification(
     title: string, 
     message: string,
@@ -283,16 +282,11 @@ class NotificationServiceClass {
     try {
       const settings = await this.getNotificationSettings();
       
-      // Add to NotificationManager for in-app display
-      await NotificationManager.addNotification({
-        type: 'general',
-        title,
-        message,
-        priority: 'normal',
-        data: data || { type: 'general' },
-      });
+      // 🚫 DO NOT add general notifications to NotificationManager
+      // Only show as push notification, not in overlay
+      console.log(`📲 Simple notification (push only, not in overlay): ${title}`);
       
-      // Show push notification
+      // Show push notification only
       await this.showLocalNotification(
         title,
         message,
@@ -369,7 +363,7 @@ class NotificationServiceClass {
     return this.expoPushToken;
   }
 
-  // 🔥 FIXED: Use the simple notification method for testing
+  // 🔥 UPDATED: Test notification only shows as push, not in overlay
   async testNotification(): Promise<void> {
     await this.showSimpleNotification(
       'VALET Test',
@@ -378,10 +372,9 @@ class NotificationServiceClass {
     );
   }
 
-  // 🔥 NEW: Initialize notification manager integration
   async initializeWithManager(): Promise<void> {
     await this.initialize();
-    console.log('📱 NotificationService initialized with NotificationManager integration');
+    console.log('📱 NotificationService initialized (overlay only shows parking & feedback notifications)');
   }
 
   // 🔥 NEW: Method to simulate feedback reply (for testing)
@@ -401,7 +394,7 @@ class NotificationServiceClass {
     
     // Simulate floor update after 2 seconds
     setTimeout(async () => {
-      await this.showFloorUpdateNotification(4, 5, 42);
+      await this.showFloorUpdateNotification(4, 5, 42, 2);
     }, 2000);
   }
 
@@ -411,29 +404,27 @@ class NotificationServiceClass {
       token: this.expoPushToken?.substring(0, 20) + '...',
       platform: Platform.OS,
       isDevice: Device.isDevice,
-      managerIntegration: true,
+      overlayFilter: 'parking & feedback only',
     };
   }
 
-  // 🔥 NEW: Get notification statistics
   getNotificationStats() {
     return {
       service: 'NotificationService',
       pushToken: !!this.expoPushToken,
       platform: Platform.OS,
       deviceSupport: Device.isDevice,
-      channels: Platform.OS === 'android' ? 4 : 0, // Android channels created
-      integrations: ['NotificationManager', 'AsyncStorage', 'Expo'],
+      channels: Platform.OS === 'android' ? 3 : 0, // Removed connection-status channel
+      integrations: ['NotificationManager (filtered)', 'AsyncStorage', 'Expo'],
+      overlayTypes: ['spot_available', 'floor_update', 'feedback_reply'],
     };
   }
 
-  // 🔥 NEW: Clear all notification channels (Android only)
   async clearNotificationChannels(): Promise<void> {
     if (Platform.OS === 'android') {
       try {
         await Notifications.deleteNotificationChannelAsync('spot-available');
         await Notifications.deleteNotificationChannelAsync('floor-updates');
-        await Notifications.deleteNotificationChannelAsync('connection-status');
         await Notifications.deleteNotificationChannelAsync('feedback-replies');
         console.log('🗑️ Notification channels cleared');
       } catch (error) {
@@ -442,7 +433,6 @@ class NotificationServiceClass {
     }
   }
 
-  // 🔥 NEW: Reset notification service
   async reset(): Promise<void> {
     try {
       await this.clearNotificationChannels();

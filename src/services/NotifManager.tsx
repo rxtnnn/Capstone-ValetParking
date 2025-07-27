@@ -46,8 +46,20 @@ class NotificationManagerClass {
     }
   }
 
-  // Add a new notification
+  // 🔥 UPDATED: Only add parking and feedback notifications (no general/welcome messages)
   async addNotification(notification: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>): Promise<void> {
+    // 🚫 FILTER OUT: Do not add general notifications (welcome messages, connection status, etc.)
+    if (notification.type === 'general') {
+      console.log('🚫 General notification filtered out (not added to overlay):', notification.title);
+      return;
+    }
+
+    // ✅ ONLY ALLOW: parking updates and feedback replies
+    if (!['spot_available', 'floor_update', 'feedback_reply'].includes(notification.type)) {
+      console.log('🚫 Notification type not supported in overlay:', notification.type);
+      return;
+    }
+
     const newNotification: AppNotification = {
       ...notification,
       id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -64,7 +76,7 @@ class NotificationManagerClass {
     );
 
     if (isDuplicate) {
-      console.log('Duplicate notification prevented:', newNotification.title);
+      console.log('🚫 Duplicate notification prevented:', newNotification.title);
       return;
     }
 
@@ -73,7 +85,7 @@ class NotificationManagerClass {
     await this.saveNotifications();
     this.notifyListeners();
 
-    console.log(`📱 New notification added: ${newNotification.title}`);
+    console.log(`📱 New notification added to overlay: ${newNotification.title}`);
   }
 
   // Add feedback reply notification
@@ -98,8 +110,14 @@ class NotificationManagerClass {
     });
   }
 
-  // Add spot available notification
+  // 🔥 UPDATED: Only add spot notifications when NEW spots become available
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
+    // Only create notification if spots are actually available (> 0)
+    if (spotsAvailable <= 0) {
+      console.log('🚫 No available spots, notification not created');
+      return;
+    }
+
     await this.addNotification({
       type: 'spot_available',
       title: 'Parking Spots Available!',
@@ -115,19 +133,29 @@ class NotificationManagerClass {
     });
   }
 
-  // Add floor update notification
+  // 🔥 UPDATED: Only add floor update notifications when there are meaningful changes
   async addFloorUpdateNotification(
     floor: number, 
     availableSpots: number, 
     totalSpots: number,
     previousAvailable?: number
   ): Promise<void> {
+    // Only create notification if there's an actual increase in available spots
+    if (previousAvailable !== undefined && availableSpots <= previousAvailable) {
+      console.log(`🚫 Floor ${floor}: No increase in available spots (${availableSpots} vs ${previousAvailable}), notification not created`);
+      return;
+    }
+
+    // Only notify if there are actually spots available
+    if (availableSpots <= 0) {
+      console.log(`🚫 Floor ${floor}: No available spots, notification not created`);
+      return;
+    }
+
     const changeText = previousAvailable !== undefined 
       ? availableSpots > previousAvailable 
         ? `(+${availableSpots - previousAvailable})`
-        : availableSpots < previousAvailable 
-          ? `(${availableSpots - previousAvailable})`
-          : ''
+        : ''
       : '';
 
     await this.addNotification({
@@ -144,14 +172,8 @@ class NotificationManagerClass {
     });
   }
 
-  // Remove connection status from in-app notifications completely
-  // This method is removed - connection status notifications not supported
-  async addConnectionStatusNotification(isConnected: boolean, previousStatus?: boolean): Promise<void> {
-    // Connection status notifications are not supported
-    // Only parking updates and feedback replies are shown
-    console.log(`Connection status changed to ${isConnected ? 'connected' : 'disconnected'} - no notification created`);
-    return;
-  }
+  // 🔥 REMOVED: Connection status notifications completely removed
+  // These will never appear in the notification overlay
 
   // Mark notification as read
   async markAsRead(notificationId: string): Promise<void> {
@@ -200,14 +222,18 @@ class NotificationManagerClass {
     this.notifyListeners();
   }
 
-  // Get all notifications
+  // Get all notifications (only parking and feedback)
   getNotifications(): AppNotification[] {
-    return [...this.notifications].sort((a, b) => b.timestamp - a.timestamp);
+    return [...this.notifications]
+      .filter(n => ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type))
+      .sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  // Get unread count
+  // Get unread count (only parking and feedback)
   getUnreadCount(): number {
-    return this.unreadCount;
+    return this.notifications
+      .filter(n => !n.isRead && ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type))
+      .length;
   }
 
   // Subscribe to notification updates
@@ -226,9 +252,11 @@ class NotificationManagerClass {
     };
   }
 
-  // Update unread count
+  // Update unread count (only parking and feedback)
   private updateUnreadCount(): void {
-    this.unreadCount = this.notifications.filter(n => !n.isRead).length;
+    this.unreadCount = this.notifications
+      .filter(n => !n.isRead && ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type))
+      .length;
   }
 
   // Notify all listeners
@@ -245,6 +273,9 @@ class NotificationManagerClass {
 
   // Get notifications by type (only parking and feedback)
   getNotificationsByType(type: AppNotification['type']): AppNotification[] {
+    if (!['spot_available', 'floor_update', 'feedback_reply'].includes(type)) {
+      return [];
+    }
     return this.notifications.filter(n => n.type === type);
   }
 
@@ -252,8 +283,7 @@ class NotificationManagerClass {
   async checkForFeedbackReplies(userId: number): Promise<void> {
     try {
       // This would typically call your API to check for new feedback replies
-      // For now, we'll just log that the check was attempted
-      console.log(`Checking for feedback replies for user ${userId}`);
+      console.log(`✅ Checking for feedback replies for user ${userId}`);
       
       // Example API call structure:
       // const response = await fetch(`https://valet.up.railway.app/api/feedback/replies/${userId}`);
@@ -272,16 +302,37 @@ class NotificationManagerClass {
     }
   }
 
-  // Get summary for display
+  // Get summary for display (only parking and feedback)
   getSummary(): { total: number; unread: number; recent: number } {
+    const validNotifications = this.notifications.filter(n => 
+      ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type)
+    );
+    
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-    const recent = this.notifications.filter(n => n.timestamp > oneDayAgo).length;
+    const recent = validNotifications.filter(n => n.timestamp > oneDayAgo).length;
     
     return {
-      total: this.notifications.length,
-      unread: this.unreadCount,
+      total: validNotifications.length,
+      unread: this.getUnreadCount(),
       recent,
     };
+  }
+
+  // 🔥 NEW: Method to test parking notifications (for development)
+  async createTestParkingNotification(): Promise<void> {
+    await this.addSpotAvailableNotification(3, 4);
+    console.log('🧪 Test parking notification created');
+  }
+
+  // 🔥 NEW: Method to test feedback notifications (for development)  
+  async createTestFeedbackNotification(): Promise<void> {
+    await this.addFeedbackReplyNotification(
+      123,
+      'Test feedback about parking sensors not working properly',
+      'Thank you for your feedback! We have fixed the sensor issue on Floor 4.',
+      'Admin Team'
+    );
+    console.log('🧪 Test feedback notification created');
   }
 }
 
