@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 export const API_CONFIG = {
   BASE_URL: 'https://valet.up.railway.app/api',
-  API_TOKEN: '8|HncMi9QI3CvmrT68pANh64bqBBj47Vw8DPWozeGe61cea8b0',
+  API_TOKEN: '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad',
   TIMEOUT: 15000,
 };
 
