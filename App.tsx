@@ -17,7 +17,7 @@ import ParkingMapScreen from './src/screens/ParkingMapScreen';
 import FeedbackScreen from './src/screens/FeedbackScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import RegisterScreen from './src/screens/LoginScreen';
+import LoginScreen from './src/screens/LoginScreen';
 import { NotificationService } from './src/services/NotificationService';
 import { theme } from './src/theme/theme';
 
@@ -41,8 +41,7 @@ export type RootStackParamList = {
   Settings: undefined;
   Profile: undefined;
   ApiTest: undefined;
-  Register: undefined;
-  Login: undefined; // Added for clarity
+  Login: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -68,7 +67,7 @@ const AppNavigator: React.FC = () => {
     const welcomeTimer = setTimeout(async () => {
       try {
         await NotificationService.showSimpleNotification(
-          'VALET Connected! 🚗',
+          'VALET Connected!',
           'Your parking assistant is ready to help you find spots.',
           { 
             type: 'welcome',
@@ -94,7 +93,7 @@ const AppNavigator: React.FC = () => {
         initialRouteName="Splash"
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#B71C1C',
+            backgroundColor: '#4C0E0E',
           },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: {
@@ -108,8 +107,8 @@ const AppNavigator: React.FC = () => {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
-          name="Register" 
-          component={RegisterScreen} 
+          name="Login" 
+          component={LoginScreen} 
           options={{ headerShown: false }}
         />
         <Stack.Screen 
@@ -125,7 +124,7 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen 
           name="Feedback" 
           component={FeedbackScreen}
-          options={{ headerShown: false }}
+          options={{ title: 'Feedback' }}
         />
         <Stack.Screen 
           name="Settings" 

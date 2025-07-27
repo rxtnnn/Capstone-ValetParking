@@ -7,21 +7,21 @@ export const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 10,
     paddingHorizontal: 20,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   backButton: {
     padding: 5,
-    marginRight: 10,
+    marginRight: 0,
   },
   headerTitleContainer: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: 'flex-start'
   },
   headerTitle: {
     fontSize: 20,
