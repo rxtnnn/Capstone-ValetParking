@@ -28,11 +28,34 @@ export const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: 'white',
   },
-  headerPlaceholder: {
-    width: 34,
+  // NEW: Tab button in header
+  tabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    position: 'relative',
+  },
+  // NEW: Reply badge on tab button
+  replyBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FFD700',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  replyBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B22020',
   },
   headerDescriptionContainer: {
     alignItems: 'center',
+    marginBottom: 15,
   },
   headerDescription: {
     fontSize: 14,
@@ -40,6 +63,32 @@ export const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  // NEW: Tab indicators
+  tabIndicatorContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    padding: 4,
+  },
+  tabIndicator: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeTabIndicator: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  tabIndicatorText: {
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  activeTabIndicatorText: {
+    color: 'white',
+    fontFamily: 'Poppins_600SemiBold',
   },
   contentContainer: {
     flex: 1,
@@ -50,6 +99,169 @@ export const styles = StyleSheet.create({
   scrollViewContent: {
     paddingBottom: 30,
   },
+  
+  // NEW: Admin Replies Styles
+  repliesScrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  repliesScrollViewContent: {
+    paddingVertical: 20,
+  },
+  emptyRepliesContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyRepliesTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#6B7280',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  emptyRepliesText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 30,
+  },
+  newFeedbackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#B22020',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  newFeedbackButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B22020',
+    marginLeft: 8,
+  },
+  replyCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  originalFeedbackHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  feedbackTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  feedbackTypeText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_500Medium',
+    color: '#6B7280',
+    marginLeft: 6,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'white',
+  },
+  originalMessageContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#E5E7EB',
+  },
+  originalMessageLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  originalMessage: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#374151',
+    lineHeight: 20,
+  },
+  adminReplyContainer: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#B22020',
+  },
+  adminReplyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  adminReplyLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B22020',
+    marginLeft: 6,
+    flex: 1,
+  },
+  replyTime: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    color: '#6B7280',
+  },
+  adminReplyText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#374151',
+    lineHeight: 20,
+  },
+  ratingDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  ratingDisplayLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium',
+    color: '#6B7280',
+    marginRight: 4,
+  },
+  ratingDisplayStar: {
+    marginHorizontal: 1,
+  },
+  ratingDisplayValue: {
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium',
+    color: '#6B7280',
+    marginLeft: 4,
+  },
+
+  // Existing Feedback Form Styles
   section: {
     paddingHorizontal: 20,
     marginBottom: 20,
