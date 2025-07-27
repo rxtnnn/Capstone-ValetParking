@@ -57,6 +57,11 @@ const ParkingMapScreen: React.FC = () => {
   const [parkingStats, setParkingStats] = useState<ParkingStats | null>(null);
   const [isServiceRunning, setIsServiceRunning] = useState(false);
   
+  // 🔥 NEW: Refs to prevent loops and track mount state
+  const isMountedRef = useRef(true);
+  const servicesInitializedRef = useRef(false);
+  const connectionTestedRef = useRef(false);
+  
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -72,7 +77,7 @@ const ParkingMapScreen: React.FC = () => {
 
   // 🗺️ Sensor to spot mapping (same as before)
   const sensorToSpotMapping: { [key: number]: string } = {
-    7: 'A1',   1: 'B1',   2: 'B2',   3: 'B3',   4: 'B4',
+    7: 'A1',   4: 'B1',   3: 'B2',   2: 'B3',   1: 'B4',
     5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
     11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
     16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
@@ -102,137 +107,194 @@ const ParkingMapScreen: React.FC = () => {
 
   const [parkingSections, setParkingSections] = useState<ParkingSection[]>(computeInitialSections());
 
- // 🔄 Fixed function to properly map API sensor data to parking spots
-const updateParkingSpotsFromService = (stats: ParkingStats) => {
-  console.log('📊 Updating parking spots from service data');
-  
-  // Update parking stats
-  setParkingStats(stats);
-  
-  const sensorToSpotMap: { [key: number]: string } = {
-    7: 'A1',   1: 'B1',   2: 'B2',   3: 'B3',   4: 'B4',
-    5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
-    11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
-    16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
-    21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
-    26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
-    31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
-    36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
-    41: 'J4',  42: 'J5'
-  };
-
-  // Create a map of spot occupancy from the API data
-  const spotOccupancyMap: { [key: string]: boolean } = {};
-  
-  // If stats has sensor data array, use it to map occupancy
-  if (stats.sensorData && Array.isArray(stats.sensorData)) {
-    stats.sensorData.forEach((sensor: any) => {
-      const spotId = sensorToSpotMap[sensor.sensor_id];
-      if (spotId) {
-        // Convert is_occupied (0 or 1) to boolean
-        spotOccupancyMap[spotId] = sensor.is_occupied === 1;
-        console.log(`📍 Sensor ${sensor.sensor_id} -> Spot ${spotId}: ${sensor.is_occupied === 1 ? 'OCCUPIED' : 'AVAILABLE'}`);
-      }
-    });
-  }
-
-  // Update individual parking spots with actual sensor data
-  setParkingData(prevSpots => {
-    return prevSpots.map(spot => {
-      // Check if we have sensor data for this spot
-      const isOccupied = spotOccupancyMap.hasOwnProperty(spot.id) 
-        ? spotOccupancyMap[spot.id] 
-        : spot.isOccupied; // Keep current state if no sensor data
-      
-      return {
-        ...spot,
-        isOccupied
-      };
-    });
-  });
-
-  // Update sections based on actual spot occupancy
-  setParkingSections(prevSections => {
-    return prevSections.map(section => {
-      // Count spots in this section
-      const sectionSpots = Object.values(sensorToSpotMap)
-        .filter(spotId => spotId.startsWith(section.id));
-
-      const totalSlots = sectionSpots.length;
-      
-      // Count available spots (those that are not occupied)
-      const availableSlots = sectionSpots.filter(spotId => 
-        !spotOccupancyMap[spotId] // Not occupied or no data (assume available)
-      ).length;
-
-      return {
-        ...section,
-        totalSlots,
-        availableSlots,
-        isFull: availableSlots === 0
-      };
-    });
-  });
-
-  console.log('✅ Parking spots updated with real sensor data');
-};
-  // 🚀 Initialize the service
-  useEffect(() => {
-    console.log('🚀 Initializing RealTimeParkingService');
+  // 🔄 Fixed function to properly map API sensor data to parking spots
+  const updateParkingSpotsFromService = (stats: ParkingStats) => {
+    if (!isMountedRef.current) return;
     
-    // Test connection first
-    const testConnection = async () => {
-      const result = await RealTimeParkingService.testConnection();
-      console.log('🧪 Connection test result:', result);
-      
-      if (result.success) {
-        console.log('✅ Starting parking service');
-        RealTimeParkingService.start();
-        setIsServiceRunning(true);
-      } else {
-        console.error('Connection test failed:', result.message);
-        Alert.alert(
-          'Connection Error',
-          `Unable to connect to parking service: ${result.message}`,
-          [{ text: 'Retry', onPress: testConnection }, { text: 'OK' }]
-        );
-      }
+    console.log('📊 Updating parking spots from service data');
+    
+    // Update parking stats
+    setParkingStats(stats);
+    
+    const sensorToSpotMap: { [key: number]: string } = {
+      7: 'A1',   4: 'B1',   3: 'B2',   2: 'B3',   1: 'B4',
+      5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
+      11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
+      16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
+      21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
+      26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
+      31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
+      36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
+      41: 'J4',  42: 'J5'
     };
 
-    testConnection();
+    // Create a map of spot occupancy from the API data
+    const spotOccupancyMap: { [key: string]: boolean } = {};
+    
+    // If stats has sensor data array, use it to map occupancy
+    if (stats.sensorData && Array.isArray(stats.sensorData)) {
+      stats.sensorData.forEach((sensor: any) => {
+        const spotId = sensorToSpotMap[sensor.sensor_id];
+        if (spotId) {
+          // Convert is_occupied (0 or 1) to boolean
+          spotOccupancyMap[spotId] = sensor.is_occupied === 1;
+          console.log(`📍 Sensor ${sensor.sensor_id} -> Spot ${spotId}: ${sensor.is_occupied === 1 ? 'OCCUPIED' : 'AVAILABLE'}`);
+        }
+      });
+    }
 
-    // Subscribe to parking updates
-    const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
-      console.log('Received parking update:', data);
-      updateParkingSpotsFromService(data);
+    // Update individual parking spots with actual sensor data
+    setParkingData(prevSpots => {
+      if (!isMountedRef.current) return prevSpots;
+      
+      return prevSpots.map(spot => {
+        // Check if we have sensor data for this spot
+        const isOccupied = spotOccupancyMap.hasOwnProperty(spot.id) 
+          ? spotOccupancyMap[spot.id] 
+          : spot.isOccupied; // Keep current state if no sensor data
+        
+        return {
+          ...spot,
+          isOccupied
+        };
+      });
     });
 
-    // Subscribe to connection status
-    const unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
-      console.log('Connection status changed:', status);
-      setConnectionStatus(status);
+    // Update sections based on actual spot occupancy
+    setParkingSections(prevSections => {
+      if (!isMountedRef.current) return prevSections;
+      
+      return prevSections.map(section => {
+        // Count spots in this section
+        const sectionSpots = Object.values(sensorToSpotMap)
+          .filter(spotId => spotId.startsWith(section.id));
+
+        const totalSlots = sectionSpots.length;
+        
+        // Count available spots (those that are not occupied)
+        const availableSlots = sectionSpots.filter(spotId => 
+          !spotOccupancyMap[spotId] // Not occupied or no data (assume available)
+        ).length;
+
+        return {
+          ...section,
+          totalSlots,
+          availableSlots,
+          isFull: availableSlots === 0
+        };
+      });
     });
+
+    console.log('✅ Parking spots updated with real sensor data');
+  };
+
+  // 🔥 FIXED: Initialize the service with proper loop prevention
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    let unsubscribeParkingUpdates: (() => void) | undefined;
+    let unsubscribeConnectionStatus: (() => void) | undefined;
+
+    const initializeServices = async () => {
+      // Prevent multiple initializations
+      if (servicesInitializedRef.current || !isMountedRef.current) {
+        console.log('⚠️ Services already initialized, skipping');
+        return;
+      }
+
+      servicesInitializedRef.current = true;
+      console.log('🚀 Initializing RealTimeParkingService');
+      
+      // Test connection first (only once)
+      if (!connectionTestedRef.current) {
+        connectionTestedRef.current = true;
+        
+        try {
+          const result = await RealTimeParkingService.testConnection();
+          console.log('🧪 Connection test result:', result);
+          
+          if (!isMountedRef.current) return;
+          
+          if (result.success) {
+            console.log('✅ Starting parking service');
+            RealTimeParkingService.start();
+            setIsServiceRunning(true);
+          } else {
+            console.error('Connection test failed:', result.message);
+            Alert.alert(
+              'Connection Error',
+              `Unable to connect to parking service: ${result.message}`,
+              [
+                { 
+                  text: 'Retry', 
+                  onPress: () => {
+                    connectionTestedRef.current = false;
+                    servicesInitializedRef.current = false;
+                    initializeServices();
+                  }
+                }, 
+                { text: 'OK' }
+              ]
+            );
+          }
+        } catch (error) {
+          console.error('Error testing connection:', error);
+        }
+      }
+
+      // Subscribe to parking updates
+      unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
+        if (!isMountedRef.current) return;
+        console.log('Received parking update:', data);
+        updateParkingSpotsFromService(data);
+      });
+
+      // Subscribe to connection status
+      unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
+        if (!isMountedRef.current) return;
+        console.log('Connection status changed:', status);
+        setConnectionStatus(status);
+      });
+    };
+
+    initializeServices();
 
     // Cleanup on unmount
     return () => {
-      console.log('Cleaning up RealTimeParkingService');
-      unsubscribeParkingUpdates();
-      unsubscribeConnectionStatus();
-      RealTimeParkingService.stop();
-      setIsServiceRunning(false);
+      console.log('🧹 Cleaning up ParkingMapScreen services');
+      isMountedRef.current = false;
+      servicesInitializedRef.current = false;
+      connectionTestedRef.current = false;
+      
+      if (unsubscribeParkingUpdates) {
+        unsubscribeParkingUpdates();
+      }
+      
+      if (unsubscribeConnectionStatus) {
+        unsubscribeConnectionStatus();
+      }
+      
+      try {
+        RealTimeParkingService.stop();
+        setIsServiceRunning(false);
+      } catch (error) {
+        console.error('Error stopping service:', error);
+      }
     };
-  }, []);
+  }, []); // Empty dependency array - run only once
 
-  // 🔄 Initialize parking spots layout
+  // 🔄 Initialize parking spots layout (only once)
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     const spots: ParkingSpot[] = [
       { id: 'A1', isOccupied: false, position: { x: 680, y: 110 }, width: 35, height: 35 },
       { id: 'B4', isOccupied: false, position: { x: 500, y: 50 }, width: 35, height: 35 },
       { id: 'B3', isOccupied: false, position: { x: 540, y: 50 }, width: 35, height: 35 },
       { id: 'B2', isOccupied: false, position: { x: 580, y: 50 }, width: 35, height: 35 },
       { id: 'B1', isOccupied: false, position: { x: 620, y: 50 }, width: 35, height: 35 },
-      { id: 'C2', isOccupied: false, position: { x: 450, y: 100 }, width: 35, height: 35 },
-      { id: 'C1', isOccupied: false, position: { x: 450, y: 140 }, width: 35, height: 35 },
+      { id: 'C1', isOccupied: false, position: { x: 450, y: 100 }, width: 35, height: 35 },
+      { id: 'C2', isOccupied: false, position: { x: 450, y: 140 }, width: 35, height: 35 },
       { id: 'D7', isOccupied: false, position: { x: 120, y: 200 }, width: 35, height: 35 },
       { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 35, height: 35 },
       { id: 'D5', isOccupied: false, position: { x: 200, y: 200 }, width: 35, height: 35 },
@@ -271,7 +333,7 @@ const updateParkingSpotsFromService = (stats: ParkingStats) => {
     ];
 
     setParkingData(spots);
-  }, []);
+  }, []); // Empty dependency array - run only once
 
   // 🎯 Gesture handlers (same as before)
   const panGestureHandler = useAnimatedGestureHandler({
@@ -361,14 +423,18 @@ const updateParkingSpotsFromService = (stats: ParkingStats) => {
     };
   });
 
-  // 🔄 Updated refresh handler
+  // 🔄 Updated refresh handler with mount protection
   const handleRefresh = async () => {
+    if (!isMountedRef.current) return;
+    
     console.log('🔄 Manual refresh requested');
     try {
       await RealTimeParkingService.forceUpdate();
     } catch (error) {
       console.error('Manual refresh failed:', error);
-      Alert.alert('Refresh Failed', 'Unable to refresh parking data. Please try again.');
+      if (isMountedRef.current) {
+        Alert.alert('Refresh Failed', 'Unable to refresh parking data. Please try again.');
+      }
     }
   };
 
@@ -516,9 +582,11 @@ const updateParkingSpotsFromService = (stats: ParkingStats) => {
       </>
     );
   };
- const navigateHome = () => {
+
+  const navigateHome = () => {
     navigation.navigate('Home');
   }
+
   // Calculate total available spots from service data or fallback to sections
   const totalAvailableSpots = parkingStats?.availableSpots || 
     parkingSections.reduce((sum, section) => sum + section.availableSlots, 0);
@@ -541,7 +609,6 @@ const updateParkingSpotsFromService = (stats: ParkingStats) => {
         >
           {parkingSections.map(renderSectionIndicator)}
         </ScrollView>
-
       </LinearGradient>
 
       {/* 🔄 Enhanced Refresh Button */}

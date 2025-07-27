@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons  } from '@expo/vector-icons';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { NotificationService } from '../services/NotificationService';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
@@ -38,7 +38,7 @@ interface NotificationSettings {
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -54,36 +54,72 @@ const SettingsScreen: React.FC = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const isMountedRef = useRef(true); // 🔥 NEW: Track if component is mounted
+  const logoutInProgressRef = useRef(false); // 🔥 NEW: Track logout state
+
+  // 🔥 NEW: Check authentication when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isAuthenticated && !logoutInProgressRef.current) {
+        console.log('🔐 User not authenticated in Settings, redirecting...');
+        navigation.navigate('Register');
+      }
+    }, [isAuthenticated, navigation])
+  );
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadNotificationSettings();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const loadNotificationSettings = async () => {
+    if (!isMountedRef.current) return;
+    
     try {
       const settings = await NotificationService.getNotificationSettings();
-      setNotificationSettings(settings);
+      if (isMountedRef.current) {
+        setNotificationSettings(settings);
+      }
     } catch (error) {
       console.error('Error loading notification settings:', error);
     }
   };
 
   const saveNotificationSettings = async (newSettings: NotificationSettings) => {
+    if (!isMountedRef.current) return;
+    
     try {
       await NotificationService.saveNotificationSettings(newSettings);
-      setNotificationSettings(newSettings);
+      if (isMountedRef.current) {
+        setNotificationSettings(newSettings);
+      }
     } catch (error) {
       console.error('Error saving notification settings:', error);
-      Alert.alert('Error', 'Failed to save settings. Please try again.');
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'Failed to save settings. Please try again.');
+      }
     }
   };
 
   const handleSettingChange = (key: keyof NotificationSettings, value: boolean) => {
+    if (!isMountedRef.current) return;
+    
     const newSettings = { ...notificationSettings, [key]: value };
     saveNotificationSettings(newSettings);
   };
 
+  // 🔥 FIXED: Improved logout handling
   const handleLogout = () => {
+    // Prevent multiple logout attempts
+    if (logoutInProgressRef.current) {
+      console.log('⚠️ Logout already in progress');
+      return;
+    }
+
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
@@ -92,26 +128,83 @@ const SettingsScreen: React.FC = () => {
         { 
           text: 'Logout', 
           style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await logout();
-              navigation.navigate('Register');
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            } finally {
-              setLoading(false);
-            }
-          }
+          onPress: performLogout
         }
       ]
     );
   };
 
+  // 🔥 NEW: Separate logout function with better error handling
+  const performLogout = async () => {
+    if (logoutInProgressRef.current || !isMountedRef.current) {
+      return;
+    }
+
+    logoutInProgressRef.current = true;
+
+    try {
+      console.log('🚪 Starting logout from Settings...');
+      
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
+
+      // Call logout from auth context
+      await logout();
+      
+      console.log('✅ Logout successful from Settings');
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          navigation.navigate('Register');
+        }
+      }, 100);
+
+    } catch (error) {
+      console.error('💥 Logout error in Settings:', error);
+      
+      if (isMountedRef.current) {
+        Alert.alert(
+          'Logout Error', 
+          'There was an issue logging you out. Please try again.',
+          [
+            {
+              text: 'Retry',
+              onPress: () => {
+                logoutInProgressRef.current = false;
+                performLogout();
+              }
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => {
+                logoutInProgressRef.current = false;
+              }
+            }
+          ]
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      
+      // Reset logout flag after a delay
+      setTimeout(() => {
+        logoutInProgressRef.current = false;
+      }, 1000);
+    }
+  };
+
   const requestNotificationPermissions = async () => {
+    if (!isMountedRef.current) return;
+    
     try {
       const granted = await NotificationService.requestPermissions();
+      if (!isMountedRef.current) return;
+      
       if (granted) {
         Alert.alert('Success', 'Notification permissions granted!');
       } else {
@@ -119,16 +212,25 @@ const SettingsScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error requesting permissions:', error);
-      Alert.alert('Error', 'Failed to request permissions. Please try again.');
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'Failed to request permissions. Please try again.');
+      }
     }
   };
+
+  // 🔥 NEW: Don't render if not authenticated
+  if (!isAuthenticated && !logoutInProgressRef.current) {
+    return null;
+  }
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
           <Ionicons name="settings" size={48} color="#B22020" />
-          <Text style={styles.loadingText}>Updating Settings...</Text>
+          <Text style={styles.loadingText}>
+            {logoutInProgressRef.current ? 'Logging out...' : 'Updating Settings...'}
+          </Text>
           <View style={styles.loadingBar}>
             <View style={styles.loadingProgress} />
           </View>
@@ -163,6 +265,7 @@ const SettingsScreen: React.FC = () => {
               onValueChange={(value) => handleSettingChange('spotAvailable', value)}
               trackColor={{ false: '#E0E0E0', true: '#B22020' }}
               thumbColor={notificationSettings.spotAvailable ? '#FFFFFF' : '#F4F3F4'}
+              disabled={loading}
             />
           </View>
           
@@ -180,6 +283,7 @@ const SettingsScreen: React.FC = () => {
               onValueChange={(value) => handleSettingChange('floorUpdates', value)}
               trackColor={{ false: '#E0E0E0', true: '#B22020' }}
               thumbColor={notificationSettings.floorUpdates ? '#FFFFFF' : '#F4F3F4'}
+              disabled={loading}
             />
           </View>
           
@@ -197,6 +301,7 @@ const SettingsScreen: React.FC = () => {
               onValueChange={(value) => handleSettingChange('maintenanceAlerts', value)}
               trackColor={{ false: '#E0E0E0', true: '#B22020' }}
               thumbColor={notificationSettings.maintenanceAlerts ? '#FFFFFF' : '#F4F3F4'}
+              disabled={loading}
             />
           </View>
           
@@ -214,6 +319,7 @@ const SettingsScreen: React.FC = () => {
               onValueChange={(value) => handleSettingChange('vibration', value)}
               trackColor={{ false: '#E0E0E0', true: '#B22020' }}
               thumbColor={notificationSettings.vibration ? '#FFFFFF' : '#F4F3F4'}
+              disabled={loading}
             />
           </View>
           
@@ -231,6 +337,7 @@ const SettingsScreen: React.FC = () => {
               onValueChange={(value) => handleSettingChange('sound', value)}
               trackColor={{ false: '#E0E0E0', true: '#B22020' }}
               thumbColor={notificationSettings.sound ? '#FFFFFF' : '#F4F3F4'}
+              disabled={loading}
             />
           </View>
         </View>
@@ -242,27 +349,35 @@ const SettingsScreen: React.FC = () => {
             <Text style={styles.cardTitle}>App Settings</Text>
           </View>
           
-          <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('Profile', { userId: user?.id })}>
+          <TouchableOpacity 
+            style={[styles.settingItem, loading && styles.disabledItem]} 
+            onPress={() => !loading && navigation.navigate('Profile', { userId: user?.id })}
+            disabled={loading}
+          >
             <View style={styles.settingLeft}>
-              <Ionicons name="person-outline" size={20} color="#666" />
+              <Ionicons name="person-outline" size={20} color={loading ? "#ccc" : "#666"} />
               <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Profile</Text>
-                <Text style={styles.settingDesc}>View and edit your profile information</Text>
+                <Text style={[styles.settingTitle, loading && styles.disabledText]}>Profile</Text>
+                <Text style={[styles.settingDesc, loading && styles.disabledText]}>View and edit your profile information</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
+            <Ionicons name="chevron-forward" size={20} color={loading ? "#ccc" : "#999"} />
           </TouchableOpacity>
           
           <View style={styles.divider} />
-          <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('Feedback')}>
+          <TouchableOpacity 
+            style={[styles.settingItem, loading && styles.disabledItem]} 
+            onPress={() => !loading && navigation.navigate('Feedback')}
+            disabled={loading}
+          >
             <View style={styles.settingLeft}>
-              <Ionicons name="chatbubble-outline" size={20} color="#666" />
+              <Ionicons name="chatbubble-outline" size={20} color={loading ? "#ccc" : "#666"} />
               <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Feedback</Text>
-                <Text style={styles.settingDesc}>Send feedback and suggestions</Text>
+                <Text style={[styles.settingTitle, loading && styles.disabledText]}>Feedback</Text>
+                <Text style={[styles.settingDesc, loading && styles.disabledText]}>Send feedback and suggestions</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
+            <Ionicons name="chevron-forward" size={20} color={loading ? "#ccc" : "#999"} />
           </TouchableOpacity>
           
         </View>
@@ -274,18 +389,23 @@ const SettingsScreen: React.FC = () => {
             <Text style={styles.cardTitle}>Account Actions</Text>
           </View>
           
-          <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
+          <TouchableOpacity 
+            style={[styles.settingItem, loading && styles.disabledItem]} 
+            onPress={handleLogout}
+            disabled={loading || logoutInProgressRef.current}
+          >
             <View style={styles.settingLeft}>
-              <Ionicons name="log-out-outline" size={20} color="#F44336" />
+              <Ionicons name="log-out-outline" size={20} color={loading ? "#ccc" : "#F44336"} />
               <View style={styles.settingText}>
-                <Text style={[styles.settingTitle, { color: '#F44336' }]}>Logout</Text>
-                <Text style={styles.settingDesc}>Sign out of your VALET account</Text>
+                <Text style={[styles.settingTitle, { color: loading ? "#ccc" : '#F44336' }]}>
+                  {logoutInProgressRef.current ? 'Logging out...' : 'Logout'}
+                </Text>
+                <Text style={[styles.settingDesc, loading && styles.disabledText]}>Sign out of your VALET account</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#F44336" />
+            <Ionicons name="chevron-forward" size={20} color={loading ? "#ccc" : "#F44336"} />
           </TouchableOpacity>
         </View>
-
 
         {/* App Info */}
         <View style={styles.appInfo}>

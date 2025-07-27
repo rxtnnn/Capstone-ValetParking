@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet,Dimensions } from 'react-native';
 
 export const styles = StyleSheet.create({
   container: {
@@ -74,6 +74,30 @@ export const styles = StyleSheet.create({
   iconButton: {
     marginLeft: 16,
     padding: 4,
+  },
+  // 🔥 NEW NOTIFICATION STYLES
+  notificationIconContainer: {
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFD700',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#B22020',
+  },
+  notificationBadgeText: {
+    color: '#333',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
   },
   campusCard: {
     backgroundColor: 'white',

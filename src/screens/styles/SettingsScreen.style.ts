@@ -273,4 +273,10 @@ export const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
+  disabledItem: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: '#ccc',
+  },
 });

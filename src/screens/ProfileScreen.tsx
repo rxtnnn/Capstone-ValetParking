@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,15 @@ import {
   Animated,
   Dimensions,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext'; // 🔥 NEW: Use Auth Context
 import { styles } from './styles/ProfileScreen.style';
-
 
 type RootStackParamList = {
   Splash: undefined;
@@ -54,6 +55,7 @@ interface User {
   phone?: string;
   year_level?: string;
   course?: string;
+  profile_photo?: string; // 🔥 NEW: Add profile photo field
 }
 
 interface AlertConfig {
@@ -76,6 +78,7 @@ interface UserStats {
 }
 
 const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { user: authUser, logout, isAuthenticated } = useAuth(); // 🔥 NEW: Get user from auth context
   const [user, setUser] = useState<User | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,17 +90,46 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     type: 'info',
   });
 
+  // 🔥 NEW: Refs to prevent loops
+  const isMountedRef = useRef(true);
+  const userFetchedRef = useRef(false);
+
   const fadeAnim = new Animated.Value(0);
   const scaleAnim = new Animated.Value(0.8);
 
-  // Refresh profile data when screen is focused
+  // 🔥 FIXED: Refresh profile data when screen is focused
   useFocusEffect(
     React.useCallback(() => {
-      loadCurrentUser();
-    }, [])
+      let isActive = true;
+
+      const checkAuthAndLoad = async () => {
+        if (!isActive || !isMountedRef.current) return;
+
+        if (!isAuthenticated) {
+          console.log('🔐 User not authenticated, redirecting...');
+          navigation.navigate('Home');
+          return;
+        }
+
+        // Load user data only once per focus
+        if (!userFetchedRef.current && isActive) {
+          await loadCurrentUser();
+          userFetchedRef.current = true;
+        }
+      };
+
+      checkAuthAndLoad();
+
+      return () => {
+        isActive = false;
+        userFetchedRef.current = false;
+      };
+    }, [isAuthenticated, navigation])
   );
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     if (alert.visible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -126,26 +158,42 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         }),
       ]).start();
     }
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [alert.visible]);
 
   const showAlert = (config: Omit<AlertConfig, 'visible'>) => {
+    if (!isMountedRef.current) return;
     setAlert({ ...config, visible: true });
   };
 
   const hideAlert = () => {
+    if (!isMountedRef.current) return;
     setAlert(prev => ({ ...prev, visible: false }));
   };
 
+  // 🔥 NEW: Handle profile photo edit
+  const handleEditProfilePhoto = () => {
+    showAlert({
+      title: 'Profile Photo',
+      message: 'Profile photo management will be available in a future update. For now, your initials will be displayed as your avatar.',
+      type: 'info',
+      icon: 'camera-alt',
+      confirmText: 'Got it!'
+    });
+  };
+
+  // 🔥 FIXED: Load current user with better logic
   const loadCurrentUser = async () => {
+    if (!isMountedRef.current) return;
+
     try {
       setIsLoading(true);
-      // First, try to get user from route params
-      const routeUserId = route?.params?.userId;
-      
-      // If no route user ID, get logged-in user ID from AuthService storage
-      const userData = await AsyncStorage.getItem('valet_user_data');
-      
-      if (!userData && !routeUserId) {
+
+      // Check authentication first
+      if (!isAuthenticated || !authUser) {
         showAlert({
           title: 'Not Logged In',
           message: 'Please log in to view your profile.',
@@ -153,7 +201,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           icon: 'login',
           confirmText: 'Go to Login',
           onConfirm: () => {
-            AsyncStorage.multiRemove(['valet_auth_token', 'valet_user_data']);
             navigation.navigate('Home');
           }
         });
@@ -162,64 +209,101 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
       let targetUserId: number;
       
-      if (routeUserId) {
-        targetUserId = routeUserId;
-        console.log('Using user ID from route params:', targetUserId);
+      // Use route param if provided, otherwise use authenticated user
+      if (route?.params?.userId) {
+        targetUserId = route.params.userId;
+        console.log('📋 Using user ID from route params:', targetUserId);
       } else {
-        const loggedInUser = JSON.parse(userData!);
-        targetUserId = loggedInUser.id;
-        console.log('Using logged-in user ID from storage:', targetUserId);
+        targetUserId = authUser.id;
+        console.log('📋 Using authenticated user ID:', targetUserId);
       }
 
-      // Fetch latest user data from API
-      await fetchUserFromAPI(targetUserId);
+      // Try to get fresh data from API, fallback to stored data
+      const apiUser = await fetchUserFromAPI(targetUserId);
+      
+      if (apiUser) {
+        console.log('✅ Using API user data');
+        setUser(apiUser);
+      } else if (authUser.id === targetUserId) {
+        console.log('✅ Using stored auth user data');
+        setUser(authUser as User);
+      } else {
+        throw new Error('User data not available');
+      }
+
+      await loadUserStats(targetUserId);
 
     } catch (error) {
       console.error('Error loading current user:', error);
-      showAlert({
-        title: 'Loading Error',
-        message: 'Couldn\'t load your profile. Please try logging in again.',
-        type: 'warning',
-        icon: 'warning',
-        confirmText: 'OK',
-        onConfirm: () => navigation.navigate('Home')
-      });
+      
+      if (isMountedRef.current) {
+        showAlert({
+          title: 'Loading Error',
+          message: 'Couldn\'t load your profile. Using cached data.',
+          type: 'warning',
+          icon: 'warning',
+          confirmText: 'OK'
+        });
+
+        // Fallback to auth user if available
+        if (authUser) {
+          setUser(authUser as User);
+        }
+      }
     } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
-  const fetchUserFromAPI = async (userId: number) => {
+  // 🔥 FIXED: Fetch user from API with better error handling
+  const fetchUserFromAPI = async (userId: number): Promise<User | null> => {
     try {
-      const response = await fetch('https://valet.up.railway.app/api/users', {
+      console.log('🌐 Fetching user data from API...');
+      
+      const response = await fetch('https://valet.up.railway.app/api/public/users', {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer 1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad',
           'User-Agent': 'VALET-Mobile/1.0',
         },
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        console.log(`⚠️ API response not OK: ${response.status}`);
+        return null;
       }
 
       const responseData = await response.json();
-      const users = responseData.users || responseData;
+      console.log('📊 API response received');
       
-      if (!Array.isArray(users)) {
-        throw new Error('Invalid API response format - users is not an array');
+      // Handle different response formats
+      let users: any[] = [];
+      if (Array.isArray(responseData)) {
+        users = responseData;
+      } else if (responseData.users && Array.isArray(responseData.users)) {
+        users = responseData.users;
+      } else if (responseData.data && Array.isArray(responseData.data)) {
+        users = responseData.data;
+      } else {
+        console.error('❌ Invalid API response format');
+        return null;
       }
 
       const currentUser = users.find((u: any) => u.id === userId);
 
       if (!currentUser) {
-        throw new Error(`User with ID ${userId} not found in API response`);
+        console.log(`❌ User with ID ${userId} not found in API`);
+        return null;
       }
 
-      console.log('👤 Current user found:', currentUser.name || currentUser.email);
+      console.log('👤 User found in API:', currentUser.name || currentUser.email);
 
+      // Check for admin users
       if (currentUser.role === 'admin') {
         showAlert({
           title: 'Access Restricted',
@@ -229,7 +313,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           confirmText: 'Understood',
           onConfirm: () => navigation.navigate('Home')
         });
-        return;
+        return null;
       }
 
       // Check if user account is active
@@ -244,85 +328,58 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             handleForceLogout();
           }
         });
-        return;
+        return null;
       }
 
-      // Update user data in local storage with latest from API (only if it's the logged-in user)
-      const storedUserData = await AsyncStorage.getItem('valet_user_data');
-      if (storedUserData) {
-        const storedUser = JSON.parse(storedUserData);
-        if (storedUser.id === userId) {
+      // Update stored user data if it's the current authenticated user
+      if (authUser && authUser.id === userId) {
+        try {
           await AsyncStorage.setItem('valet_user_data', JSON.stringify(currentUser));
+          console.log('💾 Updated stored user data');
+        } catch (error) {
+          console.error('Error updating stored user data:', error);
         }
       }
       
-      setUser(currentUser);
-      await loadUserStats(currentUser.id);
+      return currentUser;
 
     } catch (error: any) {
-      if (error.message.includes('not found in API')) {
-        showAlert({
-          title: 'Account Not Found',
-          message: 'Your account was not found in the system. Please contact support or try logging in again.',
-          type: 'warning',
-          icon: 'warning',
-          confirmText: 'Logout',
-          onConfirm: () => handleForceLogout()
-        });
-      } else if (error.message.includes('HTTP 404')) {
-        showAlert({
-          title: 'Service Unavailable',
-          message: 'The user service is currently unavailable. Please try again later.',
-          type: 'warning',
-          icon: 'warning',
-          confirmText: 'OK'
-        });
-      } else if (error.message.includes('Network') || error.message.includes('fetch')) {
-        showAlert({
-          title: 'Connection Error',
-          message: 'Cannot connect to the server. Please check your internet connection and try again.',
-          type: 'warning',
-          icon: 'warning',
-          confirmText: 'Retry',
-          onConfirm: () => loadCurrentUser()
-        });
-      } else {
-        showAlert({
-          title: 'Loading Error',
-          message: `Couldn't load profile data: ${error.message}`,
-          type: 'warning',
-          icon: 'warning',
-          confirmText: 'OK'
-        });
+      console.error('💥 Error fetching user from API:', error);
+      
+      if (error.message.includes('Network') || error.message.includes('fetch')) {
+        console.log('🌐 Network error, will use cached data');
       }
+      
+      return null;
     }
   };
 
   const handleForceLogout = async () => {
     try {
-      await AsyncStorage.multiRemove([
-        'valet_auth_token', 
-        'valet_user_data', 
-        '@valet_notification_settings'
-      ]);
-      navigation.navigate('Splash');
+      await logout();
+      navigation.navigate('Home');
     } catch (error) {
       console.error('Error during force logout:', error);
-      navigation.navigate('Splash');
+      navigation.navigate('Home');
     }
   };
 
   const loadUserStats = async (userId: number) => {
+    if (!isMountedRef.current) return;
+    
     try {
+      // Mock stats for now - replace with actual API call when available
       const mockStats: UserStats = {
         totalParkingSessions: Math.floor(Math.random() * 50) + 10,
         hoursParked: Math.floor(Math.random() * 200) + 50,
-        favoriteFloor: Math.floor(Math.random() * 3) + 1,
+        favoriteFloor: Math.floor(Math.random() * 4) + 1,
         lastParked: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
       };
       
-      setUserStats(mockStats);
-      console.log('✅ User stats loaded');
+      if (isMountedRef.current) {
+        setUserStats(mockStats);
+        console.log('✅ User stats loaded');
+      }
     } catch (error) {
       console.error('Error loading user stats:', error);
       // Stats are optional, don't show error
@@ -330,7 +387,10 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const onRefresh = () => {
+    if (!isMountedRef.current) return;
+    
     setRefreshing(true);
+    userFetchedRef.current = false; // Allow refetch
     loadCurrentUser();
   };
 
@@ -344,11 +404,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       cancelText: 'Cancel',
       onConfirm: async () => {
         try {
-          await AsyncStorage.multiRemove([
-            'valet_auth_token', 
-            'valet_user_data', 
-            '@valet_notification_settings'
-          ]);
+          await logout();
           
           showAlert({
             title: 'Signed Out',
@@ -440,139 +496,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     ];
   };
 
-  const renderDynamicFields = () => {
-    const fields = [];
-
-    // Email (always show if available)
-    if (user?.email) {
-      fields.push(
-        <View key="email">
-          <View style={styles.infoItem}>
-            <MaterialIcons name="email" size={20} color="#2196F3" />
-            <View style={styles.infoText}>
-              <Text style={styles.infoLabel}>Email Address</Text>
-              <Text style={styles.infoValue}>{user.email}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-        </View>
-      );
-    }
-
-    // ID Field (employee_id or student_id)
-    const idField = user?.employee_id || user?.student_id;
-    if (idField) {
-      fields.push(
-        <View key="id">
-          <View style={styles.infoItem}>
-            <MaterialIcons name="badge" size={20} color="#4CAF50" />
-            <View style={styles.infoText}>
-              <Text style={styles.infoLabel}>
-                {user?.employee_id ? 'Employee ID' : 'Student ID'}
-              </Text>
-              <Text style={styles.infoValue}>{idField}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-        </View>
-      );
-    }
-
-    // Role (simplified for users)
-    if (user?.role_display && user.role !== 'admin') {
-      fields.push(
-        <View key="role">
-          <View style={styles.infoItem}>
-            <MaterialIcons name={getUserTypeIcon(user?.role || '')} size={20} color="#2196F3" />
-            <View style={styles.infoText}>
-              <Text style={styles.infoLabel}>Role</Text>
-              <Text style={styles.infoValue}>{user?.role_display}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-        </View>
-      );
-    }
-
-    // Department
-    if (user?.department) {
-      fields.push(
-        <View key="department">
-          <View style={styles.infoItem}>
-            <MaterialIcons name="business" size={20} color="#FF9800" />
-            <View style={styles.infoText}>
-              <Text style={styles.infoLabel}>Department</Text>
-              <Text style={styles.infoValue}>{user.department}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-        </View>
-      );
-    }
-
-    // Course (for students)
-    if (user?.course) {
-      fields.push(
-        <View key="course">
-          <View style={styles.infoItem}>
-            <MaterialIcons name="school" size={20} color="#673AB7" />
-            <View style={styles.infoText}>
-              <Text style={styles.infoLabel}>Course</Text>
-              <Text style={styles.infoValue}>{user.course}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-        </View>
-      );
-    }
-
-    // Year Level (for students)
-    if (user?.year_level) {
-      fields.push(
-        <View key="year">
-          <View style={styles.infoItem}>
-            <MaterialIcons name="grade" size={20} color="#E91E63" />
-            <View style={styles.infoText}>
-              <Text style={styles.infoLabel}>Year Level</Text>
-              <Text style={styles.infoValue}>{user.year_level}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-        </View>
-      );
-    }
-
-    // Phone (if available)
-    if (user?.phone) {
-      fields.push(
-        <View key="phone">
-          <View style={styles.infoItem}>
-            <MaterialIcons name="phone" size={20} color="#4CAF50" />
-            <View style={styles.infoText}>
-              <Text style={styles.infoLabel}>Phone Number</Text>
-              <Text style={styles.infoValue}>{user.phone}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-        </View>
-      );
-    }
-
-    // Member Since (always show)
-    fields.push(
-      <View key="created">
-        <View style={styles.infoItem}>
-          <MaterialIcons name="access-time" size={20} color="#607D8B" />
-          <View style={styles.infoText}>
-            <Text style={styles.infoLabel}>Member Since</Text>
-            <Text style={styles.infoValue}>{formatDate(user?.created_at)}</Text>
-          </View>
-        </View>
-      </View>
-    );
-
-    return fields;
-  };
 
   const CustomAlert = () => {
     const getIconColor = () => {
@@ -669,13 +592,20 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
+  // Don't render if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
           <MaterialIcons name="person" size={48} color="#B71C1C" />
           <Text style={styles.loadingText}>Loading Your Profile...</Text>
-          <Text style={styles.loadingSubtext}>Fetching latest data from server</Text>
+          <Text style={styles.loadingSubtext}>
+            {authUser ? `Welcome ${authUser.name || authUser.email}` : 'Fetching latest data from server'}
+          </Text>
           <View style={styles.loadingBar}>
             <View style={styles.loadingProgress} />
           </View>
@@ -701,54 +631,44 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           style={styles.profileCard}
         >
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {user?.name ? getInitials(user.name) : 'U'}
-              </Text>
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {user?.name ? getInitials(user.name) : (authUser?.name ? getInitials(authUser.name) : 'U')}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.editAvatarButton}
+                onPress={handleEditProfilePhoto}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="camera-alt" size={14} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.userName}>{user?.name || 'Unknown User'}</Text>
+              <Text style={styles.userName}>
+                {user?.name || authUser?.name || 'Unknown User'}
+              </Text>
               <View style={styles.userStatusContainer}>
                 <Text style={styles.userType}>
-                  {user?.role_display || 'VALET User'} {(user?.employee_id || user?.student_id) && `• ${user?.employee_id || user?.student_id}`}
+                  {user?.email}
+                  
                 </Text>
-                {user?.is_active && (
+                 {(user?.is_active !== false) && (
                   <View style={styles.activeStatus}>
                     <MaterialIcons name="check-circle" size={12} color="#4CAF50" />
                     <Text style={styles.activeText}>Active</Text>
                   </View>
                 )}
+               
               </View>
-              {user?.department && (
-                <Text style={styles.userDepartment}>{user.department}</Text>
+              {(user?.department || authUser?.department) && (
+                <Text style={styles.userDepartment}>{user?.department || authUser?.department}</Text>
               )}
             </View>
           </View>
-          
-          <TouchableOpacity 
-            style={styles.editButton}
-            onPress={() => showAlert({
-              title: 'Edit Profile',
-              message: 'Profile editing is not available in the mobile app. Please contact your administrator to update your information.',
-              type: 'info',
-              icon: 'edit',
-              confirmText: 'Got it'
-            })}
-          >
-            <MaterialIcons name="edit" size={20} color="#FFFFFF" />
-            <Text style={styles.editButtonText}>Edit</Text>
-          </TouchableOpacity>
         </LinearGradient>
 
-        {/* Account Information Card - Dynamic Fields */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <MaterialIcons name="account-circle" size={20} color="#B71C1C" />
-            <Text style={styles.cardTitle}>Account Information</Text>
-          </View>
-          
-          {renderDynamicFields()}
-        </View>
 
         {/* Quick Actions Card - User Actions Only */}
         <View style={styles.card}>
@@ -810,7 +730,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.actionItem}
             onPress={() => showAlert({
               title: 'About VALET Mobile',
-              message: 'VALET Mobile - Your Parking Buddy!\nVersion 1.0.0 quickly and easily\n© 2025 VALET Team',
+              message: 'VALET Mobile - Your Parking Buddy!\nVersion 1.0.0\n© 2025 VALET Team',
               type: 'info',
               icon: 'info',
               confirmText: 'Cool!'
@@ -844,4 +764,5 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 };
+
 export default ProfileScreen;
