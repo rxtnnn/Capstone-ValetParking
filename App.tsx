@@ -21,6 +21,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import { NotificationService } from './src/services/NotificationService';
+import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
 
 Notifications.setNotificationHandler({
@@ -39,11 +40,12 @@ export type RootStackParamList = {
   Home: undefined;
   Floors: undefined;
   ParkingMap: { floor: number };
-  Feedback: undefined;
+  Feedback: { showReplies?: boolean };
   Settings: undefined;
   Profile: undefined;
   ApiTest: undefined;
   Login: undefined;
+  AdminReplies: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -207,6 +209,20 @@ const AppNavigator: React.FC = () => {
             header: () => (
               <GradientHeader 
                 title="Profile" 
+                navigation={navigation}
+                canGoBack={true}
+              />
+            ),
+          })}
+        />
+        <Stack.Screen 
+          name="AdminReplies" 
+          component={AdminRepliesSection}
+          options={({ navigation }) => ({
+            headerShown: true,
+            header: () => (
+              <GradientHeader 
+                title="Admin Replies" 
                 navigation={navigation}
                 canGoBack={true}
               />

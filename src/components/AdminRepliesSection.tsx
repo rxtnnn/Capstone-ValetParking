@@ -138,16 +138,6 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
 
   return (
     <View style={adminRepliesStyles.container}>
-      <View style={adminRepliesStyles.header}>
-        <Ionicons name="chatbubbles-outline" size={24} color="#B22020" />
-        <Text style={adminRepliesStyles.headerTitle}>Admin Replies</Text>
-        <View style={adminRepliesStyles.headerBadge}>
-          <Text style={adminRepliesStyles.headerBadgeText}>{feedbackWithReplies.length}</Text>
-        </View>
-        <TouchableOpacity onPress={handleRefresh} style={adminRepliesStyles.refreshButton}>
-          <Ionicons name="refresh" size={20} color="#6B7280" />
-        </TouchableOpacity>
-      </View>
 
       <ScrollView 
         style={adminRepliesStyles.scrollView}
@@ -156,29 +146,6 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* ✅ NEW: Development test button */}
-        {__DEV__ && (
-          <View style={{ padding: 16, backgroundColor: '#f8f9fa', margin: 16, borderRadius: 8 }}>
-            <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-              🧪 Development Tools
-            </Text>
-            <TouchableOpacity 
-              onPress={handleTestNotification}
-              style={{
-                backgroundColor: '#B22020',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 6,
-                alignSelf: 'flex-start',
-              }}
-            >
-              <Text style={{ color: 'white', fontSize: 11 }}>
-                Test Feedback Notification
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {feedbackWithReplies.map((item, index) => (
           <View key={item.id || index} style={adminRepliesStyles.replyCard}>
             {/* Original Feedback Header */}

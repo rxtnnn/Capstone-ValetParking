@@ -1,136 +1,167 @@
-// src/types/NotificationTypes.ts
+// src/types/NotifTypes.ts - Updated with userId support
+
+export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
+
 export interface BaseNotification {
   id: string;
-  type: 'spot_available' | 'floor_update' | 'feedback_reply' | 'general';
   title: string;
   message: string;
   timestamp: number;
   isRead: boolean;
-  priority: 'low' | 'normal' | 'high';
+  priority: NotificationPriority;
 }
 
+// 🔥 UPDATED: Enhanced data interfaces with userId
+export interface SpotAvailableData {
+  spotsAvailable: number;
+  floor?: number;
+  spotIds?: string[];
+  userId?: number; // 🔥 NEW: Add userId support
+}
+
+export interface FloorUpdateData {
+  floor: number;
+  availableSpots: number;
+  totalSpots: number;
+  previousAvailable?: number;
+  userId?: number; // 🔥 NEW: Add userId support
+}
+
+export interface FeedbackReplyData {
+  feedbackId: number;
+  originalFeedback: string;
+  adminReply: string;
+  adminName?: string;
+  replyTimestamp: number;
+  userId?: number; // 🔥 NEW: Add userId support
+}
+
+// 🔥 NEW: Generic notification data with userId
+export interface GenericNotificationData {
+  userId?: number;
+  [key: string]: any;
+}
+
+// 🔥 UPDATED: Specific notification types with proper data typing
 export interface SpotAvailableNotification extends BaseNotification {
   type: 'spot_available';
-  data: {
-    spotsAvailable: number;
-    floor?: number;
-    spotIds?: string[];
-  };
+  data: SpotAvailableData;
 }
 
 export interface FloorUpdateNotification extends BaseNotification {
   type: 'floor_update';
-  data: {
-    floor: number;
-    availableSpots: number;
-    totalSpots: number;
-    previousAvailable?: number;
-  };
+  data: FloorUpdateData;
 }
 
 export interface FeedbackReplyNotification extends BaseNotification {
   type: 'feedback_reply';
-  data: {
-    feedbackId: number;
-    originalFeedback: string;
-    adminReply: string;
-    adminName?: string;
-    replyTimestamp: number;
-  };
+  data: FeedbackReplyData;
 }
 
-export interface GeneralNotification extends BaseNotification {
-  type: 'general';
-  data: {
-    category?: string;
-    actionRequired?: boolean;
-  };
+// 🔥 NEW: Generic notification type for extensibility
+export interface GenericNotification extends BaseNotification {
+  type: string;
+  data: GenericNotificationData;
 }
 
+// 🔥 UPDATED: Union type with proper data types
 export type AppNotification = 
   | SpotAvailableNotification 
   | FloorUpdateNotification 
-  | FeedbackReplyNotification 
-  | GeneralNotification;
+  | FeedbackReplyNotification
+  | GenericNotification;
 
-// Additional type for notification settings
-export interface NotificationSettings {
-  spotAvailable: boolean;
-  floorUpdates: boolean;
-  maintenanceAlerts: boolean;
-  vibration: boolean;
-  sound: boolean;
-}
+// 🔥 NEW: Type guards for safe type checking
+export const isSpotAvailableNotification = (notification: AppNotification): notification is SpotAvailableNotification => {
+  return notification.type === 'spot_available';
+};
 
-// Type for notification listener callback
-export type NotificationListener = (notifications: AppNotification[]) => void;
+export const isFloorUpdateNotification = (notification: AppNotification): notification is FloorUpdateNotification => {
+  return notification.type === 'floor_update';
+};
 
-// Type for notification status
-export type NotificationStatus = 'enabled' | 'disabled' | 'permission_denied';
+export const isFeedbackReplyNotification = (notification: AppNotification): notification is FeedbackReplyNotification => {
+  return notification.type === 'feedback_reply';
+};
 
-// Type for notification priority levels
-export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
+// 🔥 NEW: Helper function to safely get userId from any notification
+export const getNotificationUserId = (notification: AppNotification): number | undefined => {
+  return notification.data?.userId;
+};
 
-// Interface for notification summary
-export interface NotificationSummary {
-  total: number;
-  unread: number;
-  recent: number;
-  byType: {
-    spot_available: number;
-    floor_update: number;
-    feedback_reply: number;
-    general: number;
+// 🔥 NEW: Helper function to set userId on notification data
+export const setNotificationUserId = (data: any, userId: number | null): any => {
+  return {
+    ...data,
+    userId: userId || undefined
   };
-}
+};
 
-// Interface for notification manager state
-export interface NotificationManagerState {
-  notifications: AppNotification[];
-  unreadCount: number;
-  lastUpdated: number;
-  isLoading: boolean;
-}
+// 🔥 NEW: Factory functions for creating typed notifications
+export const createSpotAvailableNotification = (
+  title: string,
+  message: string,
+  spotsAvailable: number,
+  floor?: number,
+  spotIds?: string[],
+  userId?: number
+): Omit<SpotAvailableNotification, 'id' | 'timestamp' | 'isRead'> => ({
+  type: 'spot_available',
+  title,
+  message,
+  priority: 'high',
+  data: {
+    spotsAvailable,
+    floor,
+    spotIds,
+    userId
+  }
+});
 
-// Enum for notification types (alternative to string literals)
-export enum NotificationType {
-  SPOT_AVAILABLE = 'spot_available',
-  FLOOR_UPDATE = 'floor_update',
-  FEEDBACK_REPLY = 'feedback_reply',
-  GENERAL = 'general'
-}
+export const createFloorUpdateNotification = (
+  title: string,
+  message: string,
+  floor: number,
+  availableSpots: number,
+  totalSpots: number,
+  previousAvailable?: number,
+  userId?: number
+): Omit<FloorUpdateNotification, 'id' | 'timestamp' | 'isRead'> => ({
+  type: 'floor_update',
+  title,
+  message,
+  priority: 'normal',
+  data: {
+    floor,
+    availableSpots,
+    totalSpots,
+    previousAvailable,
+    userId
+  }
+});
 
-// Enum for notification priorities
-export enum NotificationPriorityLevel {
-  LOW = 'low',
-  NORMAL = 'normal',
-  HIGH = 'high',
-  URGENT = 'urgent'
-}
+export const createFeedbackReplyNotification = (
+  title: string,
+  message: string,
+  feedbackId: number,
+  originalFeedback: string,
+  adminReply: string,
+  adminName?: string,
+  userId?: number
+): Omit<FeedbackReplyNotification, 'id' | 'timestamp' | 'isRead'> => ({
+  type: 'feedback_reply',
+  title,
+  message,
+  priority: 'high',
+  data: {
+    feedbackId,
+    originalFeedback,
+    adminReply,
+    adminName,
+    replyTimestamp: Date.now(),
+    userId
+  }
+});
 
-// Interface for creating new notifications (without auto-generated fields)
-export interface CreateNotificationData {
-  type: AppNotification['type'];
-  title: string;
-  message: string;
-  priority: NotificationPriority;
-  data: any;
-}
-
-// Interface for notification filter options
-export interface NotificationFilter {
-  type?: AppNotification['type'];
-  isRead?: boolean;
-  priority?: NotificationPriority;
-  dateFrom?: Date;
-  dateTo?: Date;
-  limit?: number;
-}
-
-// Interface for notification actions
-export interface NotificationAction {
-  id: string;
-  label: string;
-  action: () => void;
-  destructive?: boolean;
-}
+// 🔥 NEW: Type for notification creation (excludes auto-generated fields)
+export type CreateNotificationInput = Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>;

@@ -27,20 +27,22 @@ import { useFeedback } from '../hooks/useFeedback';
 import { FeedbackData } from '../types/feedback';
 import { getBasicDeviceInfo } from '../utils/deviceInfo';
 import { styles } from './styles/FeedbackScreen.style';
+import { NotificationManager } from '../services/NotifManager';
+import { useRoute, RouteProp } from '@react-navigation/native';
 
 type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   Floors: undefined;
   ParkingMap: { floor: number };
-  Feedback: undefined;
+  Feedback: { showReplies?: boolean };
   Settings: undefined;
   Profile: undefined;
   ApiTest: undefined;
 };
 
 type FeedbackScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Feedback'>;
-
+type FeedbackRouteProp = RouteProp<RootStackParamList, 'Feedback'>;
 interface Props {
   navigation: FeedbackScreenNavigationProp;
 }
@@ -68,31 +70,25 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
+const [refreshing, setRefreshing] = useState(false);
 
   // Use feedback hook
-  const { feedback, loading: repliesLoading, refreshFeedback } = useFeedback();
+  const { 
+    feedback, 
+    loading: repliesLoading, 
+    refreshFeedback, 
+    checkForNewReplies,  // 🔥 NEW: Get the new method
+    currentUserId        // 🔥 NEW: Get current user ID
+  } = useFeedback();
 
+  const route = useRoute<FeedbackRouteProp>();
+  const { showReplies: initialShowReplies } = route.params || {};
+  
   useEffect(() => {
-    const testApiConnection = async () => {
-      try {
-        console.log('Testing API connection...');
-        const isConnected = await ApiService.testConnection();
-        console.log('API connection test result:', isConnected);
-        
-        if (!isConnected) {
-          Alert.alert(
-            'Connection Issue',
-            'Unable to connect to the feedback system. Please check your internet connection.',
-            [{ text: 'OK' }]
-          );
-        }
-      } catch (error) {
-        console.error('API connection test failed:', error);
-      }
-    };
-
-    testApiConnection();
-  }, []);
+    if (initialShowReplies) {
+      setShowReplies(true);
+    }
+  }, [initialShowReplies]);
 
   // 🔥 UPDATED: More descriptive feedback types
   const feedbackTypes: FeedbackType[] = [
@@ -233,28 +229,40 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
       console.log('Submitting feedback data:', feedbackData);
 
+      // 🔥 UPDATED: Use the hook's submit method (which now uses dynamic user ID)
       const feedbackId = await ApiService.submitFeedback(feedbackData);
       
-      console.log('Feedback submitted successfully with ID:', feedbackId);
+      if (feedbackId) {
+        console.log('Feedback submitted successfully with ID:', feedbackId);
 
-      resetForm();
-      await refreshFeedback();
+        resetForm();
+        
+        // 🔥 NEW: Refresh both feedback and check for any new replies
+        await refreshFeedback();
+        
+        // 🔥 NEW: Check for immediate replies (in case admin responds quickly)
+        if (currentUserId) {
+          setTimeout(async () => {
+            await checkForNewReplies();
+          }, 2000); // Check after 2 seconds
+        }
 
-      Alert.alert(
-        'Thank You! 🙏',
-        `Your feedback has been submitted successfully.\n\n`,
-        [
-          { 
-            text: 'Submit Another', 
-            style: 'default'
-          },
-          { 
-            text: 'Done', 
-            style: 'cancel',
-            onPress: () => navigation.goBack() 
-          }
-        ]
-      );
+        Alert.alert(
+          'Thank You! 🙏',
+          `Your feedback has been submitted successfully.\n\nWe'll notify you when we respond to your feedback.`,
+          [
+            { 
+              text: 'Submit Another', 
+              style: 'default'
+            },
+            { 
+              text: 'Done', 
+              style: 'cancel',
+              onPress: () => navigation.goBack() 
+            }
+          ]
+        );
+      }
     } catch (error) {
       console.error('Error submitting feedback:', error);
       
@@ -262,7 +270,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       
       if (error instanceof Error) {
         if (error.message.includes('Authentication failed')) {
-          errorMessage = 'Authentication error. Please contact support.';
+          errorMessage = 'Authentication error. Please log in again.';
         } else if (error.message.includes('Validation failed')) {
           errorMessage = 'Please check your input and try again.';
         } else if (error.message.includes('Network')) {
@@ -281,6 +289,25 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
+  };
+const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      console.log('🔄 Refreshing feedback and checking for new replies...');
+      
+      // Refresh user's feedback
+      await refreshFeedback();
+      
+      // Check for new replies and update notifications
+      if (currentUserId) {
+        await checkForNewReplies();
+        await NotificationManager.checkForFeedbackReplies(currentUserId);
+      }
+      
+    } catch (error) {
+      console.error('Error refreshing notifications:', error);
+    }
+    setRefreshing(false);
   };
 
   const getPlaceholderText = (): string => {
@@ -378,8 +405,15 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const renderAdminReplies = () => {
-    if (feedbackWithReplies.length === 0) {
+   const renderAdminReplies = () => {
+    // Filter feedback to only show items for current user with replies
+    const userFeedbackWithReplies = feedback.filter(item => 
+      item.admin_response && 
+      item.admin_response.trim().length > 0 &&
+      (!currentUserId || item.user_id === currentUserId) // Ensure it belongs to current user
+    );
+
+    if (userFeedbackWithReplies.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
@@ -387,7 +421,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           <Text style={styles.emptyTitle}>No replies yet</Text>
           <Text style={styles.emptySubtitle}>
-            Admin responses to your feedback will appear here
+            Admin responses to your feedback will appear here.{'\n'}
+            You'll receive notifications when we reply!
           </Text>
           <TouchableOpacity 
             style={styles.emptyAction}
@@ -403,12 +438,13 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView 
         style={styles.repliesContainer}
         refreshControl={
-          <RefreshControl refreshing={repliesLoading} onRefresh={refreshFeedback} />
+          <RefreshControl refreshing={repliesLoading} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.repliesContent}
       >
-        {feedbackWithReplies.map((item, index) => (
+        
+        {userFeedbackWithReplies.map((item, index) => (
           <View key={item.id || index} style={styles.replyCard}>
             <View style={styles.replyHeader}>
               <View style={styles.replyTypeContainer}>
@@ -733,3 +769,4 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 export default FeedbackScreen;
+

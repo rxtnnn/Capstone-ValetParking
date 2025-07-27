@@ -20,9 +20,10 @@ import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from './styles/HomeScreen.style';
-// 🔥 NEW IMPORTS
+// NEW IMPORTS
 import { NotificationManager } from '../services/NotifManager';
 import NotificationOverlay from '../components/NotifOverlay';
+import { useFeedback } from '../hooks/useFeedback';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -93,7 +94,8 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { checkForNewReplies } = useFeedback();
   
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -115,12 +117,12 @@ const HomeScreen: React.FC = () => {
   const [showFullAlert, setShowFullAlert] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  // 🔥 NEW NOTIFICATION STATE
+  // NOTIFICATION STATE
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [lastParkingData, setLastParkingData] = useState<ParkingStats | null>(null);
 
-  // 🔥 NEW: Refs to prevent loops and track mount state
+  // Refs to prevent loops and track mount state
   const isMountedRef = useRef(true);
   const servicesInitializedRef = useRef(false);
   const userIdFetchedRef = useRef(false);
@@ -135,6 +137,8 @@ const HomeScreen: React.FC = () => {
 
         if (!isAuthenticated) {
           console.log('🔐 User not authenticated, redirecting to login');
+          // Clear notifications for logged out user
+          await NotificationManager.setCurrentUserId(null);
           navigation.navigate('Register');
           return;
         }
@@ -151,7 +155,7 @@ const HomeScreen: React.FC = () => {
       return () => {
         isActive = false;
       };
-    }, [isAuthenticated, navigation]) // Removed currentUserId from dependencies
+    }, [isAuthenticated, navigation])
   );
 
   // Function to get current user ID from storage
@@ -162,11 +166,19 @@ const HomeScreen: React.FC = () => {
       const userData = await AsyncStorage.getItem('valet_user_data');
       if (userData && isMountedRef.current) {
         const user = JSON.parse(userData);
-        setCurrentUserId(user.id);
-        console.log('📋 Current user ID set:', user.id);
+        const userId = user.id;
+        setCurrentUserId(userId);
         
-        // Check for feedback replies only after setting user ID
-        NotificationManager.checkForFeedbackReplies(user.id);
+        // Set user ID in notification manager
+        await NotificationManager.setCurrentUserId(userId);
+        
+        console.log('📋 Current user ID set:', userId);
+        
+        // Check for feedback replies for this specific user
+        await checkForNewReplies();
+        
+        // Additional check using NotificationManager
+        await NotificationManager.checkForFeedbackReplies(userId);
       }
     } catch (error) {
       console.error('Error getting current user ID:', error);
@@ -296,9 +308,8 @@ const HomeScreen: React.FC = () => {
     };
   };
 
-  // Function to check for parking changes and trigger notifications
   const checkParkingChanges = (newData: ParkingStats) => {
-    if (!lastParkingData || !isMountedRef.current) {
+    if (!lastParkingData || !isMountedRef.current || !currentUserId) {
       setLastParkingData(newData);
       return;
     }
@@ -314,6 +325,7 @@ const HomeScreen: React.FC = () => {
           prev.available > current.available ? prev : current
         );
         
+        // Notifications will now be tagged with current user ID
         NotificationManager.addSpotAvailableNotification(
           increase,
           bestFloor.floor
@@ -325,6 +337,7 @@ const HomeScreen: React.FC = () => {
         const oldFloor = lastParkingData.floors.find(f => f.floor === newFloor.floor);
         
         if (oldFloor && oldFloor.available !== newFloor.available) {
+          // Floor notifications will be tagged with current user ID
           NotificationManager.addFloorUpdateNotification(
             newFloor.floor,
             newFloor.available,
@@ -340,7 +353,7 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  // 🔥 FIXED: Main useEffect with comprehensive loop prevention
+  // 🔥 FIXED: Main useEffect - removed nested useEffect
   useEffect(() => {
     isMountedRef.current = true;
     
@@ -376,9 +389,15 @@ const HomeScreen: React.FC = () => {
           setConnectionStatus(status);
         });
 
-        // Subscribe to notifications with mount check
+        // Subscribe to user-specific notifications
         unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
           if (!isMountedRef.current) return;
+          
+          // Only update count if notifications belong to current user
+          const userNotifications = notifications.filter(n => 
+            !currentUserId || !n.data?.userId || n.data.userId === currentUserId
+          );
+          
           setUnreadNotificationCount(NotificationManager.getUnreadCount());
         });
 
@@ -441,8 +460,27 @@ const HomeScreen: React.FC = () => {
         console.error('Error stopping RealTimeParkingService:', error);
       }
     };
-  }, [isAuthenticated]); // Only depend on authentication status
+  }, [isAuthenticated, currentUserId]); // 🔥 FIXED: Added proper dependencies
 
+  // 🔥 FIXED: Separate useEffect for periodic feedback checks
+  useEffect(() => {
+    if (!currentUserId || !isAuthenticated) return;
+
+    const checkFeedbackInterval = setInterval(async () => {
+      try {
+        console.log('🔔 Periodic check for new feedback replies...');
+        await checkForNewReplies();
+      } catch (error) {
+        console.error('Error in periodic feedback check:', error);
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => {
+      clearInterval(checkFeedbackInterval);
+    };
+  }, [currentUserId, isAuthenticated, checkForNewReplies]);
+
+  // 🔥 FIXED: Single onRefresh function with proper implementation
   const onRefresh = async () => {
     if (!isAuthenticated || !isMountedRef.current) {
       console.log('⚠️ Cannot refresh - not authenticated or not mounted');
@@ -452,6 +490,12 @@ const HomeScreen: React.FC = () => {
     setRefreshing(true);
     try {
       await RealTimeParkingService.forceUpdate();
+      
+      // Also refresh feedback replies during pull-to-refresh
+      if (currentUserId) {
+        await checkForNewReplies();
+        await NotificationManager.checkForFeedbackReplies(currentUserId);
+      }
     } catch (error) {
       console.error('Error during refresh:', error);
       if (isAuthenticated && isMountedRef.current) {
@@ -544,7 +588,7 @@ const HomeScreen: React.FC = () => {
           </View>
           
           <View style={styles.headerIcons}>
-            {/* 🔥 ENHANCED NOTIFICATION BUTTON WITH BADGE */}
+            {/* ENHANCED NOTIFICATION BUTTON WITH BADGE */}
             <TouchableOpacity 
               style={styles.iconButton} 
               onPress={() => setShowNotifications(true)}
@@ -784,7 +828,7 @@ const HomeScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* 🔥 NEW: Notification Overlay */}
+      {/* NEW: Notification Overlay */}
       <NotificationOverlay
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}
@@ -812,6 +856,5 @@ const HomeScreen: React.FC = () => {
     </View>
   );
 };
-
 
 export default HomeScreen;
