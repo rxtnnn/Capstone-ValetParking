@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     maxHeight: '90%',
-    minHeight: 500,
+    minHeight: 450,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -395,9 +395,6 @@ const styles = StyleSheet.create({
   },
   refreshButtonLoading: {
     backgroundColor: '#f5f5f5',
-  },
-  refreshIconSpinning: {
-    // Add rotation animation if desired
   },
   filterContainer: {
     paddingHorizontal: 20,

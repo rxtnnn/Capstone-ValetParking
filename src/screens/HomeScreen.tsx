@@ -169,29 +169,6 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              navigation.navigate('Register');
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const extractFloorFromLocation = (floor_level: string): number => {
     if (!floor_level) {
       return 1;
@@ -487,9 +464,6 @@ const HomeScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Settings')}>
               <Ionicons name="settings-outline" size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={24} color="white" />
             </TouchableOpacity>
           </View>
         </View>

@@ -86,24 +86,63 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     testApiConnection();
   }, []);
 
+  // 🔥 UPDATED: More appropriate feedback types for parking app
   const feedbackTypes: FeedbackType[] = [
-    { value: 'general', label: 'General Feedback', icon: 'chatbubble-outline' },
-    { value: 'bug', label: 'Report Bug', icon: 'bug-outline' },
-    { value: 'feature', label: 'Feature Request', icon: 'bulb-outline' },
-    { value: 'parking', label: 'Parking Issue', icon: 'car-outline' },
+    { value: 'general', label: 'App Experience', icon: 'star-outline' },
+    { value: 'parking', label: 'Parking Issues', icon: 'car-outline' },
+    { value: 'technical', label: 'Technical Problems', icon: 'settings-outline' },
+    { value: 'suggestion', label: 'Suggestions', icon: 'bulb-outline' },
   ];
 
-  // Common issues for bug reports and parking issues
-  const commonIssues = [
-    'Sensor not working',
-    'App performance',
-    'Incorrect spot status',
-    'Navigation issues',
-    'Notification problems',
-    'UI/UX concerns',
-    'Connection problems',
-    'Data not updating',
-  ];
+  // 🔥 UPDATED: More specific and relevant issues
+  const getIssuesForType = (type: FeedbackData['type']): string[] => {
+    switch (type) {
+      case 'parking':
+        return [
+          'Sensor shows wrong status',
+          'Spot marked occupied but empty',
+          'Spot marked available but occupied',
+          'Floor map not updating',
+          'Cannot find parking spot',
+          'Incorrect floor information',
+          'Navigation to spot unclear',
+          'Real-time data not working'
+        ];
+      case 'technical':
+        return [
+          'App crashes frequently',
+          'Slow loading times',
+          'Login/logout issues',
+          'Notifications not working',
+          'Map not loading properly',
+          'Internet connection problems',
+          'App freezes or hangs',
+          'Data not syncing properly'
+        ];
+      case 'suggestion':
+        return [
+          'Better navigation features',
+          'Improved spot reservation',
+          'More detailed floor maps',
+          'Better notification system',
+          'Dark mode option',
+          'Offline mode support',
+          'Integration with calendar',
+          'Voice guidance features'
+        ];
+      default:
+        return [
+          'User interface design',
+          'App performance',
+          'Feature availability',
+          'Ease of use',
+          'Information accuracy',
+          'Response time',
+          'Overall satisfaction',
+          'Recommendation likelihood'
+        ];
+    }
+  };
 
   // Rating handler
   const handleRatingPress = (value: number) => {
@@ -190,7 +229,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         message: message.trim(),
         deviceInfo: deviceInfo,
         feedback_type: feedbackType === 'parking' ? 'parking_experience' : 
-                     (feedbackType === 'general' ? 'general' : 'app_usage'),
+                     feedbackType === 'technical' ? 'technical_issue' :
+                     feedbackType === 'suggestion' ? 'feature_request' : 'general',
         parking_location: feedbackType === 'parking' ? 'Mobile App Feedback' : undefined,
       };
 
@@ -265,19 +305,47 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // Get placeholder text based on feedback type
+  // 🔥 UPDATED: Get appropriate placeholder text
   const getPlaceholderText = (): string => {
     switch (feedbackType) {
       case 'general':
-        return "Tell us what you think about the VALET app. What do you like? What could be improved?";
-      case 'bug':
-        return "Describe the bug you encountered. Please include when it happened and what you were trying to do.";
-      case 'feature':
-        return "What feature would you like to see in VALET? How would it help you?";
+        return "How was your experience with VALET? What did you like or dislike about the app?";
       case 'parking':
-        return "Describe the parking issue you experienced. Which floor/section was affected?";
+        return "Describe the parking issue you encountered. Which floor or section was affected? When did this happen?";
+      case 'technical':
+        return "What technical problem did you experience? Please describe what happened and when it occurred.";
+      case 'suggestion':
+        return "What feature or improvement would you like to see in VALET? How would it make your parking experience better?";
       default:
         return "Please share your feedback with us...";
+    }
+  };
+
+  // 🔥 UPDATED: Get section title for issues
+  const getIssuesSectionTitle = (): string => {
+    switch (feedbackType) {
+      case 'parking':
+        return 'Common Parking Issues (Optional)';
+      case 'technical':
+        return 'Technical Problems (Optional)';
+      case 'suggestion':
+        return 'Improvement Areas (Optional)';
+      default:
+        return 'Related Issues (Optional)';
+    }
+  };
+
+  // 🔥 UPDATED: Get section subtitle for issues
+  const getIssuesSectionSubtitle = (): string => {
+    switch (feedbackType) {
+      case 'parking':
+        return 'Select any parking-related issues you experienced';
+      case 'technical':
+        return 'Select any technical problems you encountered';
+      case 'suggestion':
+        return 'Select areas where you think VALET could improve';
+      default:
+        return 'Select any that apply to help us understand your feedback better';
     }
   };
 
@@ -285,7 +353,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const renderStarRating = () => {
     return (
       <View style={styles.ratingContainer}>
-        <Text style={styles.ratingLabel}>How would you rate your experience?</Text>
+        <Text style={styles.ratingLabel}>How would you rate your overall experience with VALET?</Text>
         <View style={styles.starsContainer}>
           {[1, 2, 3, 4, 5].map((star) => (
             <TouchableOpacity
@@ -305,10 +373,10 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         {rating > 0 && (
           <View style={styles.ratingTextContainer}>
             <Text style={styles.ratingText}>
-              {rating === 1 && '😞 Poor'}
-              {rating === 2 && '😐 Fair'}
-              {rating === 3 && '🙂 Good'}
-              {rating === 4 && '😊 Very Good'}
+              {rating === 1 && '😞 Very Poor'}
+              {rating === 2 && '😐 Poor'}
+              {rating === 3 && '🙂 Average'}
+              {rating === 4 && '😊 Good'}
               {rating === 5 && '🤩 Excellent'}
             </Text>
           </View>
@@ -334,14 +402,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Feedback</Text>
           </View>
-          <View style={styles.headerPlaceholder} />
         </View>
         
-        <View style={styles.headerDescriptionContainer}>
-          <Text style={styles.headerDescription}>
-            Help us improve VALET by sharing your thoughts and experiences
-          </Text>
-        </View>
       </LinearGradient>
 
       <KeyboardAvoidingView
@@ -366,7 +428,10 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                     styles.feedbackTypeCard,
                     feedbackType === type.value && styles.selectedFeedbackTypeCard
                   ]}
-                  onPress={() => setFeedbackType(type.value)}
+                  onPress={() => {
+                    setFeedbackType(type.value);
+                    setSelectedIssues([]); // Reset issues when changing type
+                  }}
                   activeOpacity={0.8}
                 >
                   <View style={[
@@ -399,16 +464,16 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
 
-          {/* Common Issues (for bug reports and parking issues) */}
-          {(feedbackType === 'bug' || feedbackType === 'parking') && (
+          {/* Issues Section (for all types except general) */}
+          {feedbackType !== 'general' && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Related Issues (Optional)</Text>
+              <Text style={styles.sectionTitle}>{getIssuesSectionTitle()}</Text>
               <Text style={styles.sectionSubtitle}>
-                Select any that apply to help us understand your issue better
+                {getIssuesSectionSubtitle()}
               </Text>
               <View style={styles.card}>
                 <View style={styles.chipsContainer}>
-                  {commonIssues.map((issue) => (
+                  {getIssuesForType(feedbackType).map((issue) => (
                     <TouchableOpacity
                       key={issue}
                       style={[
@@ -518,7 +583,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.contactTitle}>Need immediate assistance?</Text>
               </View>
               <Text style={styles.contactText}>
-                Contact our support team for urgent issues:
+                Contact our support team for urgent parking issues:
               </Text>
               <View style={styles.contactMethods}>
                 <TouchableOpacity style={styles.contactMethod} activeOpacity={0.7}>
@@ -545,8 +610,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.privacyTitle}>Privacy Notice</Text>
               </View>
               <Text style={styles.privacyText}>
-                Your feedback is important to us. We collect device information to help us improve our service. 
-                Your email will only be used to follow up on your feedback if requested.
+                Your feedback helps us improve VALET. We collect basic device information to help diagnose issues. 
+                Your email will only be used to follow up on your feedback if you request it.
               </Text>
             </View>
           </View>
