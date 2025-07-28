@@ -1,4 +1,3 @@
-// Updated NotificationOverlay.tsx - Fixed TypeScript types
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -10,41 +9,262 @@ import {
   Animated,
   RefreshControl,
   TouchableWithoutFeedback,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { AppNotification, getNotificationUserId } from '../types/NotifTypes'; // 🔥 UPDATED: Import helper function
+import { AppNotification, getNotificationUserId } from '../types/NotifTypes';
 import { NotificationManager } from '../services/NotifManager';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { useFeedback } from '../hooks/useFeedback';
 import ApiService from '../services/ApiService';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../../App';
+import { useNavigation } from '@react-navigation/native';
+
 interface NotificationOverlayProps {
   visible: boolean;
   onClose: () => void;
   userId?: number;
 }
 
+// 🔥 FIXED: Swipeable Notification Item Component
+interface SwipeableNotificationItemProps {
+  notification: AppNotification;
+  onPress: (notification: AppNotification) => void;
+  onDelete: (notificationId: string) => void;
+  getNotificationIcon: (type: AppNotification['type']) => React.ReactNode;
+  formatTime: (timestamp: number) => string;
+}
+
+const SwipeableNotificationItem: React.FC<SwipeableNotificationItemProps> = ({
+  notification,
+  onPress,
+  onDelete,
+  getNotificationIcon,
+  formatTime,
+}) => {
+  const [translateX] = useState(new Animated.Value(0));
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteButton, setShowDeleteButton] = useState(false);
+
+  const SWIPE_THRESHOLD = -80; // Minimum swipe distance to show delete
+  const DELETE_THRESHOLD = -120; // Swipe distance to auto-delete
+
+  // 🔥 FIXED: Create PanResponder for swipe handling
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: (evt, gestureState) => {
+      // Only respond to horizontal swipes
+      return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 5;
+    },
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      // Activate when swiping left with sufficient movement
+      return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+    },
+    onPanResponderGrant: () => {
+      // Set initial value without offset to avoid accumulation
+      translateX.stopAnimation();
+      translateX.setOffset(0);
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      // Only allow left swipes (negative values)
+      if (gestureState.dx <= 0) {
+        translateX.setValue(gestureState.dx);
+      }
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      const swipeDistance = gestureState.dx;
+      const swipeVelocity = gestureState.vx;
+
+      // Consider velocity for more responsive interaction
+      if (swipeDistance <= DELETE_THRESHOLD || swipeVelocity < -0.5) {
+        // Auto-delete if swiped far enough or fast enough
+        handleDelete();
+      } else if (swipeDistance <= SWIPE_THRESHOLD) {
+        // Show delete button
+        setShowDeleteButton(true);
+        Animated.spring(translateX, {
+          toValue: SWIPE_THRESHOLD,
+          useNativeDriver: false,
+          tension: 100,
+          friction: 8,
+        }).start();
+      } else {
+        // Snap back to original position
+        resetSwipe();
+      }
+    },
+    onPanResponderTerminate: () => {
+      resetSwipe();
+    },
+  }), [translateX]);
+
+  // 🔥 FIXED: Reset swipe position
+  const resetSwipe = () => {
+    setShowDeleteButton(false);
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: false,
+      tension: 100,
+      friction: 8,
+    }).start();
+  };
+
+  // 🔥 FIXED: Handle delete action
+  const handleDelete = () => {
+    if (isDeleting) return;
+    
+    setIsDeleting(true);
+    
+    // Animate item sliding out
+    Animated.timing(translateX, {
+      toValue: -Dimensions.get('window').width,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      onDelete(notification.id);
+    });
+  };
+
+  // 🔥 FIXED: Handle notification press (prevent when swiped)
+  const handleNotificationPress = () => {
+    if (showDeleteButton) {
+      resetSwipe();
+    } else {
+      onPress(notification);
+    }
+  };
+
+  const notificationData = notification.data as any;
+  const isFeedbackReply = notification.type === 'feedback_reply';
+  const isSpotAvailable = notification.type === 'spot_available';
+
+  return (
+    <View style={styles.swipeContainer}>
+      {/* 🔥 FIXED: Delete button background */}
+      <View style={styles.deleteButtonContainer}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDelete}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="trash" size={20} color="white" />
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 🔥 FIXED: Swipeable notification content */}
+      <Animated.View
+        style={[
+          styles.swipeableContent,
+          {
+            transform: [{ translateX }],
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity
+          style={[
+            styles.notificationItem,
+            !notification.isRead && styles.unreadNotification,
+            isDeleting && styles.deletingNotification,
+          ]}
+          onPress={handleNotificationPress}
+          activeOpacity={0.8}
+          disabled={isDeleting}
+        >
+          <View style={styles.notificationContent}>
+            <View style={styles.notificationHeader}>
+              <View style={styles.iconContainer}>
+                {getNotificationIcon(notification.type)}
+              </View>
+              <View style={styles.notificationTextContainer}>
+                <Text style={[
+                  styles.notificationTitle,
+                  !notification.isRead && styles.unreadText
+                ]}>
+                  {notification.title}
+                </Text>
+                <Text style={styles.notificationTime}>
+                  {formatTime(notification.timestamp)}
+                </Text>
+              </View>
+              {!notification.isRead && (
+                <View style={styles.unreadDot} />
+              )}
+              {/* 🔥 FIXED: Swipe indicator */}
+              <View style={styles.swipeIndicator}>
+                <Ionicons name="chevron-back" size={12} color="#ccc" />
+              </View>
+            </View>
+            
+            <Text style={[
+              styles.notificationMessage,
+              !notification.isRead && styles.unreadText
+            ]}>
+              {notification.message}
+            </Text>
+
+            {/* Enhanced details for feedback replies */}
+            {isFeedbackReply && notificationData?.feedbackId && (
+              <View style={styles.feedbackDetails}>
+                <View style={styles.feedbackIdContainer}>
+                  <Text style={styles.feedbackIdText}>
+                    Feedback #{notificationData.feedbackId}
+                  </Text>
+                </View>
+                {notificationData.feedbackPreview && (
+                  <Text style={styles.feedbackPreview}>
+                    Re: "{notificationData.feedbackPreview}"
+                  </Text>
+                )}
+                <Text style={styles.actionHint}>
+                  Tap to view reply in Feedback screen
+                </Text>
+              </View>
+            )}
+
+            {/* Enhanced details for parking notifications */}
+            {isSpotAvailable && (
+              <View style={styles.parkingDetails}>
+                {notificationData?.floor && (
+                  <Text style={styles.floorInfo}>
+                    Floor {notificationData.floor}
+                  </Text>
+                )}
+                {notificationData?.spotsAvailable && (
+                  <Text style={styles.spotsInfo}>
+                    {notificationData.spotsAvailable} spot{notificationData.spotsAvailable > 1 ? 's' : ''} available
+                  </Text>
+                )}
+                <Text style={styles.actionHint}>
+                  Tap to view parking map
+                </Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+};
+
 const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
   visible,
   onClose,
   userId,
 }) => {
-  type FeedbackScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Feedback'>;
-  const navigation = useNavigation<FeedbackScreenNavigationProp>();
-
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isRefreshIconLoading, setIsRefreshIconLoading] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'parking' | 'feedback'>('all');
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const scaleAnim = useState(new Animated.Value(0.9))[0];
-  const spinAnim = useState(new Animated.Value(0))[0];
+  const [filter, setFilter] = useState<'all' | 'unread' | 'spots' | 'feedback'>('all');
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(0.9));
+  const [spinAnim] = useState(new Animated.Value(0));
+
+  const navigation = useNavigation();
 
   // Use feedback hook for API integration
-  const { checkForNewReplies, currentUserId } = useFeedback();
+  const { checkForNewReplies, currentUserId, feedbackStats } = useFeedback();
   
   // State for user info display
   const [userInfo, setUserInfo] = useState<{ id: number | null; email?: string }>({ id: null });
@@ -93,7 +313,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
       // Check for new feedback replies with proper user ID
       const effectiveUserId = userId || currentUserId || userInfo.id;
       if (effectiveUserId) {
-        console.log('🔔 Checking for feedback replies for user:', effectiveUserId);
+        console.log('🔔 NotificationOverlay: Checking for feedback replies for user:', effectiveUserId);
         NotificationManager.checkForFeedbackReplies(effectiveUserId);
         checkForNewReplies();
       }
@@ -116,27 +336,32 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     }
   }, [visible, userId, currentUserId, userInfo.id, fadeAnim, scaleAnim, checkForNewReplies]);
 
-  // Enhanced refresh with API integration
+  // Enhanced refresh with comprehensive API integration
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       const effectiveUserId = userId || currentUserId || userInfo.id;
       
       if (effectiveUserId) {
-        console.log('🔄 Refreshing notifications for user:', effectiveUserId);
+        console.log('🔄 NotificationOverlay: Comprehensive refresh for user:', effectiveUserId);
         
-        // Get fresh feedback data from API
-        const feedbackWithReplies = await ApiService.getUserFeedbackWithReplies(effectiveUserId);
+        // Get ALL feedback to catch new replies
+        const [allFeedback, feedbackWithReplies] = await Promise.all([
+          ApiService.getUserFeedback(effectiveUserId),
+          ApiService.getUserFeedbackWithReplies(effectiveUserId)
+        ]);
         
-        // Process the feedback for notifications
-        if (feedbackWithReplies.length > 0) {
-          await NotificationManager.processFeedbackReplies(feedbackWithReplies);
+        console.log(`📊 Refresh results: ${allFeedback.length} total feedback, ${feedbackWithReplies.length} with replies`);
+        
+        // Process all feedback for potential new notifications
+        if (allFeedback.length > 0) {
+          await NotificationManager.processFeedbackReplies(allFeedback);
         }
         
-        // Also check using the hook
+        // Also check using the hook for additional safety
         await checkForNewReplies();
         
-        console.log(`✅ Found ${feedbackWithReplies.length} feedback items with replies`);
+        console.log(`✅ Notification refresh completed`);
       } else {
         console.warn('⚠️ No user ID available for refresh');
       }
@@ -146,7 +371,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     setRefreshing(false);
   };
 
-  // Enhanced refresh icon with API calls
+  // Enhanced refresh icon with comprehensive refresh
   const handleRefreshIconPress = async () => {
     setIsRefreshIconLoading(true);
     
@@ -162,22 +387,23 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     spinAnimation.start();
     
     try {
-      console.log('🔄 Manual refresh triggered...');
+      console.log('🔄 Manual notification refresh triggered...');
       
       const effectiveUserId = userId || currentUserId || userInfo.id;
       
       if (effectiveUserId) {
         // Comprehensive refresh with multiple API calls
         await Promise.all([
-          // Check for new feedback replies via API
+          // Get fresh feedback data and process for notifications
           (async () => {
             try {
-              const feedbackWithReplies = await ApiService.getUserFeedbackWithReplies(effectiveUserId);
-              if (feedbackWithReplies.length > 0) {
-                await NotificationManager.processFeedbackReplies(feedbackWithReplies);
+              const allFeedback = await ApiService.getUserFeedback(effectiveUserId);
+              if (allFeedback.length > 0) {
+                await NotificationManager.processFeedbackReplies(allFeedback);
+                console.log(`📱 Processed ${allFeedback.length} feedback items for notifications`);
               }
             } catch (error) {
-              console.error('Error fetching feedback replies:', error);
+              console.error('Error in comprehensive feedback refresh:', error);
             }
           })(),
           
@@ -196,7 +422,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
           })(),
         ]);
         
-        console.log('✅ Manual refresh completed for user:', effectiveUserId);
+        console.log('✅ Comprehensive manual refresh completed for user:', effectiveUserId);
       } else {
         console.warn('⚠️ No user ID available for manual refresh');
       }
@@ -213,7 +439,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     }, 1000);
   };
 
-  // 🔥 UPDATED: Enhanced filtering with proper type checking
+  // Enhanced filtering
   const filteredNotifications = useMemo(() => {
     const effectiveUserId = userId || currentUserId || userInfo.id;
     
@@ -222,7 +448,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     // Filter by user ID if available
     if (effectiveUserId) {
       userNotifications = notifications.filter(n => {
-        const notifUserId = getNotificationUserId(n); // 🔥 FIXED: Use helper function
+        const notifUserId = getNotificationUserId(n);
         return !notifUserId || notifUserId === effectiveUserId;
       });
     }
@@ -231,11 +457,8 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     switch (filter) {
       case 'unread':
         return userNotifications.filter(n => !n.isRead);
-      case 'parking':
-        return userNotifications.filter(n => 
-          n.type === 'spot_available' || 
-          n.type === 'floor_update'
-        );
+      case 'spots':
+        return userNotifications.filter(n => n.type === 'spot_available');
       case 'feedback':
         return userNotifications.filter(n => n.type === 'feedback_reply');
       default:
@@ -247,8 +470,6 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     switch (type) {
       case 'spot_available':
         return <Ionicons name="car" size={20} color="#48D666" />;
-      case 'floor_update':
-        return <Ionicons name="layers" size={20} color="#2196F3" />;
       case 'feedback_reply':
         return <Ionicons name="chatbubble" size={20} color="#B22020" />;
       default:
@@ -268,14 +489,40 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     return new Date(timestamp).toLocaleDateString();
   };
 
+  // Handle notification press with navigation
   const handleNotificationPress = async (notification: AppNotification) => {
     if (!notification.isRead) {
       await NotificationManager.markAsRead(notification.id);
     }
 
+    // Handle different notification types with proper navigation
     if (notification.type === 'feedback_reply') {
-      onClose(); // close overlay
-      navigation.navigate('Feedback', { showReplies: true }); // ✅ navigate to AdminReplies screen, type assertion to fix TS error
+      const feedbackId = (notification.data as any)?.feedbackId;
+      console.log(`📱 Feedback reply notification pressed - Feedback ID: ${feedbackId}`);
+      
+      onClose(); // Close overlay
+      
+      // Navigate to feedback screen and show replies
+      (navigation as any).navigate('Feedback', { showReplies: true, focusFeedbackId: feedbackId });
+    } else if (notification.type === 'spot_available') {
+      const floor = (notification.data as any)?.floor;
+      const spotsAvailable = (notification.data as any)?.spotsAvailable;
+      console.log(`🚗 Parking spots notification pressed - Floor: ${floor}, Spots: ${spotsAvailable}`);
+      
+      onClose(); // Close overlay
+      
+      // Navigate to parking map (with floor info if available)
+      (navigation as any).navigate('ParkingMap', floor ? { floor } : undefined);
+    }
+  };
+
+  // 🔥 FIXED: Handle notification deletion
+  const handleNotificationDelete = async (notificationId: string) => {
+    try {
+      console.log(`🗑️ Deleting notification: ${notificationId}`);
+      await NotificationManager.deleteNotification(notificationId);
+    } catch (error) {
+      console.error('Error deleting notification:', error);
     }
   };
 
@@ -292,56 +539,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     outputRange: ['0deg', '360deg'],
   });
 
-  const renderNotificationItem = (notification: AppNotification) => {
-    const notificationData = notification.data as any; // Type assertion for mixed data types
-
-    return (
-      <TouchableOpacity
-        key={notification.id}
-        style={[
-          styles.notificationItem,
-          !notification.isRead && styles.unreadNotification
-        ]}
-        onPress={() => handleNotificationPress(notification)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.notificationContent}>
-          <View style={styles.notificationHeader}>
-            <View style={styles.iconContainer}>
-              {getNotificationIcon(notification.type)}
-            </View>
-            <View style={styles.notificationTextContainer}>
-              <Text style={[
-                styles.notificationTitle,
-                !notification.isRead && styles.unreadText
-              ]}>
-                {notification.title}
-              </Text>
-              <Text style={styles.notificationTime}>
-                {formatTime(notification.timestamp)}
-              </Text>
-            </View>
-          </View>
-          
-          <Text style={[
-            styles.notificationMessage,
-            !notification.isRead && styles.unreadText
-          ]}>
-            {notification.message}
-          </Text>
-          
-          {/* Show feedback ID for feedback replies (debug mode) */}
-          {__DEV__ && notification.type === 'feedback_reply' && notificationData?.feedbackId && (
-            <Text style={styles.debugText}>
-              Feedback ID: {notificationData.feedbackId}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // 🔥 UPDTED: Helper function for counting user-specific notifications
+  // Helper function for counting user-specific notifications
   const getNotificationCount = (type?: string) => {
     const effectiveUserId = userId || currentUserId || userInfo.id;
     
@@ -356,8 +554,8 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
       switch (type) {
         case 'unread':
           return !n.isRead;
-        case 'parking':
-          return n.type === 'spot_available' || n.type === 'floor_update';
+        case 'spots':
+          return n.type === 'spot_available';
         case 'feedback':
           return n.type === 'feedback_reply';
         default:
@@ -390,6 +588,10 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
               <View style={styles.header}>
                 <View style={styles.headerLeft}>
                   <Text style={styles.headerTitle}>Notifications</Text>
+                  {/* 🔥 FIXED: Swipe hint */}
+                  <Text style={styles.swipeHint}>
+                    Swipe left to delete notifications
+                  </Text>
                 </View>
                 <TouchableOpacity 
                   onPress={handleRefreshIconPress} 
@@ -410,7 +612,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* 🔥 UPDATED: Filter tabs with proper counts */}
+              {/* Filter tabs */}
               <View style={styles.filterContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {[
@@ -425,9 +627,9 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
                       count: getNotificationCount('unread')
                     },
                     { 
-                      key: 'parking', 
-                      label: 'Parking', 
-                      count: getNotificationCount('parking')
+                      key: 'spots',
+                      label: 'Parking Spots', 
+                      count: getNotificationCount('spots')
                     },
                     { 
                       key: 'feedback', 
@@ -454,7 +656,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
                 </ScrollView>
               </View>
 
-              {/* Notifications List */}
+              {/* 🔥 FIXED: Notifications List with swipe-to-delete */}
               <ScrollView
                 style={styles.notificationsList}
                 refreshControl={
@@ -468,15 +670,36 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
                 showsVerticalScrollIndicator={false}
               >
                 {filteredNotifications.length > 0 ? (
-                  filteredNotifications.map(renderNotificationItem)
+                  filteredNotifications.map(notification => (
+                    <SwipeableNotificationItem
+                      key={notification.id}
+                      notification={notification}
+                      onPress={handleNotificationPress}
+                      onDelete={handleNotificationDelete}
+                      getNotificationIcon={getNotificationIcon}
+                      formatTime={formatTime}
+                    />
+                  ))
                 ) : (
                   <View style={styles.emptyState}>
                     <Ionicons name="notifications-off" size={32} color="#ccc" />
                     <Text style={styles.emptyStateText}>
                       {filter === 'all' 
                         ? 'No notifications yet' 
+                        : filter === 'spots'
+                        ? 'No parking spot notifications'
                         : `No ${filter} notifications`}
                     </Text>
+                    {filter === 'spots' && (
+                      <Text style={styles.emptyStateSubtext}>
+                        You'll be notified when new parking spots become available
+                      </Text>
+                    )}
+                    {filter === 'feedback' && (
+                      <Text style={styles.emptyStateSubtext}>
+                        Submit feedback to receive admin replies here
+                      </Text>
+                    )}
                   </View>
                 )}
               </ScrollView>
@@ -498,7 +721,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
   );
 };
 
-// Enhanced styles with debug elements
+// 🔥 FIXED: Complete styles with swipe-to-delete functionality
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -535,20 +758,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
   },
-  // Debug text styles
-  userDebugText: {
+  // 🔥 FIXED: Swipe hint
+  swipeHint: {
     fontSize: 10,
-    color: '#999',
     fontFamily: 'Poppins_400Regular',
-  },
-  debugText: {
-    fontSize: 9,
     color: '#999',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  closeButton: {
-    padding: 4,
+    marginTop: 2,
   },
   refreshButton: {
     padding: 8,
@@ -585,6 +800,40 @@ const styles = StyleSheet.create({
     flex: 1,
     maxHeight: 300,
   },
+  
+  // 🔥 FIXED: Swipe container styles
+  swipeContainer: {
+    position: 'relative',
+    backgroundColor: '#EF4444', // Red background for delete
+    overflow: 'hidden',
+  },
+  deleteButtonContainer: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 120,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    marginTop: 4,
+  },
+  // 🔥 FIXED: Swipeable content
+  swipeableContent: {
+    backgroundColor: 'white',
+  },
+  
   notificationItem: {
     backgroundColor: 'white',
     paddingHorizontal: 20,
@@ -594,6 +843,12 @@ const styles = StyleSheet.create({
   },
   unreadNotification: {
     backgroundColor: '#fafafa',
+    borderLeftWidth: 3,
+    borderLeftColor: '#B22020',
+  },
+  // 🔥 FIXED: Deleting state
+  deletingNotification: {
+    opacity: 0.5,
   },
   notificationContent: {
     flex: 1,
@@ -621,6 +876,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     color: '#999',
   },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#B22020',
+    marginTop: 4,
+    marginRight: 8,
+  },
+  // 🔥 FIXED: Swipe indicator
+  swipeIndicator: {
+    marginLeft: 8,
+    opacity: 0.3,
+  },
   notificationMessage: {
     fontSize: 12,
     fontFamily: 'Poppins_400Regular',
@@ -632,39 +900,100 @@ const styles = StyleSheet.create({
     color: '#333',
     fontFamily: 'Poppins_600SemiBold',
   },
+  
+  // Enhanced styles for feedback details
+  feedbackDetails: {
+    marginLeft: 32,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  feedbackIdContainer: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  feedbackIdText: {
+    fontSize: 10,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B22020',
+  },
+  feedbackPreview: {
+    fontSize: 11,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  actionHint: {
+    fontSize: 10,
+    fontFamily: 'Poppins_400Regular',
+    color: '#999',
+    marginTop: 4,
+  },
+  
+  // Enhanced styles for parking details
+  parkingDetails: {
+    marginLeft: 32,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  floorInfo: {
+    fontSize: 11,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#48D666',
+    marginBottom: 2,
+  },
+  spotsInfo: {
+    fontSize: 11,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    marginBottom: 4,
+  },
+  
+  // Empty state styles
   emptyState: {
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
   emptyStateText: {
     fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: 'Poppins_600SemiBold',
     color: '#999',
-    marginTop: 12,
     textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 8,
   },
-  // Empty state subtext for debugging
   emptyStateSubtext: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: 'Poppins_400Regular',
     color: '#ccc',
-    marginTop: 4,
     textAlign: 'center',
+    lineHeight: 16,
   },
+  
+  // Mark all as read button
   markAllReadButton: {
-    paddingHorizontal: 20,
+    backgroundColor: '#f8f9fa',
     paddingVertical: 12,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
     alignItems: 'center',
   },
   markAllReadText: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    color: '#666',
-    textDecorationLine: 'underline',
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B22020',
   },
 });
 

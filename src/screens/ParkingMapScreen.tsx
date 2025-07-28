@@ -111,8 +111,6 @@ const ParkingMapScreen: React.FC = () => {
   const updateParkingSpotsFromService = (stats: ParkingStats) => {
     if (!isMountedRef.current) return;
     
-    console.log('📊 Updating parking spots from service data');
-    
     // Update parking stats
     setParkingStats(stats);
     

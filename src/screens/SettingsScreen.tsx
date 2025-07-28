@@ -19,7 +19,7 @@ import { styles } from './styles/SettingsScreen.style';
 type RootStackParamList = {
   Home: undefined;
   Settings: undefined;
-  Register: undefined;
+  Login: undefined;
   Profile: { userId?: number } | undefined;
   ApiTest: undefined;
   ParkingMap: undefined;
@@ -62,7 +62,7 @@ const SettingsScreen: React.FC = () => {
     React.useCallback(() => {
       if (!isAuthenticated && !logoutInProgressRef.current) {
         console.log('🔐 User not authenticated in Settings, redirecting...');
-        navigation.navigate('Register');
+        navigation.navigate('Login');
       }
     }, [isAuthenticated, navigation])
   );
@@ -116,7 +116,6 @@ const SettingsScreen: React.FC = () => {
   const handleLogout = () => {
     // Prevent multiple logout attempts
     if (logoutInProgressRef.current) {
-      console.log('⚠️ Logout already in progress');
       return;
     }
 
@@ -157,7 +156,7 @@ const SettingsScreen: React.FC = () => {
       // Small delay to ensure state is updated
       setTimeout(() => {
         if (isMountedRef.current) {
-          navigation.navigate('Register');
+          navigation.navigate('Login');
         }
       }, 100);
 

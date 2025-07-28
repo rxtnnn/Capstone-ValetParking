@@ -1,10 +1,9 @@
-// src/services/NotifManager.ts - Updated with proper TypeScript types
+// src/services/NotifManager.ts - Updated to only show parking spots available notifications
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   AppNotification, 
   CreateNotificationInput,
   createSpotAvailableNotification,
-  createFloorUpdateNotification,
   createFeedbackReplyNotification,
   getNotificationUserId,
   setNotificationUserId
@@ -13,7 +12,8 @@ import { FeedbackData } from '../types/feedback';
 
 const NOTIFICATIONS_STORAGE_KEY = '@valet_notifications';
 const LAST_FEEDBACK_CHECK_KEY = '@valet_last_feedback_check';
-const MAX_NOTIFICATIONS = 50; // Keep only last 50 notifications
+const PROCESSED_FEEDBACK_REPLIES_KEY = '@valet_processed_replies';
+const MAX_NOTIFICATIONS = 100;
 
 type NotificationListener = (notifications: AppNotification[]) => void;
 
@@ -22,9 +22,11 @@ class NotificationManagerClass {
   private listeners: NotificationListener[] = [];
   private unreadCount = 0;
   private currentUserId: number | null = null;
+  private processedReplies: Set<string> = new Set();
 
   constructor() {
     this.loadNotifications();
+    this.loadProcessedReplies();
     this.getCurrentUserId();
   }
 
@@ -47,14 +49,63 @@ class NotificationManagerClass {
     this.currentUserId = userId;
     
     if (userId === null) {
-      // User logged out - clear all notifications
+      // User logged out - clear all notifications and processed replies
       await this.clearAllNotifications();
-      console.log('🚪 User logged out - notifications cleared');
+      await this.clearProcessedReplies();
+      console.log('🚪 User logged out - notifications and tracking cleared');
     } else {
-      // User logged in - load their notifications
+      // User logged in - load their notifications and processed replies
       await this.loadNotifications();
+      await this.loadProcessedReplies();
       console.log('🔐 User logged in - loading notifications for user:', userId);
     }
+  }
+
+  // Load processed replies tracking
+  private async loadProcessedReplies(): Promise<void> {
+    try {
+      const storageKey = this.getUserStorageKey(PROCESSED_FEEDBACK_REPLIES_KEY);
+      const stored = await AsyncStorage.getItem(storageKey);
+      
+      if (stored) {
+        const processedArray = JSON.parse(stored);
+        this.processedReplies = new Set(processedArray);
+        console.log(`📱 Loaded ${this.processedReplies.size} processed replies for user ${this.currentUserId}`);
+      } else {
+        this.processedReplies = new Set();
+      }
+    } catch (error) {
+      console.error('Error loading processed replies:', error);
+      this.processedReplies = new Set();
+    }
+  }
+
+  // Save processed replies tracking
+  private async saveProcessedReplies(): Promise<void> {
+    try {
+      const storageKey = this.getUserStorageKey(PROCESSED_FEEDBACK_REPLIES_KEY);
+      const processedArray = Array.from(this.processedReplies);
+      await AsyncStorage.setItem(storageKey, JSON.stringify(processedArray));
+    } catch (error) {
+      console.error('Error saving processed replies:', error);
+    }
+  }
+
+  // Clear processed replies tracking
+  private async clearProcessedReplies(): Promise<void> {
+    try {
+      const storageKey = this.getUserStorageKey(PROCESSED_FEEDBACK_REPLIES_KEY);
+      await AsyncStorage.removeItem(storageKey);
+      this.processedReplies = new Set();
+    } catch (error) {
+      console.error('Error clearing processed replies:', error);
+    }
+  }
+
+  // Generate unique reply ID for tracking
+  private generateReplyId(feedback: FeedbackData): string {
+    const responseTime = feedback.responded_at ? new Date(feedback.responded_at).getTime() : Date.now();
+    return `feedback_${feedback.id}_${responseTime}`;
   }
 
   // User-specific storage keys
@@ -62,7 +113,7 @@ class NotificationManagerClass {
     if (this.currentUserId) {
       return `${key}_user_${this.currentUserId}`;
     }
-    return key; // Fallback for when user ID is not available
+    return key;
   }
 
   // Load notifications for current user only
@@ -111,10 +162,10 @@ class NotificationManagerClass {
     }
   }
 
-  // 🔥 UPDATED: Type-safe notification addition
+  // 🔥 UPDATED: Only allow parking spots available and feedback replies
   async addNotification(notification: CreateNotificationInput): Promise<void> {
-    // Only allow parking updates and feedback replies
-    const allowedTypes = ['spot_available', 'floor_update', 'feedback_reply'];
+    // 🔥 UPDATED: Only allow spot_available and feedback_reply (removed floor_update)
+    const allowedTypes = ['spot_available', 'feedback_reply'];
     
     if (!allowedTypes.includes(notification.type)) {
       console.log('🚫 Notification type filtered out from overlay:', notification.type, notification.title);
@@ -135,7 +186,7 @@ class NotificationManagerClass {
       return;
     }
 
-    // 🔥 UPDATED: Create notification with proper typing and user ID
+    // Create notification with proper typing and user ID
     const newNotification: AppNotification = {
       ...notification,
       id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -144,12 +195,24 @@ class NotificationManagerClass {
       data: setNotificationUserId(notification.data, this.currentUserId)
     } as AppNotification;
 
-    // Check for duplicate notifications (same type and similar content within 5 minutes)
+    // Enhanced duplicate check
     const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
     const isDuplicate = this.notifications.some(existing => {
       const existingUserId = getNotificationUserId(existing);
       const newUserId = getNotificationUserId(newNotification);
       
+      // For feedback replies, check by feedback ID instead of just title
+      if (notification.type === 'feedback_reply' && existing.type === 'feedback_reply') {
+        const existingFeedbackId = (existing.data as any)?.feedbackId;
+        const newFeedbackId = (newNotification.data as any)?.feedbackId;
+        
+        if (existingFeedbackId && newFeedbackId && existingFeedbackId === newFeedbackId) {
+          console.log(`🚫 Duplicate feedback reply notification prevented for feedback ID ${newFeedbackId}`);
+          return true;
+        }
+      }
+      
+      // General duplicate check for other types
       return existing.type === newNotification.type &&
              existing.title === newNotification.title &&
              existing.timestamp > fiveMinutesAgo &&
@@ -169,18 +232,22 @@ class NotificationManagerClass {
     console.log(`📱 New notification added for user ${this.currentUserId}: ${newNotification.title}`);
   }
 
-  // 🔥 UPDATED: Type-safe spot available notification
+  // 🔥 UPDATED: Enhanced spot available notification (only parking notification we show)
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
     if (spotsAvailable <= 0) {
       console.log('🚫 No available spots, notification not created');
       return;
     }
 
+    // 🔥 ENHANCED: Better message format
+    const title = 'Parking Spots Available!';
+    const message = floor 
+      ? `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}. Tap to view parking map.`
+      : `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available. Tap to view parking map.`;
+
     const notification = createSpotAvailableNotification(
-      'Parking Spots Available!',
-      floor 
-        ? `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}`
-        : `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available`,
+      title,
+      message,
       spotsAvailable,
       floor,
       spotIds,
@@ -190,129 +257,87 @@ class NotificationManagerClass {
     await this.addNotification(notification);
   }
 
-  // 🔥 UPDATED: Type-safe floor update notification
-  async addFloorUpdateNotification(
-    floor: number, 
-    availableSpots: number, 
-    totalSpots: number,
-    previousAvailable?: number
-  ): Promise<void> {
-    if (previousAvailable !== undefined && availableSpots <= previousAvailable) {
-      console.log(`🚫 Floor ${floor}: No increase in available spots, notification not created`);
-      return;
-    }
-
-    if (availableSpots <= 0) {
-      console.log(`🚫 Floor ${floor}: No available spots, notification not created`);
-      return;
-    }
-
-    const changeText = previousAvailable !== undefined 
-      ? availableSpots > previousAvailable 
-        ? `(+${availableSpots - previousAvailable})`
-        : ''
-      : '';
-
-    const notification = createFloorUpdateNotification(
-      `Floor ${floor} Update`,
-      `${availableSpots}/${totalSpots} spots available ${changeText}`.trim(),
-      floor,
-      availableSpots,
-      totalSpots,
-      previousAvailable,
-      this.currentUserId || undefined
-    );
-
-    await this.addNotification(notification);
-  }
-
-  // 🔥 UPDATED: Type-safe feedback reply notification
   async addFeedbackReplyNotification(
     feedbackId: number | undefined,
     originalFeedback: string,
     adminReply: string,
-    adminName?: string
+    adminName?: string,
+    respondedAt?: string
   ): Promise<void> {
+    if (!feedbackId) {
+      return;
+    }
+
+    // Generate unique reply ID for tracking
+    const replyId = `feedback_${feedbackId}_${respondedAt ? new Date(respondedAt).getTime() : Date.now()}`;
+    
+    // Check if we've already processed this reply
+    if (this.processedReplies.has(replyId)) {
+      return;
+    }
+
+    // Enhanced notification with feedback context
     const notification = createFeedbackReplyNotification(
-      'Admin Reply Received',
-      `Your feedback has been responded to by ${adminName || 'Admin'}`,
-      feedbackId || 0,
-      originalFeedback.substring(0, 100) + (originalFeedback.length > 100 ? '...' : ''),
+      'Admin Replied to your Feedback',
+      `Reply to your ${originalFeedback.length > 30 ? 'feedback' : `"${originalFeedback.substring(0, 30)}..."`}`,
+      feedbackId,
+      originalFeedback.substring(0, 200) + (originalFeedback.length > 200 ? '...' : ''),
       adminReply,
       adminName,
       this.currentUserId || undefined
     );
 
     await this.addNotification(notification);
+
+    // Mark this reply as processed
+    this.processedReplies.add(replyId);
+    await this.saveProcessedReplies();
   }
 
-  // Enhanced feedback reply processing with user validation
+  // Process feedback replies and create individual notifications for each
   async processFeedbackReplies(feedbackArray: FeedbackData[]): Promise<void> {
     try {
       if (!this.currentUserId) {
         console.warn('⚠️ No current user ID - cannot process feedback replies');
         return;
       }
-
-      // Get last check time for this specific user
-      const lastCheckTime = await this.getLastFeedbackCheckTime();
-      const currentTime = Date.now();
-
-      // Filter feedback that belongs to current user and has new admin responses
-      const userFeedbackWithNewReplies = feedbackArray.filter(feedback => {
+      // Filter feedback that belongs to current user and has admin responses
+      const userFeedbackWithReplies = feedbackArray.filter(feedback => {
         // Must belong to current user
         if (feedback.user_id !== this.currentUserId) {
           return false;
         }
 
-        // Must have admin response
-        if (!feedback.admin_response || !feedback.responded_at) {
+        // Must have admin response and valid ID
+        if (!feedback.admin_response || !feedback.responded_at || !feedback.id) {
           return false;
         }
 
-        // Must be newer than last check
-        const responseTime = new Date(feedback.responded_at).getTime();
-        return responseTime > lastCheckTime;
+        return true;
       });
 
-      console.log(`📱 Found ${userFeedbackWithNewReplies.length} new feedback replies for user ${this.currentUserId}`);
 
-      // Create notifications for new replies
-      for (const feedback of userFeedbackWithNewReplies) {
-        await this.addFeedbackReplyNotification(
-          feedback.id,
-          feedback.message,
-          feedback.admin_response!,
-          'Admin Team'
-        );
+      // Process each feedback reply individually
+      let newNotificationsCount = 0;
+      
+      for (const feedback of userFeedbackWithReplies) {
+        const replyId = this.generateReplyId(feedback);
+        
+        // Check if we've already processed this specific reply
+        if (!this.processedReplies.has(replyId)) {
+          await this.addFeedbackReplyNotification(
+            feedback.id,
+            feedback.message,
+            feedback.admin_response!,
+            'Admin Team',
+            feedback.responded_at
+          );
+          newNotificationsCount++;
+        } 
       }
-
-      // Update last check time for this user
-      await this.updateLastFeedbackCheckTime(currentTime);
 
     } catch (error) {
       console.error('Error processing feedback replies:', error);
-    }
-  }
-
-  // User-specific feedback check time
-  private async getLastFeedbackCheckTime(): Promise<number> {
-    try {
-      const storageKey = this.getUserStorageKey(LAST_FEEDBACK_CHECK_KEY);
-      const stored = await AsyncStorage.getItem(storageKey);
-      return stored ? parseInt(stored, 10) : 0;
-    } catch (error) {
-      console.error('Error getting last feedback check time:', error);
-      return 0;
-    }
-  }
-
-  private async updateLastFeedbackCheckTime(timestamp: number): Promise<void> {
-    try {
-      const storageKey = this.getUserStorageKey(LAST_FEEDBACK_CHECK_KEY);
-      await AsyncStorage.setItem(storageKey, timestamp.toString());
-    } catch (error) {
-      console.error('Error updating last feedback check time:', error);
     }
   }
 
@@ -402,12 +427,12 @@ class NotificationManagerClass {
     this.notifyListeners();
   }
 
-  // Get notifications for current user only
+  // 🔥 UPDATED: Get notifications for current user only (removed floor_update from allowed types)
   getNotifications(): AppNotification[] {
     return [...this.notifications]
       .filter(n => {
-        // Filter by allowed types
-        const isAllowedType = ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type);
+        // 🔥 UPDATED: Only allow spot_available and feedback_reply
+        const isAllowedType = ['spot_available', 'feedback_reply'].includes(n.type);
         
         // Filter by user ID (if user is logged in)
         const belongsToUser = !this.currentUserId || !getNotificationUserId(n) || getNotificationUserId(n) === this.currentUserId;
@@ -417,11 +442,11 @@ class NotificationManagerClass {
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  // Get unread count for current user only
+  // 🔥 UPDATED: Get unread count for current user only (removed floor_update)
   getUnreadCount(): number {
     return this.notifications
       .filter(n => {
-        const isAllowedType = ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type);
+        const isAllowedType = ['spot_available', 'feedback_reply'].includes(n.type);
         const belongsToUser = !this.currentUserId || !getNotificationUserId(n) || getNotificationUserId(n) === this.currentUserId;
         return !n.isRead && isAllowedType && belongsToUser;
       })
@@ -448,7 +473,7 @@ class NotificationManagerClass {
   private updateUnreadCount(): void {
     this.unreadCount = this.notifications
       .filter(n => {
-        const isAllowedType = ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type);
+        const isAllowedType = ['spot_available', 'feedback_reply'].includes(n.type);
         const belongsToUser = !this.currentUserId || !getNotificationUserId(n) || getNotificationUserId(n) === this.currentUserId;
         return !n.isRead && isAllowedType && belongsToUser;
       })
@@ -467,9 +492,9 @@ class NotificationManagerClass {
     });
   }
 
-  // Get notifications by type for current user
+  // 🔥 UPDATED: Get notifications by type for current user (removed floor_update)
   getNotificationsByType(type: AppNotification['type']): AppNotification[] {
-    if (!['spot_available', 'floor_update', 'feedback_reply'].includes(type)) {
+    if (!['spot_available', 'feedback_reply'].includes(type)) {
       return [];
     }
     return this.notifications.filter(n => {
@@ -478,22 +503,47 @@ class NotificationManagerClass {
     });
   }
 
-  // Get summary for current user
-  getSummary(): { total: number; unread: number; recent: number } {
+  // 🔥 UPDATED: Get summary for current user (removed floor_update references)
+  getSummary(): { total: number; unread: number; recent: number; feedbackReplies: number; parkingSpots: number } {
     const validNotifications = this.notifications.filter(n => {
-      const isAllowedType = ['spot_available', 'floor_update', 'feedback_reply'].includes(n.type);
+      const isAllowedType = ['spot_available', 'feedback_reply'].includes(n.type);
       const belongsToUser = !this.currentUserId || !getNotificationUserId(n) || getNotificationUserId(n) === this.currentUserId;
       return isAllowedType && belongsToUser;
     });
     
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
     const recent = validNotifications.filter(n => n.timestamp > oneDayAgo).length;
+    const feedbackReplies = validNotifications.filter(n => n.type === 'feedback_reply').length;
+    const parkingSpots = validNotifications.filter(n => n.type === 'spot_available').length;
     
     return {
       total: validNotifications.length,
       unread: this.getUnreadCount(),
       recent,
+      feedbackReplies,
+      parkingSpots
     };
+  }
+
+  // Get feedback reply notifications specifically
+  getFeedbackReplyNotifications(): AppNotification[] {
+    return this.getNotificationsByType('feedback_reply');
+  }
+
+  // 🔥 NEW: Get parking spot notifications specifically
+  getParkingSpotNotifications(): AppNotification[] {
+    return this.getNotificationsByType('spot_available');
+  }
+
+  // Get notifications for specific feedback ID
+  getNotificationsForFeedback(feedbackId: number): AppNotification[] {
+    return this.notifications.filter(n => {
+      const belongsToUser = !this.currentUserId || !getNotificationUserId(n) || getNotificationUserId(n) === this.currentUserId;
+      const isFeedbackReply = n.type === 'feedback_reply';
+      const matchesFeedbackId = (n.data as any)?.feedbackId === feedbackId;
+      
+      return belongsToUser && isFeedbackReply && matchesFeedbackId;
+    });
   }
 
   // Method to test parking notifications (for development)
@@ -508,45 +558,50 @@ class NotificationManagerClass {
       123,
       'Test feedback about parking sensors not working properly',
       'Thank you for your feedback! We have fixed the sensor issue on Floor 4.',
-      'Admin Team'
+      'Admin Team',
+      new Date().toISOString()
     );
     console.log('🧪 Test feedback notification created');
   }
 
-  // Reset last feedback check time for current user
-  async resetFeedbackCheckTime(): Promise<void> {
-    try {
-      const storageKey = this.getUserStorageKey(LAST_FEEDBACK_CHECK_KEY);
-      await AsyncStorage.removeItem(storageKey);
-      console.log('🔄 Feedback check time reset for current user');
-    } catch (error) {
-      console.error('Error resetting feedback check time:', error);
-    }
+  // Reset processed replies (useful for testing)
+  async resetProcessedReplies(): Promise<void> {
+    await this.clearProcessedReplies();
+    console.log('🔄 Processed replies reset for current user');
   }
 
-
-  // Debug method to see all stored data
+  // 🔥 UPDATED: Enhanced debug method
   async getDebugInfo(): Promise<any> {
     const userStorageKey = this.getUserStorageKey(NOTIFICATIONS_STORAGE_KEY);
     const feedbackCheckKey = this.getUserStorageKey(LAST_FEEDBACK_CHECK_KEY);
+    const processedRepliesKey = this.getUserStorageKey(PROCESSED_FEEDBACK_REPLIES_KEY);
     
     try {
-      const [notifications, lastCheck] = await Promise.all([
+      const [notifications, lastCheck, processedReplies] = await Promise.all([
         AsyncStorage.getItem(userStorageKey),
-        AsyncStorage.getItem(feedbackCheckKey)
+        AsyncStorage.getItem(feedbackCheckKey),
+        AsyncStorage.getItem(processedRepliesKey)
       ]);
+
+      const summary = this.getSummary();
 
       return {
         currentUserId: this.currentUserId,
         storageKeys: {
           notifications: userStorageKey,
-          lastFeedbackCheck: feedbackCheckKey
+          lastFeedbackCheck: feedbackCheckKey,
+          processedReplies: processedRepliesKey
         },
         storedNotifications: notifications ? JSON.parse(notifications).length : 0,
         lastFeedbackCheck: lastCheck ? new Date(parseInt(lastCheck)).toISOString() : 'never',
+        processedRepliesCount: this.processedReplies.size,
         activeNotifications: this.notifications.length,
         unreadCount: this.unreadCount,
-        summary: this.getSummary()
+        summary,
+        notificationTypes: {
+          parkingSpots: summary.parkingSpots,
+          feedbackReplies: summary.feedbackReplies
+        }
       };
     } catch (error) {
       return {

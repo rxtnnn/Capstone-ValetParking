@@ -174,9 +174,7 @@ class NotificationServiceClass {
       const title = 'Floor Update';
       const message = `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`;
 
-      // Add to NotificationManager for in-app display
-      await NotificationManager.addFloorUpdateNotification(floor, availableSpots, totalSpots, previousAvailable);
-
+  
       // Show push notification
       await this.showLocalNotification(
         title,

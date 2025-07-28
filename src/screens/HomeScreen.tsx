@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,7 @@ type RootStackParamList = {
   Settings: undefined;
   Profile: { userId?: number } | undefined;
   ApiTest: undefined;
-  Register: undefined;
+  Login: undefined;
 };
 
 type HomeScreenNavigationProp = NavigationProp<RootStackParamList>;
@@ -127,39 +127,63 @@ const HomeScreen: React.FC = () => {
   const servicesInitializedRef = useRef(false);
   const userIdFetchedRef = useRef(false);
 
-  // 🔥 FIXED: Authentication check with proper cleanup
-  useFocusEffect(
-    React.useCallback(() => {
-      let isActive = true;
+  // 🔥 MEMOIZED: Floor preparation to prevent infinite calls
+  const floorsToDisplay = useMemo(() => {
+    console.log('Preparing floors for display:', parkingData.floors.length, 'real floors');
+    
+    const fixedFloors = [
+      { floor: 1, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
+      { floor: 2, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
+      { floor: 3, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
+      { floor: 4, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
+    ];
 
-      const checkAuth = async () => {
-        if (!isActive || !isMountedRef.current) return;
+    fixedFloors.forEach(fixedFloor => {
+      const realFloor = parkingData.floors.find(rf => rf.floor === fixedFloor.floor);
+      if (realFloor) {
+        fixedFloor.total = realFloor.total;
+        fixedFloor.available = realFloor.available;
+        fixedFloor.occupancyRate = realFloor.occupancyRate;
+        fixedFloor.status = realFloor.status;
+      } 
+    });
+    
+    return fixedFloors;
+  }, [parkingData.floors]); // Only recalculate when floors actually change
 
-        if (!isAuthenticated) {
-          console.log('🔐 User not authenticated, redirecting to login');
-          // Clear notifications for logged out user
-          await NotificationManager.setCurrentUserId(null);
-          navigation.navigate('Register');
-          return;
-        }
+  // 🔥 MEMOIZED: Parking change detection function
+  const checkParkingChanges = useCallback((newData: ParkingStats) => {
+    if (!lastParkingData || !isMountedRef.current || !currentUserId) {
+      setLastParkingData(newData);
+      return;
+    }
 
-        // Only get user ID once per mount
-        if (!userIdFetchedRef.current && isActive) {
-          await getCurrentUserId();
-          userIdFetchedRef.current = true;
-        }
-      };
+    try {
+      // Only check for new available spots
+      if (newData.availableSpots > lastParkingData.availableSpots) {
+        const increase = newData.availableSpots - lastParkingData.availableSpots;
+        console.log(`🟢 ${increase} new spot(s) available!`);
+        
+        const bestFloor = newData.floors.reduce((prev, current) => 
+          prev.available > current.available ? prev : current
+        );
+        
+        NotificationManager.addSpotAvailableNotification(
+          increase,
+          bestFloor.floor
+        );
+        
+        console.log(`📱 Created parking spots notification: ${increase} spots on Floor ${bestFloor.floor}`);
+      }
 
-      checkAuth();
+      setLastParkingData(newData);
+    } catch (error) {
+      console.error('Error checking parking changes:', error);
+    }
+  }, [lastParkingData, currentUserId]);
 
-      return () => {
-        isActive = false;
-      };
-    }, [isAuthenticated, navigation])
-  );
-
-  // Function to get current user ID from storage
-  const getCurrentUserId = async () => {
+  // 🔥 MEMOIZED: Get current user ID function
+  const getCurrentUserId = useCallback(async () => {
     if (!isMountedRef.current) return;
     
     try {
@@ -169,60 +193,20 @@ const HomeScreen: React.FC = () => {
         const userId = user.id;
         setCurrentUserId(userId);
         
-        // Set user ID in notification manager
         await NotificationManager.setCurrentUserId(userId);
         
         console.log('📋 Current user ID set:', userId);
         
-        // Check for feedback replies for this specific user
         await checkForNewReplies();
-        
-        // Additional check using NotificationManager
         await NotificationManager.checkForFeedbackReplies(userId);
       }
     } catch (error) {
       console.error('Error getting current user ID:', error);
     }
-  };
+  }, [checkForNewReplies]);
 
-  const getFloorName = (floorNumber: number): string => {
-    const suffixes = ['th', 'st', 'nd', 'rd'];
-    const remainder = floorNumber % 100;
-    const suffix = (remainder >= 11 && remainder <= 13) 
-      ? 'th' 
-      : suffixes[floorNumber % 10] || 'th';
-    
-    return `${floorNumber}${suffix} Floor`;
-  };
-
-  const handleFloorPress = (floor: any) => {
-    const status = getFloorStatus(floor.available, floor.total);
-    
-    if (status.text === 'FULL') {
-     setShowFullAlert(true);
-    } else {
-      navigation.navigate('ParkingMap');
-    }
-  };
-
-  const extractFloorFromLocation = (floor_level: string): number => {
-    if (!floor_level) {
-      return 1;
-    }
-
-    const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
-    const match = floor_level.match(pattern);
-
-    if (match) {
-      const floorNumber = parseInt(match[1]);
-      if (floorNumber >= 1 && floorNumber <= 4) {
-        return floorNumber;
-      }
-    }
-    return 1;
-  };
-
-  const fetchParkingDataDirect = async () => {
+  // 🔥 MEMOIZED: Direct parking data fetch
+  const fetchParkingDataDirect = useCallback(async () => {
     if (!isMountedRef.current) return;
     
     try {
@@ -255,10 +239,10 @@ const HomeScreen: React.FC = () => {
         setLoading(false);
       }
     }
-  };
+  }, []);
 
-  // Enhanced parking data transformation with notification integration
-  const transformParkingData = (rawData: any[]): ParkingStats => {
+  // 🔥 MEMOIZED: Transform parking data function
+  const transformParkingData = useCallback((rawData: any[]): ParkingStats => {
     const totalSpots = rawData.length;
     const availableSpots = rawData.filter((space: any) => !space.is_occupied).length;
     const occupiedSpots = totalSpots - availableSpots;
@@ -306,106 +290,193 @@ const HomeScreen: React.FC = () => {
       isLive: true,
       sensorData: rawData,
     };
-  };
+  }, []);
 
-  const checkParkingChanges = (newData: ParkingStats) => {
-    if (!lastParkingData || !isMountedRef.current || !currentUserId) {
-      setLastParkingData(newData);
+  // 🔥 MEMOIZED: onRefresh function
+  const onRefresh = useCallback(async () => {
+    if (!isAuthenticated || !isMountedRef.current) {
+      console.log('⚠️ Cannot refresh - not authenticated or not mounted');
       return;
     }
 
+    setRefreshing(true);
     try {
-      // Check for new available spots
-      if (newData.availableSpots > lastParkingData.availableSpots) {
-        const increase = newData.availableSpots - lastParkingData.availableSpots;
-        console.log(`🟢 ${increase} new spot(s) available!`);
-        
-        // Find floor with most new spots
-        const bestFloor = newData.floors.reduce((prev, current) => 
-          prev.available > current.available ? prev : current
-        );
-        
-        // Notifications will now be tagged with current user ID
-        NotificationManager.addSpotAvailableNotification(
-          increase,
-          bestFloor.floor
-        );
+      await RealTimeParkingService.forceUpdate();
+      
+      if (currentUserId) {
+        await checkForNewReplies();
+        await NotificationManager.checkForFeedbackReplies(currentUserId);
       }
-
-      // Check for floor status changes
-      newData.floors.forEach(newFloor => {
-        const oldFloor = lastParkingData.floors.find(f => f.floor === newFloor.floor);
-        
-        if (oldFloor && oldFloor.available !== newFloor.available) {
-          // Floor notifications will be tagged with current user ID
-          NotificationManager.addFloorUpdateNotification(
-            newFloor.floor,
-            newFloor.available,
-            newFloor.total,
-            oldFloor.available
-          );
-        }
-      });
-
-      setLastParkingData(newData);
     } catch (error) {
-      console.error('Error checking parking changes:', error);
+      console.error('Error during refresh:', error);
+      if (isAuthenticated && isMountedRef.current) {
+        await fetchParkingDataDirect();
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setRefreshing(false);
+      }
+    }
+  }, [isAuthenticated, currentUserId, checkForNewReplies, fetchParkingDataDirect]);
+
+  // Helper functions
+  const getFloorName = (floorNumber: number): string => {
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const remainder = floorNumber % 100;
+    const suffix = (remainder >= 11 && remainder <= 13) 
+      ? 'th' 
+      : suffixes[floorNumber % 10] || 'th';
+    
+    return `${floorNumber}${suffix} Floor`;
+  };
+
+  const handleFloorPress = (floor: any) => {
+    const status = getFloorStatus(floor.available, floor.total);
+    
+    if (status.text === 'FULL') {
+     setShowFullAlert(true);
+    } else {
+      navigation.navigate('ParkingMap');
     }
   };
 
-  // 🔥 FIXED: Main useEffect - removed nested useEffect
+  const extractFloorFromLocation = (floor_level: string): number => {
+    if (!floor_level) {
+      return 1;
+    }
+
+    const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
+    const match = floor_level.match(pattern);
+
+    if (match) {
+      const floorNumber = parseInt(match[1]);
+      if (floorNumber >= 1 && floorNumber <= 4) {
+        return floorNumber;
+      }
+    }
+    return 1;
+  };
+
+  const getFloorStatus = (available: number, total: number) => {
+    if (total === 0) return { text: 'NO DATA', color: '#999' };
+    const percentage = (available / total) * 100;
+    if (percentage === 0) return { text: 'FULL', color: '#B22020' };
+    if (percentage < 25) return { text: 'LIMITED', color: '#FF9801' };
+    return { text: 'AVAILABLE', color: '#48D666' };
+  };
+
+  const getProgressPercentage = (available: number, total: number) => {
+    if (total === 0) return 0;
+    return ((total - available) / total) * 100;
+  };
+
+  // Replace your current useFocusEffect with this:
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+      let timeoutId: NodeJS.Timeout;
+
+      const checkAuth = async () => {
+        if (!isActive || !isMountedRef.current) return;
+
+        try {
+          if (!isAuthenticated) {
+            console.log('🔐 User not authenticated, redirecting to login');
+            await NotificationManager.setCurrentUserId(null);
+            
+            // Add delay to prevent navigation loop
+            timeoutId = setTimeout(() => {
+              if (isActive) {
+                navigation.navigate('Login'); // Use replace instead of navigate
+              }
+            }, 100);
+            return;
+          }
+
+          if (!userIdFetchedRef.current && isActive) {
+            await getCurrentUserId();
+            userIdFetchedRef.current = true;
+          }
+        } catch (error) {
+          console.error('Auth check error:', error);
+        }
+      };
+
+      checkAuth();
+
+      return () => {
+        isActive = false;
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+    }, [isAuthenticated]) // Remove navigation from dependencies
+  );
+
+  // 🔥 EFFECT 2: Component Mount/Unmount Tracking
   useEffect(() => {
     isMountedRef.current = true;
     
+    return () => {
+      console.log('🧹 Component unmounting');
+      isMountedRef.current = false;
+      servicesInitializedRef.current = false;
+      userIdFetchedRef.current = false;
+    };
+  }, []);
+
+  // 🔥 EFFECT 3: Parking Service Setup
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
+    if (servicesInitializedRef.current) {
+      console.log('⚠️ Services already initialized, skipping setup');
+      return;
+    }
+
     let unsubscribeParkingUpdates: (() => void) | undefined;
     let unsubscribeConnectionStatus: (() => void) | undefined;
-    let unsubscribeNotifications: (() => void) | undefined;
     let fallbackTimer: NodeJS.Timeout | undefined;
 
-    const setupServices = async () => {
-      // Prevent multiple initializations
-      if (servicesInitializedRef.current || !isAuthenticated || !isMountedRef.current) {
-        console.log('⚠️ Services already initialized or not authenticated, skipping setup');
-        return;
-      }
-
+    const setupParkingService = async () => {
       servicesInitializedRef.current = true;
 
       try {
         console.log('🚀 Setting up parking services...');
 
-        // Subscribe to parking updates with mount check
+        // 🔥 DEBOUNCED: Parking updates with timeout to prevent rapid changes
+        let updateTimeout: NodeJS.Timeout;
         unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
           if (!isMountedRef.current) return;
           
-          setParkingData(data); 
-          checkParkingChanges(data);
-          setLoading(false);
+          // Clear previous timeout
+          if (updateTimeout) clearTimeout(updateTimeout);
+          
+          // Debounce updates by 300ms
+          updateTimeout = setTimeout(() => {
+            if (isMountedRef.current) {
+              setParkingData(prevData => {
+                // Only update if data actually changed
+                if (JSON.stringify(prevData.floors) !== JSON.stringify(data.floors)) {
+                  checkParkingChanges(data);
+                  return data;
+                }
+                return { ...prevData, lastUpdated: data.lastUpdated, isLive: data.isLive };
+              });
+              setLoading(false);
+            }
+          }, 300);
         });
 
-        // Subscribe to connection status with mount check
         unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status: 'connected' | 'disconnected' | 'error') => {
           if (!isMountedRef.current) return;
           setConnectionStatus(status);
         });
 
-        // Subscribe to user-specific notifications
-        unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
-          if (!isMountedRef.current) return;
-          
-          // Only update count if notifications belong to current user
-          const userNotifications = notifications.filter(n => 
-            !currentUserId || !n.data?.userId || n.data.userId === currentUserId
-          );
-          
-          setUnreadNotificationCount(NotificationManager.getUnreadCount());
-        });
-
-        // Start the service only if still mounted and authenticated
         if (isMountedRef.current && isAuthenticated) {
           RealTimeParkingService.start();
           
-          // Fallback timer with mount check
           fallbackTimer = setTimeout(() => {
             if (isMountedRef.current && loading && isAuthenticated) {
               console.log('⏰ Fallback timer triggered, fetching data directly');
@@ -422,47 +493,53 @@ const HomeScreen: React.FC = () => {
       }
     };
 
-    // Only setup services if authenticated
-    if (isAuthenticated) {
-      setupServices();
-    } else {
-      console.log('🔐 Not authenticated, skipping service setup');
-      setLoading(false);
-    }
+    setupParkingService();
 
-    // Cleanup function
     return () => {
-      console.log('🧹 Cleaning up HomeScreen effects');
-      isMountedRef.current = false;
+      console.log('🧹 Cleaning up parking service');
       servicesInitializedRef.current = false;
-      userIdFetchedRef.current = false;
 
-      if (fallbackTimer) {
-        clearTimeout(fallbackTimer);
-      }
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (unsubscribeParkingUpdates) unsubscribeParkingUpdates();
+      if (unsubscribeConnectionStatus) unsubscribeConnectionStatus();
 
-      if (unsubscribeParkingUpdates) {
-        unsubscribeParkingUpdates();
-      }
-
-      if (unsubscribeConnectionStatus) {
-        unsubscribeConnectionStatus();
-      }
-
-      if (unsubscribeNotifications) {
-        unsubscribeNotifications();
-      }
-
-      // Stop the service
       try {
         RealTimeParkingService.stop();
       } catch (error) {
         console.error('Error stopping RealTimeParkingService:', error);
       }
     };
-  }, [isAuthenticated, currentUserId]); // 🔥 FIXED: Added proper dependencies
+  }, [isAuthenticated, checkParkingChanges, fetchParkingDataDirect]);
 
-  // 🔥 FIXED: Separate useEffect for periodic feedback checks
+  // 🔥 EFFECT 4: Notification Management
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    let unsubscribeNotifications: (() => void) | undefined;
+
+    const setupNotifications = () => {
+      console.log('🔔 Setting up notifications for user:', currentUserId);
+
+      unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
+        if (!isMountedRef.current) return;
+        
+        const userNotifications = notifications.filter(n => 
+          !n.data?.userId || n.data.userId === currentUserId
+        );
+        
+        setUnreadNotificationCount(NotificationManager.getUnreadCount());
+      });
+    };
+
+    setupNotifications();
+
+    return () => {
+      console.log('🧹 Cleaning up notifications');
+      if (unsubscribeNotifications) unsubscribeNotifications();
+    };
+  }, [currentUserId]);
+
+  // 🔥 EFFECT 5: Periodic Feedback Checks
   useEffect(() => {
     if (!currentUserId || !isAuthenticated) return;
 
@@ -479,72 +556,6 @@ const HomeScreen: React.FC = () => {
       clearInterval(checkFeedbackInterval);
     };
   }, [currentUserId, isAuthenticated, checkForNewReplies]);
-
-  // 🔥 FIXED: Single onRefresh function with proper implementation
-  const onRefresh = async () => {
-    if (!isAuthenticated || !isMountedRef.current) {
-      console.log('⚠️ Cannot refresh - not authenticated or not mounted');
-      return;
-    }
-
-    setRefreshing(true);
-    try {
-      await RealTimeParkingService.forceUpdate();
-      
-      // Also refresh feedback replies during pull-to-refresh
-      if (currentUserId) {
-        await checkForNewReplies();
-        await NotificationManager.checkForFeedbackReplies(currentUserId);
-      }
-    } catch (error) {
-      console.error('Error during refresh:', error);
-      if (isAuthenticated && isMountedRef.current) {
-        await fetchParkingDataDirect();
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setRefreshing(false);
-      }
-    }
-  };
-
-  const getFloorStatus = (available: number, total: number) => {
-    if (total === 0) return { text: 'NO DATA', color: '#999' };
-    const percentage = (available / total) * 100;
-    if (percentage === 0) return { text: 'FULL', color: '#B22020' };
-    if (percentage < 25) return { text: 'LIMITED', color: '#FF9801' };
-    return { text: 'AVAILABLE', color: '#48D666' };
-  };
-
-  const getProgressPercentage = (available: number, total: number) => {
-    if (total === 0) return 0;
-    return ((total - available) / total) * 100;
-  };
-
-  const prepareFloorsForDisplay = (realFloors: any[]) => {
-    console.log('Preparing floors for display:', realFloors.length, 'real floors');
-    
-    const fixedFloors = [
-      { floor: 1, total: 0, available: 0, occupancyRate: 0, status: 'available' as const },
-      { floor: 2, total: 0, available: 0, occupancyRate: 0, status: 'available' as const },
-      { floor: 3, total: 0, available: 0, occupancyRate: 0, status: 'available' as const },
-      { floor: 4, total: 0, available: 0, occupancyRate: 0, status: 'available' as const },
-    ];
-
-    fixedFloors.forEach(fixedFloor => {
-      const realFloor = realFloors.find(rf => rf.floor === fixedFloor.floor);
-      if (realFloor) {
-        fixedFloor.total = realFloor.total;
-        fixedFloor.available = realFloor.available;
-        fixedFloor.occupancyRate = realFloor.occupancyRate;
-        fixedFloor.status = realFloor.status;
-      } 
-    });
-    
-    return fixedFloors;
-  };
-
-  const floorsToDisplay = prepareFloorsForDisplay(parkingData.floors);
 
   // Don't render if not authenticated
   if (!isAuthenticated) {
@@ -688,7 +699,7 @@ const HomeScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* dynamic floor real data */}
+          {/* Dynamic floor real data using memoized floorsToDisplay */}
           {floorsToDisplay.map((floor, index) => {
             const status = getFloorStatus(floor.available, floor.total);
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
@@ -828,7 +839,6 @@ const HomeScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* NEW: Notification Overlay */}
       <NotificationOverlay
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}

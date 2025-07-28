@@ -21,6 +21,7 @@ import { styles } from './styles/ProfileScreen.style';
 type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
+  Login: undefined;
   Floors: undefined;
   ParkingMap: { floor: number };
   Feedback: undefined;
@@ -412,7 +413,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             type: 'success',
             icon: 'check-circle',
             confirmText: 'OK',
-            onConfirm: () => navigation.navigate('Home')
+            onConfirm: () => navigation.navigate('Login')
           });
         } catch (error) {
           showAlert({
