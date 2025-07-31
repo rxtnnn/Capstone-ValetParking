@@ -71,7 +71,7 @@ export const styles = StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     borderRadius: 8,
     alignItems: 'center',
   },

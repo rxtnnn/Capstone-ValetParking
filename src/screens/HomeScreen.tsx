@@ -716,7 +716,6 @@ const HomeScreen: React.FC = () => {
       <View style={styles.tabBar}>
         <TouchableOpacity style={[styles.tabItem, styles.activeTab]} onPress={() => navigation.navigate('Home')}>
           <Ionicons name="home" size={24} color="white" />
-          <Text style={styles.tabText}>Home</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('ParkingMap')}>

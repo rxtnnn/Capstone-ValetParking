@@ -465,7 +465,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const CustomAlert = useCallback(() => {
     const getIconColor = () => ALERT_COLORS[alert.type];
-    const getIcon = () => alert.icon || ALERT_ICONS[alert.type];
 
     return (
       <Modal
@@ -493,13 +492,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             ]}
           >
             <View style={styles.alertHeader}>
-              <View style={[styles.alertIconContainer, { backgroundColor: getIconColor() + '20' }]}>
-                <MaterialIcons 
-                  name={getIcon() as any} 
-                  size={32} 
-                  color={getIconColor()} 
-                />
-              </View>
               <Text style={styles.alertTitle}>{alert.title}</Text>
             </View>
             

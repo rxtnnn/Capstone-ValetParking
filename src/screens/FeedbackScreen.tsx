@@ -804,7 +804,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.contactOption}>
                     <Ionicons name="call" size={14} color="#6B7280" />
-                    <Text style={styles.contactText}>+63 919 929 6588</Text>
+                    <Text style={styles.contactText}>+63 919 123 456</Text>
                   </TouchableOpacity>
                 </View>
               </View>

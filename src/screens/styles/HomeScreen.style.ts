@@ -288,12 +288,6 @@ export const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 20,
   },
-  tabText: {
-    color: 'white',
-    fontSize: 10,
-    textAlign: 'center',
-    fontFamily: 'Poppins_600SemiBold',
-  },
   activeTab: {
     backgroundColor: '#B22020',
   },
