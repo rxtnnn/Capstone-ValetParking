@@ -1,5 +1,3 @@
-// src/types/NotifTypes.ts - Updated with userId support
-
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export interface BaseNotification {
@@ -11,12 +9,11 @@ export interface BaseNotification {
   priority: NotificationPriority;
 }
 
-// 🔥 UPDATED: Enhanced data interfaces with userId
 export interface SpotAvailableData {
   spotsAvailable: number;
   floor?: number;
   spotIds?: string[];
-  userId?: number; // 🔥 NEW: Add userId support
+  userId?: number;
 }
 
 export interface FloorUpdateData {
@@ -24,7 +21,7 @@ export interface FloorUpdateData {
   availableSpots: number;
   totalSpots: number;
   previousAvailable?: number;
-  userId?: number; // 🔥 NEW: Add userId support
+  userId?: number;
 }
 
 export interface FeedbackReplyData {
@@ -33,16 +30,14 @@ export interface FeedbackReplyData {
   adminReply: string;
   adminName?: string;
   replyTimestamp: number;
-  userId?: number; // 🔥 NEW: Add userId support
+  userId?: number;
 }
 
-// 🔥 NEW: Generic notification data with userId
 export interface GenericNotificationData {
   userId?: number;
   [key: string]: any;
 }
 
-// 🔥 UPDATED: Specific notification types with proper data typing
 export interface SpotAvailableNotification extends BaseNotification {
   type: 'spot_available';
   data: SpotAvailableData;
@@ -58,20 +53,18 @@ export interface FeedbackReplyNotification extends BaseNotification {
   data: FeedbackReplyData;
 }
 
-// 🔥 NEW: Generic notification type for extensibility
 export interface GenericNotification extends BaseNotification {
   type: string;
   data: GenericNotificationData;
 }
 
-// 🔥 UPDATED: Union type with proper data types
 export type AppNotification = 
   | SpotAvailableNotification 
   | FloorUpdateNotification 
   | FeedbackReplyNotification
   | GenericNotification;
 
-// 🔥 NEW: Type guards for safe type checking
+// Type guards for safe type checking
 export const isSpotAvailableNotification = (notification: AppNotification): notification is SpotAvailableNotification => {
   return notification.type === 'spot_available';
 };
@@ -84,12 +77,12 @@ export const isFeedbackReplyNotification = (notification: AppNotification): noti
   return notification.type === 'feedback_reply';
 };
 
-// 🔥 NEW: Helper function to safely get userId from any notification
+// Helper function to safely get userId from any notification
 export const getNotificationUserId = (notification: AppNotification): number | undefined => {
   return notification.data?.userId;
 };
 
-// 🔥 NEW: Helper function to set userId on notification data
+// Helper function to set userId on notification data
 export const setNotificationUserId = (data: any, userId: number | null): any => {
   return {
     ...data,
@@ -97,7 +90,7 @@ export const setNotificationUserId = (data: any, userId: number | null): any => 
   };
 };
 
-// 🔥 NEW: Factory functions for creating typed notifications
+// Factory functions for creating typed notifications
 export const createSpotAvailableNotification = (
   title: string,
   message: string,
@@ -163,5 +156,4 @@ export const createFeedbackReplyNotification = (
   }
 });
 
-// 🔥 NEW: Type for notification creation (excludes auto-generated fields)
 export type CreateNotificationInput = Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>;

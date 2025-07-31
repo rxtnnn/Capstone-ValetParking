@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,16 +17,16 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
+import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { styles } from './styles/ParkingMapScreen.style';
-
-// 🔥 Import the RealTimeParkingService
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 
 type RootStackParamList = {
   Home: undefined;
-}
+};
+
 type ParkingMapScreenNavigationProp = NavigationProp<RootStackParamList>;
+
 interface ParkingSpot {
   id: string;
   isOccupied: boolean;
@@ -44,24 +44,93 @@ interface ParkingSection {
   isFull: boolean;
 }
 
+const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
+
+const SENSOR_TO_SPOT_MAPPING: { [key: number]: string } = {
+  7: 'A1',   4: 'B1',   3: 'B2',   2: 'B3',   1: 'B4',
+  5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
+  11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
+  16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
+  21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
+  26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
+  31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
+  36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
+  41: 'J4',  42: 'J5'
+};
+
+const INITIAL_SPOTS: ParkingSpot[] = [
+  { id: 'A1', isOccupied: false, position: { x: 680, y: 110 }, width: 35, height: 35 },
+  { id: 'B4', isOccupied: false, position: { x: 500, y: 50 }, width: 35, height: 35 },
+  { id: 'B3', isOccupied: false, position: { x: 540, y: 50 }, width: 35, height: 35 },
+  { id: 'B2', isOccupied: false, position: { x: 580, y: 50 }, width: 35, height: 35 },
+  { id: 'B1', isOccupied: false, position: { x: 620, y: 50 }, width: 35, height: 35 },
+  { id: 'C1', isOccupied: false, position: { x: 450, y: 100 }, width: 35, height: 35 },
+  { id: 'C2', isOccupied: false, position: { x: 450, y: 140 }, width: 35, height: 35 },
+  { id: 'D7', isOccupied: false, position: { x: 120, y: 200 }, width: 35, height: 35 },
+  { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 35, height: 35 },
+  { id: 'D5', isOccupied: false, position: { x: 200, y: 200 }, width: 35, height: 35 },
+  { id: 'D4', isOccupied: false, position: { x: 240, y: 200 }, width: 35, height: 35 },
+  { id: 'D3', isOccupied: false, position: { x: 300, y: 200 }, width: 35, height: 35 },
+  { id: 'D2', isOccupied: false, position: { x: 340, y: 200 }, width: 35, height: 35 },
+  { id: 'D1', isOccupied: false, position: { x: 380, y: 200 }, width: 35, height: 35 },
+  { id: 'J5', isOccupied: false, position: { x: 300, y: 370 }, width: 35, height: 35 },
+  { id: 'J4', isOccupied: false, position: { x: 340, y: 370 }, width: 35, height: 35 },
+  { id: 'J3', isOccupied: false, position: { x: 380, y: 370 }, width: 35, height: 35 },
+  { id: 'J2', isOccupied: false, position: { x: 420, y: 370 }, width: 35, height: 35 },
+  { id: 'J1', isOccupied: false, position: { x: 460, y: 370 }, width: 35, height: 35 },
+  { id: 'E3', isOccupied: false, position: { x: 55, y: 315 }, width: 35, height: 60 },
+  { id: 'E2', isOccupied: false, position: { x: 55, y: 380 }, width: 35, height: 60 },
+  { id: 'E1', isOccupied: false, position: { x: 55, y: 445 }, width: 35, height: 60 },
+  { id: 'F1', isOccupied: false, position: { x: 120, y: 520 }, width: 35, height: 35 },
+  { id: 'F2', isOccupied: false, position: { x: 160, y: 520 }, width: 35, height: 35 },
+  { id: 'F3', isOccupied: false, position: { x: 220, y: 520 }, width: 35, height: 35 },
+  { id: 'F4', isOccupied: false, position: { x: 260, y: 520 }, width: 35, height: 35 },
+  { id: 'F5', isOccupied: false, position: { x: 300, y: 520 }, width: 35, height: 35 },
+  { id: 'F6', isOccupied: false, position: { x: 360, y: 520 }, width: 35, height: 35 },
+  { id: 'F7', isOccupied: false, position: { x: 400, y: 520 }, width: 35, height: 35 },
+  { id: 'G1', isOccupied: false, position: { x: 500, y: 590 }, width: 35, height: 35 },
+  { id: 'G2', isOccupied: false, position: { x: 500, y: 630 }, width: 35, height: 35 },
+  { id: 'G3', isOccupied: false, position: { x: 500, y: 670 }, width: 35, height: 35 }, 
+  { id: 'G4', isOccupied: false, position: { x: 500, y: 730 }, width: 35, height: 35 },
+  { id: 'G5', isOccupied: false, position: { x: 500, y: 770 }, width: 35, height: 35 },
+  { id: 'H1', isOccupied: false, position: { x: 550, y: 830 }, width: 35, height: 35 },
+  { id: 'H2', isOccupied: false, position: { x: 590, y: 830 }, width: 35, height: 35 },
+  { id: 'H3', isOccupied: false, position: { x: 630, y: 830 }, width: 35, height: 35 },
+  { id: 'I5', isOccupied: false, position: { x: 680, y: 590 }, width: 35, height: 35 },
+  { id: 'I4', isOccupied: false, position: { x: 680, y: 630 }, width: 35, height: 35 },
+  { id: 'I3', isOccupied: false, position: { x: 680, y: 670 }, width: 35, height: 35 },
+  { id: 'I2', isOccupied: false, position: { x: 680, y: 730 }, width: 35, height: 35 },
+  { id: 'I1', isOccupied: false, position: { x: 680, y: 770 }, width: 35, height: 35 },
+];
+
+const GESTURE_LIMITS = {
+  maxTranslateX: 200,
+  minTranslateX: -400,
+  maxTranslateY: 100,
+  minTranslateY: -300,
+  minScale: 0.5,
+  maxScale: 3,
+  clampMinScale: 0.7,
+  clampMaxScale: 2.5
+};
+
 const ParkingMapScreen: React.FC = () => {
   const navigation = useNavigation<ParkingMapScreenNavigationProp>();
+  const [fontsLoaded] = useFonts(FONTS);
+
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
-  const [parkingData, setParkingData] = useState<ParkingSpot[]>([]);
+  const [parkingData, setParkingData] = useState<ParkingSpot[]>(INITIAL_SPOTS);
   const [highlightedSection, setHighlightedSection] = useState<string | null>(null);
   const [navigationPath, setNavigationPath] = useState<{x: number, y: number}[]>([]);
-  
-  // 🔄 Updated state management for real-time service
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [parkingStats, setParkingStats] = useState<ParkingStats | null>(null);
   const [isServiceRunning, setIsServiceRunning] = useState(false);
-  
-  // 🔥 NEW: Refs to prevent loops and track mount state
+
   const isMountedRef = useRef(true);
   const servicesInitializedRef = useRef(false);
   const connectionTestedRef = useRef(false);
-  
+
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -70,28 +139,10 @@ const ParkingMapScreen: React.FC = () => {
   const panRef = useRef<PanGestureHandler>(null);
   const pinchRef = useRef<PinchGestureHandler>(null);
 
-  const [fontsLoaded] = useFonts({
-      Poppins_400Regular,
-      Poppins_600SemiBold,
-    });
-
-  // 🗺️ Sensor to spot mapping (same as before)
-  const sensorToSpotMapping: { [key: number]: string } = {
-    7: 'A1',   4: 'B1',   3: 'B2',   2: 'B3',   1: 'B4',
-    5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
-    11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
-    16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
-    21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
-    26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
-    31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
-    36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
-    41: 'J4',  42: 'J5'
-  };
- 
-  const computeInitialSections = (): ParkingSection[] => {
+  const computeInitialSections = useCallback((): ParkingSection[] => {
     const sectionMap: { [key: string]: number } = {};
 
-    Object.values(sensorToSpotMapping).forEach(spotId => {
+    Object.values(SENSOR_TO_SPOT_MAPPING).forEach(spotId => {
       const section = spotId.charAt(0);
       sectionMap[section] = (sectionMap[section] || 0) + 1;
     });
@@ -103,75 +154,47 @@ const ParkingMapScreen: React.FC = () => {
       availableSlots: total,
       isFull: false,
     })).sort((a, b) => a.id.localeCompare(b.id));
-  };
+  }, []);
 
-  const [parkingSections, setParkingSections] = useState<ParkingSection[]>(computeInitialSections());
+  const [parkingSections, setParkingSections] = useState<ParkingSection[]>(() => computeInitialSections());
 
-  // 🔄 Fixed function to properly map API sensor data to parking spots
-  const updateParkingSpotsFromService = (stats: ParkingStats) => {
+  const updateParkingSpotsFromService = useCallback((stats: ParkingStats) => {
     if (!isMountedRef.current) return;
     
-    // Update parking stats
     setParkingStats(stats);
     
-    const sensorToSpotMap: { [key: number]: string } = {
-      7: 'A1',   4: 'B1',   3: 'B2',   2: 'B3',   1: 'B4',
-      5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
-      11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
-      16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
-      21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
-      26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
-      31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
-      36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
-      41: 'J4',  42: 'J5'
-    };
-
-    // Create a map of spot occupancy from the API data
     const spotOccupancyMap: { [key: string]: boolean } = {};
     
-    // If stats has sensor data array, use it to map occupancy
     if (stats.sensorData && Array.isArray(stats.sensorData)) {
       stats.sensorData.forEach((sensor: any) => {
-        const spotId = sensorToSpotMap[sensor.sensor_id];
+        const spotId = SENSOR_TO_SPOT_MAPPING[sensor.sensor_id];
         if (spotId) {
-          // Convert is_occupied (0 or 1) to boolean
           spotOccupancyMap[spotId] = sensor.is_occupied === 1;
-          console.log(`📍 Sensor ${sensor.sensor_id} -> Spot ${spotId}: ${sensor.is_occupied === 1 ? 'OCCUPIED' : 'AVAILABLE'}`);
         }
       });
     }
 
-    // Update individual parking spots with actual sensor data
     setParkingData(prevSpots => {
       if (!isMountedRef.current) return prevSpots;
       
-      return prevSpots.map(spot => {
-        // Check if we have sensor data for this spot
-        const isOccupied = spotOccupancyMap.hasOwnProperty(spot.id) 
+      return prevSpots.map(spot => ({
+        ...spot,
+        isOccupied: spotOccupancyMap.hasOwnProperty(spot.id) 
           ? spotOccupancyMap[spot.id] 
-          : spot.isOccupied; // Keep current state if no sensor data
-        
-        return {
-          ...spot,
-          isOccupied
-        };
-      });
+          : spot.isOccupied
+      }));
     });
 
-    // Update sections based on actual spot occupancy
     setParkingSections(prevSections => {
       if (!isMountedRef.current) return prevSections;
       
       return prevSections.map(section => {
-        // Count spots in this section
-        const sectionSpots = Object.values(sensorToSpotMap)
+        const sectionSpots = Object.values(SENSOR_TO_SPOT_MAPPING)
           .filter(spotId => spotId.startsWith(section.id));
 
         const totalSlots = sectionSpots.length;
-        
-        // Count available spots (those that are not occupied)
         const availableSlots = sectionSpots.filter(spotId => 
-          !spotOccupancyMap[spotId] // Not occupied or no data (assume available)
+          !spotOccupancyMap[spotId]
         ).length;
 
         return {
@@ -182,11 +205,8 @@ const ParkingMapScreen: React.FC = () => {
         };
       });
     });
+  }, []);
 
-    console.log('✅ Parking spots updated with real sensor data');
-  };
-
-  // 🔥 FIXED: Initialize the service with proper loop prevention
   useEffect(() => {
     isMountedRef.current = true;
     
@@ -194,31 +214,22 @@ const ParkingMapScreen: React.FC = () => {
     let unsubscribeConnectionStatus: (() => void) | undefined;
 
     const initializeServices = async () => {
-      // Prevent multiple initializations
-      if (servicesInitializedRef.current || !isMountedRef.current) {
-        console.log('⚠️ Services already initialized, skipping');
-        return;
-      }
+      if (servicesInitializedRef.current || !isMountedRef.current) return;
 
       servicesInitializedRef.current = true;
-      console.log('🚀 Initializing RealTimeParkingService');
       
-      // Test connection first (only once)
       if (!connectionTestedRef.current) {
         connectionTestedRef.current = true;
         
         try {
           const result = await RealTimeParkingService.testConnection();
-          console.log('🧪 Connection test result:', result);
           
           if (!isMountedRef.current) return;
           
           if (result.success) {
-            console.log('✅ Starting parking service');
             RealTimeParkingService.start();
             setIsServiceRunning(true);
           } else {
-            console.error('Connection test failed:', result.message);
             Alert.alert(
               'Connection Error',
               `Unable to connect to parking service: ${result.message}`,
@@ -240,37 +251,26 @@ const ParkingMapScreen: React.FC = () => {
         }
       }
 
-      // Subscribe to parking updates
       unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
         if (!isMountedRef.current) return;
-        console.log('Received parking update:', data);
         updateParkingSpotsFromService(data);
       });
 
-      // Subscribe to connection status
       unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
         if (!isMountedRef.current) return;
-        console.log('Connection status changed:', status);
         setConnectionStatus(status);
       });
     };
 
     initializeServices();
 
-    // Cleanup on unmount
     return () => {
-      console.log('🧹 Cleaning up ParkingMapScreen services');
       isMountedRef.current = false;
       servicesInitializedRef.current = false;
       connectionTestedRef.current = false;
       
-      if (unsubscribeParkingUpdates) {
-        unsubscribeParkingUpdates();
-      }
-      
-      if (unsubscribeConnectionStatus) {
-        unsubscribeConnectionStatus();
-      }
+      if (unsubscribeParkingUpdates) unsubscribeParkingUpdates();
+      if (unsubscribeConnectionStatus) unsubscribeConnectionStatus();
       
       try {
         RealTimeParkingService.stop();
@@ -279,61 +279,8 @@ const ParkingMapScreen: React.FC = () => {
         console.error('Error stopping service:', error);
       }
     };
-  }, []); // Empty dependency array - run only once
+  }, [updateParkingSpotsFromService]);
 
-  // 🔄 Initialize parking spots layout (only once)
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-    
-    const spots: ParkingSpot[] = [
-      { id: 'A1', isOccupied: false, position: { x: 680, y: 110 }, width: 35, height: 35 },
-      { id: 'B4', isOccupied: false, position: { x: 500, y: 50 }, width: 35, height: 35 },
-      { id: 'B3', isOccupied: false, position: { x: 540, y: 50 }, width: 35, height: 35 },
-      { id: 'B2', isOccupied: false, position: { x: 580, y: 50 }, width: 35, height: 35 },
-      { id: 'B1', isOccupied: false, position: { x: 620, y: 50 }, width: 35, height: 35 },
-      { id: 'C1', isOccupied: false, position: { x: 450, y: 100 }, width: 35, height: 35 },
-      { id: 'C2', isOccupied: false, position: { x: 450, y: 140 }, width: 35, height: 35 },
-      { id: 'D7', isOccupied: false, position: { x: 120, y: 200 }, width: 35, height: 35 },
-      { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 35, height: 35 },
-      { id: 'D5', isOccupied: false, position: { x: 200, y: 200 }, width: 35, height: 35 },
-      { id: 'D4', isOccupied: false, position: { x: 240, y: 200 }, width: 35, height: 35 },
-      { id: 'D3', isOccupied: false, position: { x: 300, y: 200 }, width: 35, height: 35 },
-      { id: 'D2', isOccupied: false, position: { x: 340, y: 200 }, width: 35, height: 35 },
-      { id: 'D1', isOccupied: false, position: { x: 380, y: 200 }, width: 35, height: 35 },
-      { id: 'J5', isOccupied: false, position: { x: 300, y: 370 }, width: 35, height: 35 },
-      { id: 'J4', isOccupied: false, position: { x: 340, y: 370 }, width: 35, height: 35 },
-      { id: 'J3', isOccupied: false, position: { x: 380, y: 370 }, width: 35, height: 35 },
-      { id: 'J2', isOccupied: false, position: { x: 420, y: 370 }, width: 35, height: 35 },
-      { id: 'J1', isOccupied: false, position: { x: 460, y: 370 }, width: 35, height: 35 },
-      { id: 'E3', isOccupied: false, position: { x: 55, y: 315 }, width: 35, height: 60 },
-      { id: 'E2', isOccupied: false, position: { x: 55, y: 380 }, width: 35, height: 60 },
-      { id: 'E1', isOccupied: false, position: { x: 55, y: 445 }, width: 35, height: 60 },
-      { id: 'F1', isOccupied: false, position: { x: 120, y: 520 }, width: 35, height: 35 },
-      { id: 'F2', isOccupied: false, position: { x: 160, y: 520 }, width: 35, height: 35 },
-      { id: 'F3', isOccupied: false, position: { x: 220, y: 520 }, width: 35, height: 35 },
-      { id: 'F4', isOccupied: false, position: { x: 260, y: 520 }, width: 35, height: 35 },
-      { id: 'F5', isOccupied: false, position: { x: 300, y: 520 }, width: 35, height: 35 },
-      { id: 'F6', isOccupied: false, position: { x: 360, y: 520 }, width: 35, height: 35 },
-      { id: 'F7', isOccupied: false, position: { x: 400, y: 520 }, width: 35, height: 35 },
-      { id: 'G1', isOccupied: false, position: { x: 500, y: 590 }, width: 35, height: 35 },
-      { id: 'G2', isOccupied: false, position: { x: 500, y: 630 }, width: 35, height: 35 },
-      { id: 'G3', isOccupied: false, position: { x: 500, y: 670 }, width: 35, height: 35 }, 
-      { id: 'G4', isOccupied: false, position: { x: 500, y: 730 }, width: 35, height: 35 },
-      { id: 'G5', isOccupied: false, position: { x: 500, y: 770 }, width: 35, height: 35 },
-      { id: 'H1', isOccupied: false, position: { x: 550, y: 830 }, width: 35, height: 35 },
-      { id: 'H2', isOccupied: false, position: { x: 590, y: 830 }, width: 35, height: 35 },
-      { id: 'H3', isOccupied: false, position: { x: 630, y: 830 }, width: 35, height: 35 },
-      { id: 'I5', isOccupied: false, position: { x: 680, y: 590 }, width: 35, height: 35 },
-      { id: 'I4', isOccupied: false, position: { x: 680, y: 630 }, width: 35, height: 35 },
-      { id: 'I3', isOccupied: false, position: { x: 680, y: 670 }, width: 35, height: 35 },
-      { id: 'I2', isOccupied: false, position: { x: 680, y: 730 }, width: 35, height: 35 },
-      { id: 'I1', isOccupied: false, position: { x: 680, y: 770 }, width: 35, height: 35 },
-    ];
-
-    setParkingData(spots);
-  }, []); // Empty dependency array - run only once
-
-  // 🎯 Gesture handlers (same as before)
   const panGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
       context.startX = translateX.value;
@@ -344,10 +291,7 @@ const ParkingMapScreen: React.FC = () => {
       translateY.value = context.startY + event.translationY;
     },
     onEnd: () => {
-      const maxTranslateX = 200;
-      const minTranslateX = -400;
-      const maxTranslateY = 100;
-      const minTranslateY = -300;
+      const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = GESTURE_LIMITS;
 
       if (translateX.value > maxTranslateX) {
         translateX.value = withSpring(maxTranslateX);
@@ -368,13 +312,15 @@ const ParkingMapScreen: React.FC = () => {
       context.startScale = scale.value;
     },
     onActive: (event: any, context: any) => {
-      scale.value = Math.max(0.5, Math.min(3, context.startScale * event.scale));
+      const { minScale, maxScale } = GESTURE_LIMITS;
+      scale.value = Math.max(minScale, Math.min(maxScale, context.startScale * event.scale));
     },
     onEnd: () => {
-      if (scale.value < 0.7) {
-        scale.value = withSpring(0.7);
-      } else if (scale.value > 2.5) {
-        scale.value = withSpring(2.5);
+      const { clampMinScale, clampMaxScale } = GESTURE_LIMITS;
+      if (scale.value < clampMinScale) {
+        scale.value = withSpring(clampMinScale);
+      } else if (scale.value > clampMaxScale) {
+        scale.value = withSpring(clampMaxScale);
       }
     },
   });
@@ -396,36 +342,26 @@ const ParkingMapScreen: React.FC = () => {
       } else if (velocity < -500 || currentY < 25) {
         bottomPanelY.value = withSpring(0);
       } else {
-        if (currentY > 50) {
-          bottomPanelY.value = withSpring(120);
-        } else {
-          bottomPanelY.value = withSpring(0);
-        }
+        bottomPanelY.value = withSpring(currentY > 50 ? 120 : 0);
       }
     },
   });
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { scale: scale.value },
-      ],
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
 
-  const bottomPanelAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: bottomPanelY.value }],
-    };
-  });
+  const bottomPanelAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: bottomPanelY.value }],
+  }));
 
-  // 🔄 Updated refresh handler with mount protection
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     if (!isMountedRef.current) return;
     
-    console.log('🔄 Manual refresh requested');
     try {
       await RealTimeParkingService.forceUpdate();
     } catch (error) {
@@ -434,24 +370,19 @@ const ParkingMapScreen: React.FC = () => {
         Alert.alert('Refresh Failed', 'Unable to refresh parking data. Please try again.');
       }
     }
-  };
+  }, []);
 
-  // 🎯 Event handlers (same as before)
-  const clearNavigation = () => {
+  const clearNavigation = useCallback(() => {
     setShowNavigation(false);
     setNavigationPath([]);
     setSelectedSpot(null);
-  };
+  }, []);
 
-  const handleSectionPress = (sectionId: string) => {
-    if (highlightedSection === sectionId) {
-      setHighlightedSection(null);
-    } else {
-      setHighlightedSection(sectionId);
-    }
-  };
+  const handleSectionPress = useCallback((sectionId: string) => {
+    setHighlightedSection(prev => prev === sectionId ? null : sectionId);
+  }, []);
 
-  const handleSpotPress = (spot: ParkingSpot) => {
+  const handleSpotPress = useCallback((spot: ParkingSpot) => {
     if (spot.isOccupied) {
       Alert.alert('Spot Occupied', 'This parking spot is currently occupied.');
       return;
@@ -465,16 +396,23 @@ const ParkingMapScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Guide Me',
-          onPress: () => {
-            setShowNavigation(true);
-          },
+          onPress: () => setShowNavigation(true),
         },
       ]
     );
-  };
+  }, []);
 
-  // 🎨 Render functions (same as before)
-  const renderParkingSpot = (spot: ParkingSpot) => {
+  const navigateHome = useCallback(() => {
+    navigation.navigate('Home');
+  }, [navigation]);
+
+  const totalAvailableSpots = useMemo(() => 
+    parkingStats?.availableSpots || 
+    parkingSections.reduce((sum, section) => sum + section.availableSlots, 0),
+    [parkingStats, parkingSections]
+  );
+
+  const renderParkingSpot = useCallback((spot: ParkingSpot) => {
     const isSelected = selectedSpot === spot.id;
     const spotSection = spot.id.charAt(0); 
     const isHighlighted = highlightedSection === spotSection;
@@ -501,9 +439,9 @@ const ParkingMapScreen: React.FC = () => {
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [selectedSpot, highlightedSection, handleSpotPress]);
 
-  const renderSectionIndicator = (section: ParkingSection) => (
+  const renderSectionIndicator = useCallback((section: ParkingSection) => (
     <TouchableOpacity
       key={section.id}
       style={[
@@ -521,9 +459,9 @@ const ParkingMapScreen: React.FC = () => {
         {section.isFull ? 'FULL' : `${section.availableSlots} SLOTS`}
       </Text>
     </TouchableOpacity>
-  );
+  ), [highlightedSection, handleSectionPress]);
 
-  const renderNavigationPath = () => {
+  const renderNavigationPath = useCallback(() => {
     if (!showNavigation || navigationPath.length < 2) return null;
 
     return (
@@ -573,32 +511,18 @@ const ParkingMapScreen: React.FC = () => {
                 alignItems: 'center',
                 zIndex: 101,
               }}
-            >
-            </View>
+            />
           );
         })}
       </>
     );
-  };
+  }, [showNavigation, navigationPath]);
 
-  const navigateHome = () => {
-    navigation.navigate('Home');
-  }
-
-  // Calculate total available spots from service data or fallback to sections
-  const totalAvailableSpots = parkingStats?.availableSpots || 
-    parkingSections.reduce((sum, section) => sum + section.availableSlots, 0);
-
-  // 🎨 Render the UI
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header with gradient */}
-      <LinearGradient
-        colors={['#B22020', '#4C0E0E']}
-        style={styles.header}
-      >
+      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -609,13 +533,11 @@ const ParkingMapScreen: React.FC = () => {
         </ScrollView>
       </LinearGradient>
 
-      {/* 🔄 Enhanced Refresh Button */}
       <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
         <Ionicons name="refresh" size={20} color="white" />
         <Text style={styles.refreshText}>Refresh</Text>
       </TouchableOpacity>
 
-      {/* Parking map area with pan and zoom */}
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
           <PinchGestureHandler
@@ -632,11 +554,9 @@ const ParkingMapScreen: React.FC = () => {
                 maxPointers={1}
               >
                 <Animated.View style={[styles.parkingLayout, animatedStyle]}>
-                  {/* Render all parking spots */}
                   {parkingData.map(renderParkingSpot)}
                   {renderNavigationPath()}
                   
-                  {/* Structural elements (same as before) */}
                   <View style={styles.elevator1}>
                     <Text style={styles.elevatorText}>Elevator</Text>
                   </View>
@@ -659,7 +579,6 @@ const ParkingMapScreen: React.FC = () => {
                     <Text style={styles.exitText}>EXIT</Text>
                   </View>
                   
-                  {/* Direction arrows (same as before) */}
                   <View style={styles.arrow1}>
                     <Ionicons name="arrow-up" size={28} color="white" />
                   </View>
@@ -727,13 +646,9 @@ const ParkingMapScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Bottom info panel */}
       <PanGestureHandler ref={bottomPanelPanRef} onGestureEvent={bottomPanelGestureHandler}>
         <Animated.View style={[bottomPanelAnimatedStyle]}>
-          <LinearGradient
-            colors={['#B22020', '#4C0E0E']}
-            style={styles.bottomPanel}
-          >
+          <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.bottomPanel}>
             <View style={styles.dragHandle} />
             
             <View style={styles.floorInfo}>

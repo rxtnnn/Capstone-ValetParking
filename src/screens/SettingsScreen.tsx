@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,7 @@ import {
   Alert,
   Switch,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons  } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { NotificationService } from '../services/NotificationService';
@@ -36,32 +35,97 @@ interface NotificationSettings {
   sound: boolean;
 }
 
+const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
+
+const DEFAULT_SETTINGS: NotificationSettings = {
+  spotAvailable: true,
+  floorUpdates: true,
+  maintenanceAlerts: false,
+  vibration: true,
+  sound: true,
+};
+
+const SWITCH_COLORS = {
+  false: '#E0E0E0',
+  true: '#B22020'
+} as const;
+
+interface SettingItem {
+  key: keyof NotificationSettings;
+  icon: string;
+  iconColor: string;
+  title: string;
+  desc: string;
+  isMatCommunity?: boolean;
+}
+
+const SETTING_ITEMS: SettingItem[] = [
+  {
+    key: 'spotAvailable',
+    icon: 'car',
+    iconColor: '#48D666',
+    title: 'Parking Spots Available',
+    desc: 'Get notified when parking spots become available'
+  },
+  {
+    key: 'floorUpdates',
+    icon: 'layers',
+    iconColor: '#2196F3',
+    title: 'Floor Updates',
+    desc: 'Receive updates about floor occupancy changes'
+  },
+  {
+    key: 'maintenanceAlerts',
+    icon: 'construct',
+    iconColor: '#FF9801',
+    title: 'Maintenance Alerts',
+    desc: 'Get notified about system maintenance'
+  },
+  {
+    key: 'vibration',
+    icon: 'vibrate',
+    iconColor: '#9C27B0',
+    title: 'Vibration',
+    desc: 'Enable vibration for notifications',
+    isMatCommunity: true
+  },
+  {
+    key: 'sound',
+    icon: 'volume-high',
+    iconColor: '#4CAF50',
+    title: 'Sound',
+    desc: 'Play sound with notifications'
+  }
+];
+
+const APP_SETTINGS = [
+  {
+    icon: 'person-outline',
+    title: 'Profile',
+    desc: 'View and edit your profile information',
+    navigate: 'Profile' as keyof RootStackParamList
+  },
+  {
+    icon: 'chatbubble-outline',
+    title: 'Feedback',
+    desc: 'Send feedback and suggestions',
+    navigate: 'Feedback' as keyof RootStackParamList
+  }
+] as const;
+
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
   const { user, logout, isAuthenticated } = useAuth();
-  
-  const [fontsLoaded] = useFonts({
-    Poppins_400Regular,
-    Poppins_600SemiBold,
-  });
+  const [fontsLoaded] = useFonts(FONTS);
 
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    spotAvailable: true,
-    floorUpdates: true,
-    maintenanceAlerts: false,
-    vibration: true,
-    sound: true,
-  });
-
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
-  const isMountedRef = useRef(true); // 🔥 NEW: Track if component is mounted
-  const logoutInProgressRef = useRef(false); // 🔥 NEW: Track logout state
+  const isMountedRef = useRef(true);
+  const logoutInProgressRef = useRef(false);
 
-  // 🔥 NEW: Check authentication when screen is focused
   useFocusEffect(
     React.useCallback(() => {
       if (!isAuthenticated && !logoutInProgressRef.current) {
-        console.log('🔐 User not authenticated in Settings, redirecting...');
         navigation.navigate('Login');
       }
     }, [isAuthenticated, navigation])
@@ -76,7 +140,7 @@ const SettingsScreen: React.FC = () => {
     };
   }, []);
 
-  const loadNotificationSettings = async () => {
+  const loadNotificationSettings = useCallback(async () => {
     if (!isMountedRef.current) return;
     
     try {
@@ -87,9 +151,9 @@ const SettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('Error loading notification settings:', error);
     }
-  };
+  }, []);
 
-  const saveNotificationSettings = async (newSettings: NotificationSettings) => {
+  const saveNotificationSettings = useCallback(async (newSettings: NotificationSettings) => {
     if (!isMountedRef.current) return;
     
     try {
@@ -103,57 +167,27 @@ const SettingsScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to save settings. Please try again.');
       }
     }
-  };
+  }, []);
 
-  const handleSettingChange = (key: keyof NotificationSettings, value: boolean) => {
+  const handleSettingChange = useCallback((key: keyof NotificationSettings, value: boolean) => {
     if (!isMountedRef.current) return;
     
     const newSettings = { ...notificationSettings, [key]: value };
     saveNotificationSettings(newSettings);
-  };
+  }, [notificationSettings, saveNotificationSettings]);
 
-  // 🔥 FIXED: Improved logout handling
-  const handleLogout = () => {
-    // Prevent multiple logout attempts
-    if (logoutInProgressRef.current) {
-      return;
-    }
-
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: performLogout
-        }
-      ]
-    );
-  };
-
-  // 🔥 NEW: Separate logout function with better error handling
-  const performLogout = async () => {
-    if (logoutInProgressRef.current || !isMountedRef.current) {
-      return;
-    }
+  const performLogout = useCallback(async () => {
+    if (logoutInProgressRef.current || !isMountedRef.current) return;
 
     logoutInProgressRef.current = true;
 
     try {
-      console.log('🚪 Starting logout from Settings...');
-      
       if (isMountedRef.current) {
         setLoading(true);
       }
 
-      // Call logout from auth context
       await logout();
       
-      console.log('✅ Logout successful from Settings');
-      
-      // Small delay to ensure state is updated
       setTimeout(() => {
         if (isMountedRef.current) {
           navigation.navigate('Login');
@@ -161,7 +195,7 @@ const SettingsScreen: React.FC = () => {
       }, 100);
 
     } catch (error) {
-      console.error('💥 Logout error in Settings:', error);
+      console.error('Logout error in Settings:', error);
       
       if (isMountedRef.current) {
         Alert.alert(
@@ -190,34 +224,85 @@ const SettingsScreen: React.FC = () => {
         setLoading(false);
       }
       
-      // Reset logout flag after a delay
       setTimeout(() => {
         logoutInProgressRef.current = false;
       }, 1000);
     }
-  };
+  }, [logout, navigation]);
 
-  const requestNotificationPermissions = async () => {
-    if (!isMountedRef.current) return;
+  const handleLogout = useCallback(() => {
+    if (logoutInProgressRef.current) return;
+
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: performLogout
+        }
+      ]
+    );
+  }, [performLogout]);
+
+  const handleNavigation = useCallback((screen: keyof RootStackParamList) => {
+    if (loading) return;
     
-    try {
-      const granted = await NotificationService.requestPermissions();
-      if (!isMountedRef.current) return;
-      
-      if (granted) {
-        Alert.alert('Success', 'Notification permissions granted!');
-      } else {
-        Alert.alert('Permission Denied', 'Please enable notifications in your device settings for the best experience.');
-      }
-    } catch (error) {
-      console.error('Error requesting permissions:', error);
-      if (isMountedRef.current) {
-        Alert.alert('Error', 'Failed to request permissions. Please try again.');
-      }
+    if (screen === 'Profile') {
+      navigation.navigate(screen, { userId: user?.id });
+    } else {
+      navigation.navigate(screen);
     }
-  };
+  }, [loading, navigation, user?.id]);
 
-  // 🔥 NEW: Don't render if not authenticated
+  const renderSettingItem = useCallback((item: SettingItem, index: number) => {
+    const IconComponent = item.isMatCommunity ? MaterialCommunityIcons : Ionicons;
+    
+    return (
+      <React.Fragment key={item.key}>
+        <View style={styles.settingItem}>
+          <View style={styles.settingLeft}>
+            <IconComponent name={item.icon as any} size={20} color={item.iconColor} />
+            <View style={styles.settingText}>
+              <Text style={styles.settingTitle}>{item.title}</Text>
+              <Text style={styles.settingDesc}>{item.desc}</Text>
+            </View>
+          </View>
+          <Switch
+            value={notificationSettings[item.key]}
+            onValueChange={(value) => handleSettingChange(item.key, value)}
+            trackColor={SWITCH_COLORS}
+            thumbColor={notificationSettings[item.key] ? '#FFFFFF' : '#F4F3F4'}
+            disabled={loading}
+          />
+        </View>
+        {index < SETTING_ITEMS.length - 1 && <View style={styles.divider} />}
+      </React.Fragment>
+    );
+  }, [notificationSettings, handleSettingChange, loading]);
+
+  const renderAppSettingItem = useCallback((item: typeof APP_SETTINGS[number], index: number) => (
+    <React.Fragment key={item.navigate}>
+      <TouchableOpacity 
+        style={[styles.settingItem, loading && styles.disabledItem]} 
+        onPress={() => handleNavigation(item.navigate)}
+        disabled={loading}
+      >
+        <View style={styles.settingLeft}>
+          <Ionicons name={item.icon as any} size={20} color={loading ? "#ccc" : "#666"} />
+          <View style={styles.settingText}>
+            <Text style={[styles.settingTitle, loading && styles.disabledText]}>{item.title}</Text>
+            <Text style={[styles.settingDesc, loading && styles.disabledText]}>{item.desc}</Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={loading ? "#ccc" : "#999"} />
+      </TouchableOpacity>
+      {index < APP_SETTINGS.length - 1 && <View style={styles.divider} />}
+    </React.Fragment>
+  ), [loading, handleNavigation]);
+
   if (!isAuthenticated && !logoutInProgressRef.current) {
     return null;
   }
@@ -244,144 +329,24 @@ const SettingsScreen: React.FC = () => {
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* Notification Settings Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="notifications" size={24} color="#B22020" />
             <Text style={styles.cardTitle}>Notification Settings</Text>
           </View>
           
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="car" size={20} color="#48D666" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Parking Spots Available</Text>
-                <Text style={styles.settingDesc}>Get notified when parking spots become available</Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationSettings.spotAvailable}
-              onValueChange={(value) => handleSettingChange('spotAvailable', value)}
-              trackColor={{ false: '#E0E0E0', true: '#B22020' }}
-              thumbColor={notificationSettings.spotAvailable ? '#FFFFFF' : '#F4F3F4'}
-              disabled={loading}
-            />
-          </View>
-          
-          <View style={styles.divider} />
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="layers" size={20} color="#2196F3" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Floor Updates</Text>
-                <Text style={styles.settingDesc}>Receive updates about floor occupancy changes</Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationSettings.floorUpdates}
-              onValueChange={(value) => handleSettingChange('floorUpdates', value)}
-              trackColor={{ false: '#E0E0E0', true: '#B22020' }}
-              thumbColor={notificationSettings.floorUpdates ? '#FFFFFF' : '#F4F3F4'}
-              disabled={loading}
-            />
-          </View>
-          
-          <View style={styles.divider} />
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="construct" size={20} color="#FF9801" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Maintenance Alerts</Text>
-                <Text style={styles.settingDesc}>Get notified about system maintenance</Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationSettings.maintenanceAlerts}
-              onValueChange={(value) => handleSettingChange('maintenanceAlerts', value)}
-              trackColor={{ false: '#E0E0E0', true: '#B22020' }}
-              thumbColor={notificationSettings.maintenanceAlerts ? '#FFFFFF' : '#F4F3F4'}
-              disabled={loading}
-            />
-          </View>
-          
-          <View style={styles.divider} />
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <MaterialCommunityIcons name="vibrate" size={20} color="#9C27B0" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Vibration</Text>
-                <Text style={styles.settingDesc}>Enable vibration for notifications</Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationSettings.vibration}
-              onValueChange={(value) => handleSettingChange('vibration', value)}
-              trackColor={{ false: '#E0E0E0', true: '#B22020' }}
-              thumbColor={notificationSettings.vibration ? '#FFFFFF' : '#F4F3F4'}
-              disabled={loading}
-            />
-          </View>
-          
-          <View style={styles.divider} />
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="volume-high" size={20} color="#4CAF50" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Sound</Text>
-                <Text style={styles.settingDesc}>Play sound with notifications</Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationSettings.sound}
-              onValueChange={(value) => handleSettingChange('sound', value)}
-              trackColor={{ false: '#E0E0E0', true: '#B22020' }}
-              thumbColor={notificationSettings.sound ? '#FFFFFF' : '#F4F3F4'}
-              disabled={loading}
-            />
-          </View>
+          {SETTING_ITEMS.map(renderSettingItem)}
         </View>
 
-        {/* App Settings Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="settings" size={24} color="#B22020" />
             <Text style={styles.cardTitle}>App Settings</Text>
           </View>
           
-          <TouchableOpacity 
-            style={[styles.settingItem, loading && styles.disabledItem]} 
-            onPress={() => !loading && navigation.navigate('Profile', { userId: user?.id })}
-            disabled={loading}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="person-outline" size={20} color={loading ? "#ccc" : "#666"} />
-              <View style={styles.settingText}>
-                <Text style={[styles.settingTitle, loading && styles.disabledText]}>Profile</Text>
-                <Text style={[styles.settingDesc, loading && styles.disabledText]}>View and edit your profile information</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={loading ? "#ccc" : "#999"} />
-          </TouchableOpacity>
-          
-          <View style={styles.divider} />
-          <TouchableOpacity 
-            style={[styles.settingItem, loading && styles.disabledItem]} 
-            onPress={() => !loading && navigation.navigate('Feedback')}
-            disabled={loading}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons name="chatbubble-outline" size={20} color={loading ? "#ccc" : "#666"} />
-              <View style={styles.settingText}>
-                <Text style={[styles.settingTitle, loading && styles.disabledText]}>Feedback</Text>
-                <Text style={[styles.settingDesc, loading && styles.disabledText]}>Send feedback and suggestions</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={loading ? "#ccc" : "#999"} />
-          </TouchableOpacity>
-          
+          {APP_SETTINGS.map(renderAppSettingItem)}
         </View>
 
-        {/* Account Actions Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="log-out" size={24} color="#F44336" />
@@ -406,7 +371,6 @@ const SettingsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={styles.appInfoText}>VALET v1.0.0</Text>
           <Text style={styles.appInfoSubtext}>Your Virtual Parking Buddy</Text>

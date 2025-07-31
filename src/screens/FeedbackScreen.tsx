@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,6 +43,7 @@ type RootStackParamList = {
 
 type FeedbackScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Feedback'>;
 type FeedbackRouteProp = RouteProp<RootStackParamList, 'Feedback'>;
+
 interface Props {
   navigation: FeedbackScreenNavigationProp;
 }
@@ -54,15 +55,146 @@ interface FeedbackType {
   description: string;
 }
 
-const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
-  const [fontsLoaded] = useFonts({
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-  });
+interface CustomAlertProps {
+  visible: boolean;
+  title: string;
+  message: string;
+  buttons: Array<{
+    text: string;
+    onPress?: () => void;
+    style?: 'default' | 'cancel' | 'destructive';
+  }>;
+  onClose: () => void;
+}
 
-  // Main state
+const CustomAlert: React.FC<CustomAlertProps> = ({ visible, title, message, buttons, onClose }) => {
+  if (!visible) return null;
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.alertOverlay}>
+        <View style={styles.alertContainer}>
+          <View style={styles.alertIconContainer}>
+          </View>
+          
+          <Text style={styles.alertTitle}>{title}</Text>
+          <Text style={styles.alertMessage}>{message}</Text>
+          
+          <View style={styles.alertButtonContainer}>
+            {buttons.map((button, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.alertButton,
+                  button.style === 'cancel' && styles.alertCancelButton,
+                  buttons.length === 1 && styles.alertSingleButton,
+                  index === 0 && buttons.length > 1 && styles.alertPrimaryButton,
+                ]}
+                onPress={() => {
+                  button.onPress?.();
+                  onClose();
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  styles.alertButtonText,
+                  button.style === 'cancel' && styles.alertCancelButtonText,
+                  index === 0 && buttons.length > 1 && styles.alertPrimaryButtonText,
+                ]}>
+                  {button.text}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const FONTS = {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+};
+
+const FEEDBACK_TYPES: FeedbackType[] = [
+  { 
+    value: 'general', 
+    label: 'Rate Experience', 
+    icon: 'star-outline',
+    description: 'Share your overall app experience'
+  },
+  { 
+    value: 'parking', 
+    label: 'Parking Issues', 
+    icon: 'car-outline',
+    description: 'Report parking spot or navigation problems'
+  },
+  { 
+    value: 'technical', 
+    label: 'Bug Reports', 
+    icon: 'bug-outline',
+    description: 'Technical issues or app crashes'
+  },
+  { 
+    value: 'suggestion', 
+    label: 'Suggestions', 
+    icon: 'bulb-outline',
+    description: 'Ideas for new features'
+  },
+];
+
+const COMMON_ISSUES = [
+  'Sensor accuracy',
+  'App crashes',
+  'Slow loading',
+  'Wrong spot status',
+  'Map navigation',
+  'Notifications',
+  'Login issues',
+  'Data sync',
+];
+
+const RATING_LABELS = ['Very Poor 😞', 'Poor 😐', 'Average 🙂', 'Good 😊', 'Excellent 🤩'];
+
+const STATUS_COLORS = {
+  pending: '#F59E0B',
+  reviewed: '#EF4444',
+  resolved: '#10B981',
+  default: '#6B7280'
+};
+
+const TYPE_ICONS = {
+  general: 'star-outline',
+  technical: 'bug-outline',
+  suggestion: 'bulb-outline',
+  parking: 'car-outline',
+  default: 'chatbubble-outline'
+};
+
+const DEFAULT_DEVICE_INFO = {
+  platform: 'unknown',
+  version: 'unknown',
+  model: 'Unknown Device',
+  systemVersion: 'unknown',
+  appVersion: '1.0.0',
+  buildNumber: '1',
+};
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
+  const [fontsLoaded] = useFonts(FONTS);
+  const route = useRoute<FeedbackRouteProp>();
+  const { showReplies: initialShowReplies } = route.params || {};
+
   const [showReplies, setShowReplies] = useState(false);
   const [feedbackType, setFeedbackType] = useState<FeedbackData['type']>('general');
   const [rating, setRating] = useState(0);
@@ -70,121 +202,138 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
-const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Use feedback hook
+  // Custom alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertData, setAlertData] = useState<{
+    title: string;
+    message: string;
+    buttons: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }>;
+  }>({
+    title: '',
+    message: '',
+    buttons: [],
+  });
+
   const { 
     feedback, 
     loading: repliesLoading, 
     refreshFeedback, 
-    checkForNewReplies,  // 🔥 NEW: Get the new method
-    currentUserId        // 🔥 NEW: Get current user ID
+    checkForNewReplies,
+    currentUserId
   } = useFeedback();
 
-  const route = useRoute<FeedbackRouteProp>();
-  const { showReplies: initialShowReplies } = route.params || {};
-  
   useEffect(() => {
     if (initialShowReplies) {
       setShowReplies(true);
     }
   }, [initialShowReplies]);
 
-  // 🔥 UPDATED: More descriptive feedback types
-  const feedbackTypes: FeedbackType[] = [
-    { 
-      value: 'general', 
-      label: 'Rate Experience', 
-      icon: 'star-outline',
-      description: 'Share your overall app experience'
-    },
-    { 
-      value: 'parking', 
-      label: 'Parking Issues', 
-      icon: 'car-outline',
-      description: 'Report parking spot or navigation problems'
-    },
-    { 
-      value: 'technical', 
-      label: 'Bug Reports', 
-      icon: 'bug-outline',
-      description: 'Technical issues or app crashes'
-    },
-    { 
-      value: 'suggestion', 
-      label: 'Suggestions', 
-      icon: 'bulb-outline',
-      description: 'Ideas for new features'
-    },
-  ];
-
-  const commonIssues = [
-    'Sensor accuracy',
-    'App crashes',
-    'Slow loading',
-    'Wrong spot status',
-    'Map navigation',
-    'Notifications',
-    'Login issues',
-    'Data sync',
-  ];
-
-  // Get feedback with admin replies
-  const feedbackWithReplies = feedback.filter(item => 
-    item.admin_response && item.admin_response.trim().length > 0
+  const feedbackWithReplies = useMemo(() => 
+    feedback.filter(item => 
+      item.admin_response?.trim() && 
+      (!currentUserId || item.user_id === currentUserId)
+    ), [feedback, currentUserId]
   );
 
-  const handleRatingPress = (value: number) => {
-    setRating(value);
+  const showCustomAlert = (title: string, message: string, buttons: Array<{
+    text: string;
+    onPress?: () => void;
+    style?: 'default' | 'cancel' | 'destructive';
+  }>) => {
+    setAlertData({ title, message, buttons });
+    setAlertVisible(true);
   };
 
-  const handleIssueToggle = (issue: string) => {
+  const getPlaceholderText = useCallback((): string => {
+    const placeholders = {
+      general: "Tell us about your experience with VALET. What did you like? What could be improved?",
+      parking: "Describe the parking issue you encountered. Which floor or area was affected?",
+      technical: "What technical problem did you experience? When did it happen?",
+      suggestion: "What new feature would you like to see? How would it improve your experience?"
+    };
+    return placeholders[feedbackType] || "Share your thoughts with us...";
+  }, [feedbackType]);
+
+  const formatTimeAgo = useCallback((dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+
+    if (diffInDays > 0) return `${diffInDays}d ago`;
+    if (diffInHours > 0) return `${diffInHours}h ago`;
+    if (diffInMinutes > 0) return `${diffInMinutes}m ago`;
+    return 'Just now';
+  }, []);
+
+  const getStatusColor = useCallback((status: string) => 
+    STATUS_COLORS[status as keyof typeof STATUS_COLORS] || STATUS_COLORS.default, []);
+
+  const getTypeIcon = useCallback((type: string) => 
+    TYPE_ICONS[type as keyof typeof TYPE_ICONS] || TYPE_ICONS.default, []);
+
+  const handleRatingPress = useCallback((value: number) => {
+    setRating(value);
+  }, []);
+
+  const handleIssueToggle = useCallback((issue: string) => {
     setSelectedIssues(prev => 
       prev.includes(issue) 
         ? prev.filter(i => i !== issue)
         : [...prev, issue]
     );
-  };
+  }, []);
 
-  const validateForm = (): boolean => {
+  const validateForm = useCallback((): boolean => {
     if (!message.trim()) {
-      Alert.alert('Required Field', 'Please share your feedback with us');
+      showCustomAlert('Required Field', 'Please share your feedback with us to help improve VALET.', [
+        { text: 'Understood', style: 'default' }
+      ]);
       return false;
     }
 
     if (message.trim().length < 10) {
-      Alert.alert('More Details Needed', 'Please provide more detailed feedback (at least 10 characters)');
+      showCustomAlert('More Details Needed', 'Please provide more detailed feedback (at least 10 characters) so we can better understand your experience.', [
+        { text: 'Understood', style: 'default' }
+      ]);
       return false;
     }
 
     if (feedbackType === 'general' && rating === 0) {
-      Alert.alert('Rating Required', 'Please rate your experience');
+      showCustomAlert('Rating Required', 'Please rate your experience with VALET to help us understand how we\'re doing.', [
+        { text: 'Understood', style: 'default' }
+      ]);
       return false;
     }
 
-    if (email.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email.trim())) {
-        Alert.alert('Invalid Email', 'Please enter a valid email address');
-        return false;
-      }
+    if (email.trim() && !EMAIL_REGEX.test(email.trim())) {
+      showCustomAlert('Invalid Email', 'Please enter a valid email address if you\'d like us to follow up with you.', [
+        { text: 'Understood', style: 'default' }
+      ]);
+      return false;
     }
 
     return true;
-  };
+  }, [message, feedbackType, rating, email]);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setMessage('');
     setEmail('');
     setRating(0);
     setSelectedIssues([]);
     setFeedbackType('general');
-  };
+  }, []);
 
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
+  const handleSubmit = useCallback(async () => {
+    if (!validateForm()) return;
 
     setLoading(true);
 
@@ -192,17 +341,9 @@ const [refreshing, setRefreshing] = useState(false);
       let deviceInfo;
       try {
         deviceInfo = await getBasicDeviceInfo();
-        console.log('Device info collected:', deviceInfo);
       } catch (deviceError) {
         console.error('Failed to get device info:', deviceError);
-        deviceInfo = {
-          platform: 'unknown',
-          version: 'unknown',
-          model: 'Unknown Device',
-          systemVersion: 'unknown',
-          appVersion: '1.0.0',
-          buildNumber: '1',
-        };
+        deviceInfo = DEFAULT_DEVICE_INFO;
       }
 
       const feedbackData: any = {
@@ -227,193 +368,103 @@ const [refreshing, setRefreshing] = useState(false);
         feedbackData.issues = selectedIssues;
       }
 
-      console.log('Submitting feedback data:', feedbackData);
-
-      // 🔥 UPDATED: Use the hook's submit method (which now uses dynamic user ID)
       const feedbackId = await ApiService.submitFeedback(feedbackData);
       
       if (feedbackId) {
-        console.log('Feedback submitted successfully with ID:', feedbackId);
-
         resetForm();
-        
-        // 🔥 NEW: Refresh both feedback and check for any new replies
         await refreshFeedback();
         
-        // 🔥 NEW: Check for immediate replies (in case admin responds quickly)
         if (currentUserId) {
           setTimeout(async () => {
             await checkForNewReplies();
-          }, 2000); // Check after 2 seconds
+          }, 2000);
         }
 
-        Alert.alert(
+        showCustomAlert(
           'Thank You! 🙏',
-          `Your feedback has been submitted successfully.\n\nWe'll notify you when we respond to your feedback.`,
+          'Your feedback has been submitted successfully. We truly appreciate you taking the time to help us improve VALET.\n\nWe\'ll notify you when our team responds to your feedback.',
           [
-            { 
-              text: 'Submit Another', 
-              style: 'default'
-            },
-            { 
-              text: 'Done', 
-              style: 'cancel',
-              onPress: () => navigation.goBack() 
-            }
+            { text: 'Submit Another', style: 'default' },
+            { text: 'Done', style: 'cancel', onPress: () => navigation.goBack() }
           ]
         );
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);
       
-      let errorMessage = 'Failed to submit your feedback. Please try again.';
+      let errorTitle = 'Submission Failed';
+      let errorMessage = 'We couldn\'t submit your feedback right now. Please try again in a moment.';
       
       if (error instanceof Error) {
         if (error.message.includes('Authentication failed')) {
-          errorMessage = 'Authentication error. Please log in again.';
+          errorTitle = 'Authentication Error';
+          errorMessage = 'Your session has expired. Please log in again and try submitting your feedback.';
         } else if (error.message.includes('Validation failed')) {
-          errorMessage = 'Please check your input and try again.';
+          errorTitle = 'Invalid Information';
+          errorMessage = 'Please check your information and try again. Make sure all required fields are filled out correctly.';
         } else if (error.message.includes('Network')) {
-          errorMessage = 'Network error. Please check your connection.';
+          errorTitle = 'Connection Problem';
+          errorMessage = 'Please check your internet connection and try again.';
         }
       }
       
-      Alert.alert(
-        'Submission Failed',
+      showCustomAlert(
+        errorTitle,
         errorMessage,
         [
-          { text: 'Retry', onPress: handleSubmit },
+          { text: 'Try Again', onPress: handleSubmit },
           { text: 'Cancel', style: 'cancel' }
         ]
       );
     } finally {
       setLoading(false);
     }
-  };
-const onRefresh = async () => {
+  }, [validateForm, feedbackType, message, rating, email, selectedIssues, resetForm, refreshFeedback, currentUserId, checkForNewReplies, navigation]);
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      console.log('🔄 Refreshing feedback and checking for new replies...');
-      
-      // Refresh user's feedback
       await refreshFeedback();
       
-      // Check for new replies and update notifications
       if (currentUserId) {
         await checkForNewReplies();
         await NotificationManager.checkForFeedbackReplies(currentUserId);
       }
-      
     } catch (error) {
       console.error('Error refreshing notifications:', error);
     }
     setRefreshing(false);
-  };
+  }, [refreshFeedback, currentUserId, checkForNewReplies]);
 
-  const getPlaceholderText = (): string => {
-    switch (feedbackType) {
-      case 'general':
-        return "Tell us about your experience with VALET. What did you like? What could be improved?";
-      case 'parking':
-        return "Describe the parking issue you encountered. Which floor or area was affected?";
-      case 'technical':
-        return "What technical problem did you experience? When did it happen?";
-      case 'suggestion':
-        return "What new feature would you like to see? How would it improve your experience?";
-      default:
-        return "Share your thoughts with us...";
-    }
-  };
-
-  const formatTimeAgo = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-
-    if (diffInDays > 0) {
-      return `${diffInDays}d ago`;
-    } else if (diffInHours > 0) {
-      return `${diffInHours}h ago`;
-    } else if (diffInMinutes > 0) {
-      return `${diffInMinutes}m ago`;
-    } else {
-      return 'Just now';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return '#F59E0B';
-      case 'reviewed':
-        return '#EF4444';
-      case 'resolved':
-        return '#10B981';
-      default:
-        return '#6B7280';
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'general':
-        return 'star-outline';
-      case 'technical':
-        return 'bug-outline';
-      case 'suggestion':
-        return 'bulb-outline';
-      case 'parking':
-        return 'car-outline';
-      default:
-        return 'chatbubble-outline';
-    }
-  };
-
-  const renderStarRating = () => {
-    return (
-      <View style={styles.ratingContainer}>
-        <Text style={styles.ratingLabel}>Rate your experience</Text>
-        <View style={styles.starsContainer}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <TouchableOpacity
-              key={star}
-              onPress={() => handleRatingPress(star)}
-              style={styles.starButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={star <= rating ? 'star' : 'star-outline'}
-                size={28}
-                color={star <= rating ? '#FFD700' : '#E5E7EB'}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
-        {rating > 0 && (
-          <Text style={styles.ratingFeedback}>
-            {rating === 1 && 'Very Poor 😞'}
-            {rating === 2 && 'Poor 😐'}
-            {rating === 3 && 'Average 🙂'}
-            {rating === 4 && 'Good 😊'}
-            {rating === 5 && 'Excellent 🤩'}
-          </Text>
-        )}
+  const renderStarRating = useCallback(() => (
+    <View style={styles.ratingContainer}>
+      <Text style={styles.ratingLabel}>Rate your experience</Text>
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity
+            key={star}
+            onPress={() => handleRatingPress(star)}
+            style={styles.starButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={star <= rating ? 'star' : 'star-outline'}
+              size={28}
+              color={star <= rating ? '#FFD700' : '#E5E7EB'}
+            />
+          </TouchableOpacity>
+        ))}
       </View>
-    );
-  };
+      {rating > 0 && (
+        <Text style={styles.ratingFeedback}>
+          {RATING_LABELS[rating - 1]}
+        </Text>
+      )}
+    </View>
+  ), [rating, handleRatingPress]);
 
-   const renderAdminReplies = () => {
-    // Filter feedback to only show items for current user with replies
-    const userFeedbackWithReplies = feedback.filter(item => 
-      item.admin_response && 
-      item.admin_response.trim().length > 0 &&
-      (!currentUserId || item.user_id === currentUserId) // Ensure it belongs to current user
-    );
-
-    if (userFeedbackWithReplies.length === 0) {
+  const renderAdminReplies = useCallback(() => {
+    if (feedbackWithReplies.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
@@ -443,8 +494,7 @@ const onRefresh = async () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.repliesContent}
       >
-        
-        {userFeedbackWithReplies.map((item, index) => (
+        {feedbackWithReplies.map((item, index) => (
           <View key={item.id || index} style={styles.replyCard}>
             <View style={styles.replyHeader}>
               <View style={styles.replyTypeContainer}>
@@ -507,13 +557,20 @@ const onRefresh = async () => {
         ))}
       </ScrollView>
     );
-  };
+  }, [feedbackWithReplies, repliesLoading, onRefresh, getTypeIcon, getStatusColor, formatTimeAgo]);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
       
-      {/* Header */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertData.title}
+        message={alertData.message}
+        buttons={alertData.buttons}
+        onClose={() => setAlertVisible(false)}
+      />
+      
       <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity 
@@ -569,7 +626,6 @@ const onRefresh = async () => {
         </View>
       </LinearGradient>
 
-      {/* Content */}
       {showReplies ? (
         renderAdminReplies()
       ) : (
@@ -583,11 +639,10 @@ const onRefresh = async () => {
             contentContainerStyle={styles.scrollContent}
           >
             
-            {/* Feedback Type Selection */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>What would you like to share?</Text>
               <View style={styles.typeGrid}>
-                {feedbackTypes.map((type) => (
+                {FEEDBACK_TYPES.map((type) => (
                   <TouchableOpacity
                     key={type.value}
                     style={[
@@ -624,7 +679,6 @@ const onRefresh = async () => {
               </View>
             </View>
 
-            {/* Rating Section */}
             {feedbackType === 'general' && (
               <View style={styles.section}>
                 <View style={styles.card}>
@@ -633,7 +687,6 @@ const onRefresh = async () => {
               </View>
             )}
 
-            {/* Common Issues */}
             {(feedbackType === 'technical' || feedbackType === 'parking') && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Issues</Text>
@@ -642,7 +695,7 @@ const onRefresh = async () => {
                 </Text>
                 <View style={styles.card}>
                   <View style={styles.chipsContainer}>
-                    {commonIssues.map((issue) => (
+                    {COMMON_ISSUES.map((issue) => (
                       <TouchableOpacity
                         key={issue}
                         style={[
@@ -664,7 +717,6 @@ const onRefresh = async () => {
               </View>
             )}
 
-            {/* Message Input */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Your Message</Text>
               <Text style={styles.sectionSubtitle}>
@@ -691,7 +743,6 @@ const onRefresh = async () => {
               </View>
             </View>
 
-            {/* Email Input */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Email (Optional)</Text>
               <Text style={styles.sectionSubtitle}>
@@ -715,7 +766,6 @@ const onRefresh = async () => {
               </View>
             </View>
 
-            {/* Submit Button */}
             <View style={styles.submitContainer}>
               <TouchableOpacity
                 onPress={handleSubmit}
@@ -738,7 +788,6 @@ const onRefresh = async () => {
               </TouchableOpacity>
             </View>
 
-            {/* Quick Contact */}
             <View style={styles.section}>
               <View style={styles.contactCard}>
                 <View style={styles.contactHeader}>
@@ -769,4 +818,3 @@ const onRefresh = async () => {
 };
 
 export default FeedbackScreen;
-

@@ -14,6 +14,21 @@ interface NotificationSettings {
 }
 
 const SETTINGS_KEY = '@valet_notification_settings';
+const DEFAULT_VIBRATION = [0, 250, 250, 250];
+const DEFAULT_SETTINGS: NotificationSettings = {
+  spotAvailable: true,
+  floorUpdates: true,
+  maintenanceAlerts: false,
+  vibration: true,
+  sound: true,
+};
+
+const CHANNELS = {
+  SPOT_AVAILABLE: 'spot-available',
+  FLOOR_UPDATES: 'floor-updates',
+  FEEDBACK_REPLIES: 'feedback-replies',
+  DEFAULT: 'default'
+} as const;
 
 class NotificationServiceClass {
   private expoPushToken: string | null = null;
@@ -30,180 +45,146 @@ class NotificationServiceClass {
         }),
       });
 
-      if (Platform.OS === 'android') {
-        await this.createNotificationChannels();
-      }
-
-      await this.registerForPushNotifications();
+      await Promise.all([
+        Platform.OS === 'android' ? this.createNotificationChannels() : Promise.resolve(),
+        this.registerForPushNotifications()
+      ]);
     } catch (error) {
       console.error('Error initializing NotificationService:', error);
     }
   }
 
   private async createNotificationChannels(): Promise<void> {
-    await Notifications.setNotificationChannelAsync('spot-available', {
-      name: 'Parking Spots Available',
-      description: 'Notifications when new parking spots become available',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      sound: 'default',
-      lightColor: '#4CAF50',
-    });
+    const channels = [
+      {
+        id: CHANNELS.SPOT_AVAILABLE,
+        name: 'Parking Spots Available',
+        description: 'Notifications when new parking spots become available',
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: '#4CAF50',
+      },
+      {
+        id: CHANNELS.FLOOR_UPDATES,
+        name: 'Floor Status Updates',
+        description: 'Updates about floor occupancy changes',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        lightColor: '#2196F3',
+      },
+      {
+        id: CHANNELS.FEEDBACK_REPLIES,
+        name: 'Feedback Replies',
+        description: 'Admin replies to your feedback',
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: '#B22020',
+      }
+    ];
 
-    await Notifications.setNotificationChannelAsync('floor-updates', {
-      name: 'Floor Status Updates',
-      description: 'Updates about floor occupancy changes',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 150, 150, 150],
-      sound: 'default',
-      lightColor: '#2196F3',
-    });
-
-    await Notifications.setNotificationChannelAsync('feedback-replies', {
-      name: 'Feedback Replies',
-      description: 'Admin replies to your feedback',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      sound: 'default',
-      lightColor: '#B22020',
-    });
-
-    // 🔥 REMOVED: connection-status channel - no longer needed
+    await Promise.all(
+      channels.map(channel =>
+        Notifications.setNotificationChannelAsync(channel.id, {
+          ...channel,
+          vibrationPattern: DEFAULT_VIBRATION,
+          sound: 'default',
+        })
+      )
+    );
   }
 
   private async registerForPushNotifications(): Promise<string | null> {
-    let token = null;
-
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
+      await Notifications.setNotificationChannelAsync(CHANNELS.DEFAULT, {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
+        vibrationPattern: DEFAULT_VIBRATION,
         lightColor: '#B71C1C',
       });
     }
 
-    if (Device.isDevice) {
+    if (!Device.isDevice) {
+      console.warn('Must use physical device for Push Notifications');
+      return null;
+    }
+
+    try {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
+      const finalStatus = existingStatus !== 'granted' 
+        ? (await Notifications.requestPermissionsAsync()).status 
+        : existingStatus;
       
       if (finalStatus !== 'granted') {
         console.warn('Push notification permissions not granted');
         return null;
       }
       
-      try {
-        const tokenData = await Notifications.getExpoPushTokenAsync({
-          projectId: Constants.expoConfig?.extra?.eas?.projectId,
-        });
-        token = tokenData.data;
-        this.expoPushToken = token;
-      } catch (error) {
-        console.error('Error getting push token:', error);
-      }
-    } else {
-      console.warn('Must use physical device for Push Notifications');
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+      
+      this.expoPushToken = tokenData.data;
+      return tokenData.data;
+    } catch (error) {
+      console.error('Error getting push token:', error);
+      return null;
     }
-
-    return token;
   }
 
-  // 🔥 ENHANCED: Now also adds to NotificationManager for in-app display
-  async showSpotAvailableNotification(
-    spotsAvailable: number,
-    floor?: number
-  ): Promise<void> {
+  async showSpotAvailableNotification(spotsAvailable: number, floor?: number): Promise<void> {
+    if (spotsAvailable <= 0) return;
+
     try {
       const settings = await this.getNotificationSettings();
-      
-      if (!settings.spotAvailable || spotsAvailable <= 0) {
-        return;
-      }
+      if (!settings.spotAvailable) return;
 
       const title = 'Parking Spots Available!';
       const message = floor 
         ? `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}`
         : `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available`;
 
-      // Add to NotificationManager for in-app display
-      await NotificationManager.addSpotAvailableNotification(spotsAvailable, floor);
-
-      // Show push notification
-      await this.showLocalNotification(
-        title,
-        message,
-        { 
-          type: 'spot-available',
-          spotsAvailable,
-          floor,
-          timestamp: Date.now()
-        },
-        'spot-available',
-        settings
-      );
+      await Promise.all([
+        NotificationManager.addSpotAvailableNotification(spotsAvailable, floor),
+        this.showLocalNotification(
+          title,
+          message,
+          { type: 'spot-available', spotsAvailable, floor, timestamp: Date.now() },
+          CHANNELS.SPOT_AVAILABLE,
+          settings
+        )
+      ]);
     } catch (error) {
       console.error('Error showing spot notification:', error);
     }
   }
 
-  // 🔥 ENHANCED: Now also adds to NotificationManager for in-app display
   async showFloorUpdateNotification(
     floor: number, 
     availableSpots: number,
     totalSpots: number,
     previousAvailable?: number
   ): Promise<void> {
+    if (availableSpots <= 0 || (previousAvailable !== undefined && availableSpots <= previousAvailable)) {
+      return;
+    }
+
     try {
       const settings = await this.getNotificationSettings();
-      
-      if (!settings.floorUpdates || availableSpots <= 0) {
-        return;
-      }
+      if (!settings.floorUpdates) return;
 
-      // Only proceed if there's an actual increase in available spots
-      if (previousAvailable !== undefined && availableSpots <= previousAvailable) {
-        console.log(`Floor ${floor}: No increase in spots, notification skipped`);
-        return;
-      }
-
-      const title = 'Floor Update';
-      const message = `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`;
-
-  
-      // Show push notification
       await this.showLocalNotification(
-        title,
-        message,
-        { 
-          type: 'floor-update', 
-          floor, 
-          availableSpots,
-          totalSpots,
-          timestamp: Date.now()
-        },
-        'floor-updates',
+        'Floor Update',
+        `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`,
+        { type: 'floor-update', floor, availableSpots, totalSpots, timestamp: Date.now() },
+        CHANNELS.FLOOR_UPDATES,
         settings
       );
-
-      console.log(`Floor update sent: Floor ${floor} - ${availableSpots}/${totalSpots}`);
     } catch (error) {
       console.error('Error showing floor update:', error);
     }
   }
 
-  // 🔥 CONNECTION STATUS: Completely disabled - no notifications created
-  async showConnectionStatusNotification(isConnected: boolean): Promise<void> {
-    // Connection status notifications are completely disabled
-    console.log(`Connection status: ${isConnected ? 'connected' : 'disconnected'} - no notification shown`);
-    return;
+  async showConnectionStatusNotification(): Promise<void> {
+    // Connection status notifications are disabled
   }
 
-  // Feedback reply notification
   async showFeedbackReplyNotification(
     feedbackId: number,
     originalFeedback: string,
@@ -212,41 +193,32 @@ class NotificationServiceClass {
   ): Promise<void> {
     try {
       const settings = await this.getNotificationSettings();
-      
       const title = 'Admin Reply Received';
       const message = `Your feedback has been responded to by ${adminName || 'Admin'}`;
 
-      // Add to NotificationManager for in-app display
-      await NotificationManager.addFeedbackReplyNotification(
-        feedbackId,
-        originalFeedback,
-        adminReply,
-        adminName
-      );
-
-      // Show push notification
-      await this.showLocalNotification(
-        title,
-        message,
-        { 
-          type: 'feedback-reply',
-          feedbackId,
-          originalFeedback: originalFeedback.substring(0, 50) + '...',
-          adminReply: adminReply.substring(0, 50) + '...',
-          adminName,
-          timestamp: Date.now()
-        },
-        'feedback-replies',
-        settings
-      );
-
-      console.log(`Feedback reply notification sent for feedback ${feedbackId}`);
+      await Promise.all([
+        NotificationManager.addFeedbackReplyNotification(feedbackId, originalFeedback, adminReply, adminName),
+        this.showLocalNotification(
+          title,
+          message,
+          { 
+            type: 'feedback-reply',
+            feedbackId,
+            originalFeedback: originalFeedback.substring(0, 50) + '...',
+            adminReply: adminReply.substring(0, 50) + '...',
+            adminName,
+            timestamp: Date.now()
+          },
+          CHANNELS.FEEDBACK_REPLIES,
+          settings
+        )
+      ]);
     } catch (error) {
       console.error('Error showing feedback reply notification:', error);
     }
   }
 
-  public async showLocalNotification(
+  private async showLocalNotification(
     title: string, 
     message: string, 
     data: any,
@@ -260,36 +232,24 @@ class NotificationServiceClass {
           body: message,
           data: data || {},
           sound: settings.sound ? 'default' : undefined,
-          vibrate: settings.vibration ? [0, 250, 250, 250] : undefined,
+          vibrate: settings.vibration ? DEFAULT_VIBRATION : undefined,
         },
         trigger: null,
         identifier: `valet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       });
-
     } catch (error) {
       console.error('Error scheduling notification:', error);
     }
   }
 
-  // 🔥 UPDATED: Simple notification - does NOT add to NotificationManager anymore
-  public async showSimpleNotification(
-    title: string, 
-    message: string,
-    data?: any
-  ): Promise<void> {
+  async showSimpleNotification(title: string, message: string, data?: any): Promise<void> {
     try {
       const settings = await this.getNotificationSettings();
-      
-      // 🚫 DO NOT add general notifications to NotificationManager
-      // Only show as push notification, not in overlay
-      console.log(`📲 Simple notification (push only, not in overlay): ${title}`);
-      
-      // Show push notification only
       await this.showLocalNotification(
         title,
         message,
         data || { type: 'general', timestamp: Date.now() },
-        'default',
+        CHANNELS.DEFAULT,
         settings
       );
     } catch (error) {
@@ -300,28 +260,10 @@ class NotificationServiceClass {
   async getNotificationSettings(): Promise<NotificationSettings> {
     try {
       const settings = await AsyncStorage.getItem(SETTINGS_KEY);
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        return parsed;
-      } else {
-        const defaultSettings = {
-          spotAvailable: true,
-          floorUpdates: true,
-          maintenanceAlerts: false,
-          vibration: true,
-          sound: true,
-        };
-        return defaultSettings;
-      }
+      return settings ? JSON.parse(settings) : DEFAULT_SETTINGS;
     } catch (error) {
       console.error('Error loading settings:', error);
-      return {
-        spotAvailable: true,
-        floorUpdates: true,
-        maintenanceAlerts: false,
-        vibration: true,
-        sound: true,
-      };
+      return DEFAULT_SETTINGS;
     }
   }
 
@@ -334,23 +276,18 @@ class NotificationServiceClass {
   }
 
   async requestPermissions(): Promise<boolean> {
-    try {
-      if (!Device.isDevice) {
-        console.warn('Physical device required for notifications');
-        return false;
-      }
+    if (!Device.isDevice) {
+      console.warn('Physical device required for notifications');
+      return false;
+    }
 
+    try {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
+      const finalStatus = existingStatus !== 'granted' 
+        ? (await Notifications.requestPermissionsAsync()).status 
+        : existingStatus;
       
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      
-      const granted = finalStatus === 'granted';
-      console.log(`Notification permissions: ${granted ? 'Granted' : 'Denied'}`);
-      return granted;
+      return finalStatus === 'granted';
     } catch (error) {
       console.error('Error requesting permissions:', error);
       return false;
@@ -361,7 +298,6 @@ class NotificationServiceClass {
     return this.expoPushToken;
   }
 
-  // 🔥 UPDATED: Test notification only shows as push, not in overlay
   async testNotification(): Promise<void> {
     await this.showSimpleNotification(
       'VALET Test',
@@ -372,10 +308,9 @@ class NotificationServiceClass {
 
   async initializeWithManager(): Promise<void> {
     await this.initialize();
-    console.log('📱 NotificationService initialized (overlay only shows parking & feedback notifications)');
+    console.log('NotificationService initialized (overlay only shows parking & feedback notifications)');
   }
 
-  // 🔥 NEW: Method to simulate feedback reply (for testing)
   async simulateFeedbackReply(
     feedbackId: number = 1,
     originalFeedback: string = 'Test feedback message',
@@ -385,15 +320,9 @@ class NotificationServiceClass {
     await this.showFeedbackReplyNotification(feedbackId, originalFeedback, adminReply, adminName);
   }
 
-  // 🔥 NEW: Method to simulate parking notifications (for testing)
   async simulateParkingNotifications(): Promise<void> {
-    // Simulate spot available
     await this.showSpotAvailableNotification(3, 4);
-    
-    // Simulate floor update after 2 seconds
-    setTimeout(async () => {
-      await this.showFloorUpdateNotification(4, 5, 42, 2);
-    }, 2000);
+    setTimeout(() => this.showFloorUpdateNotification(4, 5, 42, 2), 2000);
   }
 
   getStatus() {
@@ -412,7 +341,7 @@ class NotificationServiceClass {
       pushToken: !!this.expoPushToken,
       platform: Platform.OS,
       deviceSupport: Device.isDevice,
-      channels: Platform.OS === 'android' ? 3 : 0, // Removed connection-status channel
+      channels: Platform.OS === 'android' ? 3 : 0,
       integrations: ['NotificationManager (filtered)', 'AsyncStorage', 'Expo'],
       overlayTypes: ['spot_available', 'floor_update', 'feedback_reply'],
     };
@@ -421,10 +350,12 @@ class NotificationServiceClass {
   async clearNotificationChannels(): Promise<void> {
     if (Platform.OS === 'android') {
       try {
-        await Notifications.deleteNotificationChannelAsync('spot-available');
-        await Notifications.deleteNotificationChannelAsync('floor-updates');
-        await Notifications.deleteNotificationChannelAsync('feedback-replies');
-        console.log('🗑️ Notification channels cleared');
+        await Promise.all([
+          Notifications.deleteNotificationChannelAsync(CHANNELS.SPOT_AVAILABLE),
+          Notifications.deleteNotificationChannelAsync(CHANNELS.FLOOR_UPDATES),
+          Notifications.deleteNotificationChannelAsync(CHANNELS.FEEDBACK_REPLIES)
+        ]);
+        console.log('Notification channels cleared');
       } catch (error) {
         console.error('Error clearing notification channels:', error);
       }
@@ -433,10 +364,12 @@ class NotificationServiceClass {
 
   async reset(): Promise<void> {
     try {
-      await this.clearNotificationChannels();
-      await AsyncStorage.removeItem(SETTINGS_KEY);
+      await Promise.all([
+        this.clearNotificationChannels(),
+        AsyncStorage.removeItem(SETTINGS_KEY)
+      ]);
       this.expoPushToken = null;
-      console.log('🔄 NotificationService reset complete');
+      console.log('NotificationService reset complete');
     } catch (error) {
       console.error('Error resetting NotificationService:', error);
     }

@@ -1,4 +1,3 @@
-// src/components/RouteGuard.tsx
 import React from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { useAuth } from '../context/AuthContext';

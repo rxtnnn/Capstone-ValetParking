@@ -1,4 +1,4 @@
-// src/types/feedback.ts - Updated with new feedback types
+// src/types/feedback.ts
 
 export interface FeedbackData {
   id?: number;
@@ -34,7 +34,6 @@ export interface DeviceInfo {
   systemVersion?: string;
   appVersion?: string;
   buildNumber?: string;
-  // Additional device info for better debugging
   userAgent?: string;
   screenResolution?: string;
   networkType?: string;
@@ -48,7 +47,6 @@ export interface FeedbackFormData {
   rating?: number;
   email?: string;
   issues?: string[];
-  // Optional metadata
   floor_number?: number;
   spot_id?: string;
   severity?: 'low' | 'medium' | 'high' | 'critical';
@@ -66,13 +64,11 @@ export interface APIResponse<T = any> {
     total_pages: number;
     has_more: boolean;
   };
-  // Additional metadata
   timestamp?: string;
   request_id?: string;
   version?: string;
 }
 
-// 🔥 NEW: Feedback category definitions
 export interface FeedbackCategory {
   value: FeedbackData['type'];
   label: string;
@@ -83,7 +79,6 @@ export interface FeedbackCategory {
   placeholder: string;
 }
 
-// 🔥 NEW: Feedback statistics for admin dashboard
 export interface FeedbackStats {
   total: number;
   by_type: {
@@ -104,7 +99,7 @@ export interface FeedbackStats {
     critical: number;
   };
   average_rating: number;
-  response_time_avg: number; // in hours
+  response_time_avg: number;
   recent_trends: {
     this_week: number;
     last_week: number;
@@ -113,7 +108,6 @@ export interface FeedbackStats {
   };
 }
 
-// 🔥 NEW: Feedback filter options
 export interface FeedbackFilters {
   type?: FeedbackData['type'];
   status?: FeedbackData['status'];
@@ -128,7 +122,6 @@ export interface FeedbackFilters {
   floor_number?: number;
 }
 
-// 🔥 NEW: Admin response data
 export interface AdminResponse {
   feedback_id: number;
   admin_id: number;
@@ -139,11 +132,10 @@ export interface AdminResponse {
   priority?: 'low' | 'medium' | 'high';
 }
 
-// 🔥 NEW: Feedback summary for reporting
 export interface FeedbackSummary {
   id: number;
   type: FeedbackData['type'];
-  message_preview: string; // First 100 characters
+  message_preview: string;
   rating?: number;
   status: FeedbackData['status'];
   user_name?: string;
@@ -154,7 +146,6 @@ export interface FeedbackSummary {
   severity?: FeedbackData['severity'];
 }
 
-// 🔥 NEW: Validation rules
 export interface FeedbackValidation {
   message: {
     min_length: number;
@@ -176,7 +167,6 @@ export interface FeedbackValidation {
   };
 }
 
-// 🔥 NEW: Feedback notification data
 export interface FeedbackNotification {
   id: number;
   feedback_id: number;
@@ -190,7 +180,6 @@ export interface FeedbackNotification {
   push_sent: boolean;
 }
 
-// 🔥 DEFAULT: Feedback categories configuration
 export const FEEDBACK_CATEGORIES: FeedbackCategory[] = [
   {
     value: 'general',
@@ -266,7 +255,6 @@ export const FEEDBACK_CATEGORIES: FeedbackCategory[] = [
   }
 ];
 
-// 🔥 DEFAULT: Validation rules
 export const FEEDBACK_VALIDATION: FeedbackValidation = {
   message: {
     min_length: 10,
@@ -293,7 +281,7 @@ export const FEEDBACK_VALIDATION: FeedbackValidation = {
   }
 };
 
-// 🔥 HELPER: Type guards
+// Type guards
 export const isFeedbackType = (value: string | undefined): value is FeedbackData['type'] => {
   return typeof value === 'string' && ['general', 'parking', 'technical', 'suggestion'].includes(value);
 };
@@ -306,18 +294,16 @@ export const isFeedbackSeverity = (value: string | undefined): value is Feedback
   return typeof value === 'string' && ['low', 'medium', 'high', 'critical'].includes(value);
 };
 
-// 🔥 HELPER: Get category by type
+// Helper functions
 export const getFeedbackCategory = (type: FeedbackData['type']): FeedbackCategory | undefined => {
   return FEEDBACK_CATEGORIES.find(category => category.value === type);
 };
 
-// 🔥 HELPER: Validate feedback data
 export const validateFeedbackData = (data: FeedbackFormData): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
   const validation = FEEDBACK_VALIDATION;
   const category = getFeedbackCategory(data.type);
 
-  // Message validation
   if (!data.message || data.message.trim().length < validation.message.min_length) {
     errors.push(`Message must be at least ${validation.message.min_length} characters long`);
   }
@@ -325,17 +311,14 @@ export const validateFeedbackData = (data: FeedbackFormData): { isValid: boolean
     errors.push(`Message must not exceed ${validation.message.max_length} characters`);
   }
 
-  // Rating validation
   if (category?.requiresRating && (!data.rating || data.rating < 1 || data.rating > 5)) {
     errors.push('Please provide a rating between 1 and 5 stars');
   }
 
-  // Email validation
   if (data.email && !validation.email.format.test(data.email)) {
     errors.push('Please enter a valid email address');
   }
 
-  // Issues validation
   if (data.issues && data.issues.length > validation.issues.max_selections) {
     errors.push(`Please select no more than ${validation.issues.max_selections} issues`);
   }

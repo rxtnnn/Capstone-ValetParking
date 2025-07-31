@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,21 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { styles } from './styles/RegisterScreen.style';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const ALERT_MESSAGES = {
+  EMAIL_REQUIRED: 'Please enter your email address',
+  INVALID_EMAIL: 'Please enter a valid email address',
+  PASSWORD_REQUIRED: 'Please enter your password',
+  LOGIN_FAILED: 'Login Failed',
+  LOGIN_ERROR: 'Login Error',
+  UNEXPECTED_ERROR: 'An unexpected error occurred. Please try again.',
+  FORGOT_PASSWORD: 'Forgot Password',
+  FORGOT_PASSWORD_MSG: 'Please contact your administrator to reset your password.',
+  CREATE_ACCOUNT: 'Create Account',
+  CREATE_ACCOUNT_MSG: 'New accounts are created by administrators only. Please contact your administrator for access.',
+};
+
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,18 +43,14 @@ const LoginScreen: React.FC = () => {
   const navigation = useNavigation();
   const { login, isAuthenticated, loading, error, clearError } = useAuth();
 
-  // Navigate to home if already authenticated
   useEffect(() => {
     if (isAuthenticated && !loading) {
       navigation.navigate('Home' as never);
     }
   }, [isAuthenticated, loading, navigation]);
 
-  // Clear error when component unmounts or email changes
   useEffect(() => {
-    return () => {
-      clearError();
-    };
+    return clearError;
   }, [clearError]);
 
   useEffect(() => {
@@ -48,29 +59,24 @@ const LoginScreen: React.FC = () => {
     }
   }, [email, clearError]);
 
-  const validateForm = (): boolean => {
+  const validateForm = useCallback((): boolean => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      Alert.alert('Error', ALERT_MESSAGES.EMAIL_REQUIRED);
       return false;
     }
-
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
+    if (!EMAIL_REGEX.test(email.trim())) {
+      Alert.alert('Error', ALERT_MESSAGES.INVALID_EMAIL);
       return false;
     }
-
     if (!password.trim()) {
-      Alert.alert('Error', 'Please enter your password');
+      Alert.alert('Error', ALERT_MESSAGES.PASSWORD_REQUIRED);
       return false;
     }
-
     return true;
-  };
+  }, [email, password]);
 
-  const handleLogin = async () => {
-    if (!validateForm()) {
-      return;
-    }
+  const handleLogin = useCallback(async () => {
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
     clearError();
@@ -82,48 +88,50 @@ const LoginScreen: React.FC = () => {
       });
 
       if (result.success) {
-        // Clear form
         setEmail('');
         setPassword('');
-        
-        // Navigate to home (this will be handled by useEffect above)
-        console.log('Login successful');
       } else {
-        // Show specific error message from server
         Alert.alert(
-          'Login Failed',
+          ALERT_MESSAGES.LOGIN_FAILED,
           result.message || 'Invalid email or password. Please try again.',
           [{ text: 'OK' }]
         );
       }
     } catch (error) {
       Alert.alert(
-        'Login Error',
-        'An unexpected error occurred. Please try again.',
+        ALERT_MESSAGES.LOGIN_ERROR,
+        ALERT_MESSAGES.UNEXPECTED_ERROR,
         [{ text: 'OK' }]
       );
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [validateForm, clearError, login, email, password]);
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = useCallback(() => {
     Alert.alert(
-      'Forgot Password',
-      'Please contact your administrator to reset your password.',
+      ALERT_MESSAGES.FORGOT_PASSWORD,
+      ALERT_MESSAGES.FORGOT_PASSWORD_MSG,
       [{ text: 'OK' }]
     );
-  };
+  }, []);
 
-  const handleCreateAccount = () => {
+  const handleCreateAccount = useCallback(() => {
     Alert.alert(
-      'Create Account',
-      'New accounts are created by administrators only. Please contact your administrator for access.',
+      ALERT_MESSAGES.CREATE_ACCOUNT,
+      ALERT_MESSAGES.CREATE_ACCOUNT_MSG,
       [{ text: 'OK' }]
     );
-  };
+  }, []);
 
-  // Show loading screen if checking authentication
+  const toggleShowPassword = useCallback(() => {
+    setShowPassword(prev => !prev);
+  }, []);
+
+  const toggleRememberMe = useCallback(() => {
+    setRememberMe(prev => !prev);
+  }, []);
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -138,13 +146,11 @@ const LoginScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-          {/* Main content */}
           <View style={styles.content}>
             <View>
               <Image 
@@ -153,13 +159,11 @@ const LoginScreen: React.FC = () => {
               />
             </View>
 
-            {/* Welcome */}
             <View style={styles.welcomeSection}>
               <Text style={styles.welcomeTitle}>Welcome back</Text>
               <Text style={styles.welcomeSubtitle}>Login to your VALET account</Text>
             </View>
 
-            {/* Error display */}
             {error && (
               <View style={styles.errorContainer}>
                 <Ionicons name="alert-circle" size={16} color="#B22020" />
@@ -167,9 +171,7 @@ const LoginScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Form starts here */}
             <View style={styles.form}>
-              {/* Email input */}
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
@@ -185,7 +187,6 @@ const LoginScreen: React.FC = () => {
                 />
               </View>
 
-              {/* Password input */}
               <View style={styles.inputContainer}>
                 <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
@@ -200,7 +201,7 @@ const LoginScreen: React.FC = () => {
                 />
                 <TouchableOpacity
                   style={styles.eyeIcon}
-                  onPress={() => setShowPassword(!showPassword)}
+                  onPress={toggleShowPassword}
                   disabled={isSubmitting}
                 >
                   <Ionicons 
@@ -211,11 +212,10 @@ const LoginScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              {/* Remember me and Forgot password */}
               <View style={styles.optionsRow}>
                 <TouchableOpacity 
                   style={styles.rememberMeContainer}
-                  onPress={() => setRememberMe(!rememberMe)}
+                  onPress={toggleRememberMe}
                   disabled={isSubmitting}
                 >
                   <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
@@ -231,7 +231,6 @@ const LoginScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              {/* Login button */}
               <TouchableOpacity 
                 style={[styles.loginButton, isSubmitting && styles.loginButtonDisabled]} 
                 onPress={handleLogin}
@@ -247,14 +246,12 @@ const LoginScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
 
-              {/* OR divider */}
               <View style={styles.dividerContainer}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>OR</Text>
                 <View style={styles.dividerLine} />
               </View>
 
-              {/* Create account */}
               <View style={styles.createAccountContainer}>
                 <Text style={styles.createAccountText}>Need an account? </Text>
                 <TouchableOpacity onPress={handleCreateAccount} disabled={isSubmitting}>

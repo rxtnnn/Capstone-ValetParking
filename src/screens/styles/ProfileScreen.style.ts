@@ -262,7 +262,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
     marginLeft: 54,
   },
-  signOutButton: {
+  outBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -278,7 +278,7 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  signOutButtonText: {
+  outBtnText: {
     marginLeft: 10,
     fontSize: 16,
     fontWeight: '600',

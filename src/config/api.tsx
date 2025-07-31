@@ -16,27 +16,22 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Enhanced logging for debugging
 apiClient.interceptors.request.use(
   (config) => {
-    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
-    console.log('📤 Data:', JSON.stringify(config.data, null, 2));
     return config;
   },
   (error) => {
-    console.error('❌ Request Error:', error);
+    console.error('Request Error:', error);
     return Promise.reject(error);
   }
 );
 
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log(`✅ API Response: ${response.status}`);
-    console.log('📥 Data:', JSON.stringify(response.data, null, 2));
     return response;
   },
   (error) => {
-    console.error('❌ Response Error:', {
+    console.error('Response Error:', {
       status: error.response?.status,
       data: error.response?.data,
       message: error.message,

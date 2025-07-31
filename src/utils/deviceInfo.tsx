@@ -25,7 +25,7 @@ export const getBasicDeviceInfo = async (): Promise<DeviceInformation> => {
     const platformVersion = safeToString(Platform.Version);
     const platformOS = Platform.OS || 'unknown';
     
-    const deviceInfo: DeviceInformation = {
+    return {
       platform: platformOS,
       version: platformVersion,
       model: platformOS === 'ios' ? 'iOS Device' : 'Android Device',
@@ -33,11 +33,8 @@ export const getBasicDeviceInfo = async (): Promise<DeviceInformation> => {
       appVersion: '1.0.0',
       buildNumber: '1',
     };
-
-    console.log('📱 Device info:', deviceInfo);
-    return deviceInfo;
   } catch (error) {
-    console.error('⚠️ Device info error:', error);
+    console.error('Device info error:', error);
     
     return {
       platform: 'unknown',

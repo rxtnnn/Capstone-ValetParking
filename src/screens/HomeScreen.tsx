@@ -1,26 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  RefreshControl,
-  StatusBar,
-  Image,
-  Modal,
-  Alert,
-} from 'react-native';
+import {View, Text, TouchableOpacity, ScrollView, RefreshControl, StatusBar, Image, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
-import { useFonts, Poppins_400Regular, Poppins_600SemiBold  } from '@expo-google-fonts/poppins';
+import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from './styles/HomeScreen.style';
-// NEW IMPORTS
 import { NotificationManager } from '../services/NotifManager';
 import NotificationOverlay from '../components/NotifOverlay';
 import { useFeedback } from '../hooks/useFeedback';
@@ -48,6 +36,18 @@ interface CircularProgressProps {
   children?: React.ReactNode;
 }
 
+const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
+const FLOOR_SUFFIXES = ['th', 'st', 'nd', 'rd'];
+const FLOOR_PATTERN = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
+const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_FLOORS = Array.from({ length: 4 }, (_, i) => ({
+  floor: i + 1,
+  total: 0,
+  available: 0,
+  occupancyRate: 0,
+  status: 'available' as const
+}));
+
 const CircularProgress: React.FC<CircularProgressProps> = ({
   size,
   strokeWidth,
@@ -58,7 +58,6 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
-  const strokeDasharray = circumference;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
@@ -79,13 +78,13 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
           stroke={color}
           strokeWidth={strokeWidth}
           fill="transparent"
-          strokeDasharray={strokeDasharray}
+          strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' }]}>
         {children}
       </View>
     </View>
@@ -96,11 +95,7 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user, isAuthenticated } = useAuth();
   const { checkForNewReplies } = useFeedback();
-  
-  const [fontsLoaded] = useFonts({
-    Poppins_400Regular,
-    Poppins_600SemiBold,
-  });
+  const [fontsLoaded] = useFonts(FONTS);
 
   const [parkingData, setParkingData] = useState<ParkingStats>({
     totalSpots: 0,
@@ -116,42 +111,57 @@ const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showFullAlert, setShowFullAlert] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-
-  // NOTIFICATION STATE
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [lastParkingData, setLastParkingData] = useState<ParkingStats | null>(null);
 
-  // Refs to prevent loops and track mount state
   const isMountedRef = useRef(true);
   const servicesInitializedRef = useRef(false);
   const userIdFetchedRef = useRef(false);
 
-  // 🔥 MEMOIZED: Floor preparation to prevent infinite calls
-  const floorsToDisplay = useMemo(() => {
-    console.log('Preparing floors for display:', parkingData.floors.length, 'real floors');
-    
-    const fixedFloors = [
-      { floor: 1, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
-      { floor: 2, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
-      { floor: 3, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
-      { floor: 4, total: 0, available: 0, occupancyRate: 0, status: 'available' as 'available' | 'limited' | 'full' },
-    ];
+  const extractFloorFromLocation = useCallback((floor_level: string): number => {
+    if (!floor_level) return 1;
+    const match = floor_level.match(FLOOR_PATTERN);
+    if (match) {
+      const floorNumber = parseInt(match[1]);
+      if (floorNumber >= 1 && floorNumber <= 4) return floorNumber;
+    }
+    return 1;
+  }, []);
 
+  const getFloorName = useCallback((floorNumber: number): string => {
+    const remainder = floorNumber % 100;
+    const suffix = (remainder >= 11 && remainder <= 13) 
+      ? 'th' 
+      : FLOOR_SUFFIXES[floorNumber % 10] || 'th';
+    return `${floorNumber}${suffix} Floor`;
+  }, []);
+
+  const getFloorStatus = useCallback((available: number, total: number) => {
+    if (total === 0) return { text: 'NO DATA', color: '#999' };
+    const percentage = (available / total) * 100;
+    if (percentage === 0) return { text: 'FULL', color: '#B22020' };
+    if (percentage < 25) return { text: 'LIMITED', color: '#FF9801' };
+    return { text: 'AVAILABLE', color: '#48D666' };
+  }, []);
+
+  const getProgressPercentage = useCallback((available: number, total: number) => {
+    return total === 0 ? 0 : ((total - available) / total) * 100;
+  }, []);
+
+  const floorsToDisplay = useMemo(() => {
+    const fixedFloors = [...DEFAULT_FLOORS];
+    
     fixedFloors.forEach(fixedFloor => {
       const realFloor = parkingData.floors.find(rf => rf.floor === fixedFloor.floor);
       if (realFloor) {
-        fixedFloor.total = realFloor.total;
-        fixedFloor.available = realFloor.available;
-        fixedFloor.occupancyRate = realFloor.occupancyRate;
-        fixedFloor.status = realFloor.status;
-      } 
+        Object.assign(fixedFloor, realFloor);
+      }
     });
     
     return fixedFloors;
-  }, [parkingData.floors]); // Only recalculate when floors actually change
+  }, [parkingData.floors]);
 
-  // 🔥 MEMOIZED: Parking change detection function
   const checkParkingChanges = useCallback((newData: ParkingStats) => {
     if (!lastParkingData || !isMountedRef.current || !currentUserId) {
       setLastParkingData(newData);
@@ -159,30 +169,20 @@ const HomeScreen: React.FC = () => {
     }
 
     try {
-      // Only check for new available spots
       if (newData.availableSpots > lastParkingData.availableSpots) {
         const increase = newData.availableSpots - lastParkingData.availableSpots;
-        console.log(`🟢 ${increase} new spot(s) available!`);
-        
         const bestFloor = newData.floors.reduce((prev, current) => 
           prev.available > current.available ? prev : current
         );
         
-        NotificationManager.addSpotAvailableNotification(
-          increase,
-          bestFloor.floor
-        );
-        
-        console.log(`📱 Created parking spots notification: ${increase} spots on Floor ${bestFloor.floor}`);
+        NotificationManager.addSpotAvailableNotification(increase, bestFloor.floor);
       }
-
       setLastParkingData(newData);
     } catch (error) {
       console.error('Error checking parking changes:', error);
     }
   }, [lastParkingData, currentUserId]);
 
-  // 🔥 MEMOIZED: Get current user ID function
   const getCurrentUserId = useCallback(async () => {
     if (!isMountedRef.current) return;
     
@@ -194,9 +194,6 @@ const HomeScreen: React.FC = () => {
         setCurrentUserId(userId);
         
         await NotificationManager.setCurrentUserId(userId);
-        
-        console.log('📋 Current user ID set:', userId);
-        
         await checkForNewReplies();
         await NotificationManager.checkForFeedbackReplies(userId);
       }
@@ -205,7 +202,49 @@ const HomeScreen: React.FC = () => {
     }
   }, [checkForNewReplies]);
 
-  // 🔥 MEMOIZED: Direct parking data fetch
+  const transformParkingData = useCallback((rawData: any[]): ParkingStats => {
+    const totalSpots = rawData.length;
+    const availableSpots = rawData.filter((space: any) => !space.is_occupied).length;
+    const occupiedSpots = totalSpots - availableSpots;
+
+    const floorGroups: { [key: number]: any[] } = {};
+  
+    rawData.forEach((space: any) => {
+      const floor = extractFloorFromLocation(space.floor_level || '');
+      if (!floorGroups[floor]) floorGroups[floor] = [];
+      floorGroups[floor].push(space);
+    });
+
+    const floors = Object.entries(floorGroups).map(([floorNum, spaces]) => {
+      const total = spaces.length;
+      const available = spaces.filter((s: any) => !s.is_occupied).length;
+      const occupancyRate = total > 0 ? ((total - available) / total) * 100 : 0;
+      
+      let status: 'available' | 'limited' | 'full';
+      if (available === 0) status = 'full';
+      else if (available / total < 0.2) status = 'limited';
+      else status = 'available';
+
+      return {
+        floor: parseInt(floorNum),
+        total,
+        available,
+        occupancyRate,
+        status,
+      };
+    }).sort((a, b) => a.floor - b.floor);
+
+    return {
+      totalSpots,
+      availableSpots,
+      occupiedSpots,
+      floors,
+      lastUpdated: new Date().toLocaleTimeString(),
+      isLive: true,
+      sensorData: rawData,
+    };
+  }, [extractFloorFromLocation]);
+
   const fetchParkingDataDirect = useCallback(async () => {
     if (!isMountedRef.current) return;
     
@@ -229,7 +268,6 @@ const HomeScreen: React.FC = () => {
         setParkingData(transformedData);
         setConnectionStatus('connected');
       }
-      
     } catch (error) {
       if (isMountedRef.current) {
         setConnectionStatus('error');
@@ -239,65 +277,10 @@ const HomeScreen: React.FC = () => {
         setLoading(false);
       }
     }
-  }, []);
+  }, [transformParkingData]);
 
-  // 🔥 MEMOIZED: Transform parking data function
-  const transformParkingData = useCallback((rawData: any[]): ParkingStats => {
-    const totalSpots = rawData.length;
-    const availableSpots = rawData.filter((space: any) => !space.is_occupied).length;
-    const occupiedSpots = totalSpots - availableSpots;
-
-    const floorGroups: { [key: number]: any[] } = {};
-  
-    rawData.forEach((space: any) => {
-      const floor = extractFloorFromLocation(space.floor_level || '');
-      
-      if (!floorGroups[floor]) {
-        floorGroups[floor] = [];
-      }
-      floorGroups[floor].push(space);
-    });
-
-    const floors = Object.entries(floorGroups).map(([floorNum, spaces]) => {
-      const total = spaces.length;
-      const available = spaces.filter((s: any) => !s.is_occupied).length;
-      const occupancyRate = total > 0 ? ((total - available) / total) * 100 : 0;
-      
-      let status: 'available' | 'limited' | 'full';
-      if (available === 0) {
-        status = 'full';
-      } else if (available / total < 0.2) {
-        status = 'limited';
-      } else {
-        status = 'available';
-      }
-
-      return {
-        floor: parseInt(floorNum),
-        total,
-        available,
-        occupancyRate,
-        status,
-      };
-    }).sort((a, b) => a.floor - b.floor);
-
-    return {
-      totalSpots,
-      availableSpots,
-      occupiedSpots,
-      floors,
-      lastUpdated: new Date().toLocaleTimeString(),
-      isLive: true,
-      sensorData: rawData,
-    };
-  }, []);
-
-  // 🔥 MEMOIZED: onRefresh function
   const onRefresh = useCallback(async () => {
-    if (!isAuthenticated || !isMountedRef.current) {
-      console.log('⚠️ Cannot refresh - not authenticated or not mounted');
-      return;
-    }
+    if (!isAuthenticated || !isMountedRef.current) return;
 
     setRefreshing(true);
     try {
@@ -319,58 +302,16 @@ const HomeScreen: React.FC = () => {
     }
   }, [isAuthenticated, currentUserId, checkForNewReplies, fetchParkingDataDirect]);
 
-  // Helper functions
-  const getFloorName = (floorNumber: number): string => {
-    const suffixes = ['th', 'st', 'nd', 'rd'];
-    const remainder = floorNumber % 100;
-    const suffix = (remainder >= 11 && remainder <= 13) 
-      ? 'th' 
-      : suffixes[floorNumber % 10] || 'th';
-    
-    return `${floorNumber}${suffix} Floor`;
-  };
-
-  const handleFloorPress = (floor: any) => {
+  const handleFloorPress = useCallback((floor: any) => {
     const status = getFloorStatus(floor.available, floor.total);
     
     if (status.text === 'FULL') {
-     setShowFullAlert(true);
+      setShowFullAlert(true);
     } else {
       navigation.navigate('ParkingMap');
     }
-  };
+  }, [getFloorStatus, navigation]);
 
-  const extractFloorFromLocation = (floor_level: string): number => {
-    if (!floor_level) {
-      return 1;
-    }
-
-    const pattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
-    const match = floor_level.match(pattern);
-
-    if (match) {
-      const floorNumber = parseInt(match[1]);
-      if (floorNumber >= 1 && floorNumber <= 4) {
-        return floorNumber;
-      }
-    }
-    return 1;
-  };
-
-  const getFloorStatus = (available: number, total: number) => {
-    if (total === 0) return { text: 'NO DATA', color: '#999' };
-    const percentage = (available / total) * 100;
-    if (percentage === 0) return { text: 'FULL', color: '#B22020' };
-    if (percentage < 25) return { text: 'LIMITED', color: '#FF9801' };
-    return { text: 'AVAILABLE', color: '#48D666' };
-  };
-
-  const getProgressPercentage = (available: number, total: number) => {
-    if (total === 0) return 0;
-    return ((total - available) / total) * 100;
-  };
-
-  // Replace your current useFocusEffect with this:
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
@@ -381,13 +322,10 @@ const HomeScreen: React.FC = () => {
 
         try {
           if (!isAuthenticated) {
-            console.log('🔐 User not authenticated, redirecting to login');
             await NotificationManager.setCurrentUserId(null);
-            
-            // Add delay to prevent navigation loop
             timeoutId = setTimeout(() => {
               if (isActive) {
-                navigation.navigate('Login'); // Use replace instead of navigate
+                navigation.navigate('Login');
               }
             }, 100);
             return;
@@ -408,32 +346,26 @@ const HomeScreen: React.FC = () => {
         isActive = false;
         if (timeoutId) clearTimeout(timeoutId);
       };
-    }, [isAuthenticated]) // Remove navigation from dependencies
+    }, [isAuthenticated, getCurrentUserId, navigation])
   );
 
-  // 🔥 EFFECT 2: Component Mount/Unmount Tracking
   useEffect(() => {
     isMountedRef.current = true;
     
     return () => {
-      console.log('🧹 Component unmounting');
       isMountedRef.current = false;
       servicesInitializedRef.current = false;
       userIdFetchedRef.current = false;
     };
   }, []);
 
-  // 🔥 EFFECT 3: Parking Service Setup
   useEffect(() => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
     }
 
-    if (servicesInitializedRef.current) {
-      console.log('⚠️ Services already initialized, skipping setup');
-      return;
-    }
+    if (servicesInitializedRef.current) return;
 
     let unsubscribeParkingUpdates: (() => void) | undefined;
     let unsubscribeConnectionStatus: (() => void) | undefined;
@@ -443,21 +375,15 @@ const HomeScreen: React.FC = () => {
       servicesInitializedRef.current = true;
 
       try {
-        console.log('🚀 Setting up parking services...');
-
-        // 🔥 DEBOUNCED: Parking updates with timeout to prevent rapid changes
         let updateTimeout: NodeJS.Timeout;
         unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
           if (!isMountedRef.current) return;
           
-          // Clear previous timeout
           if (updateTimeout) clearTimeout(updateTimeout);
           
-          // Debounce updates by 300ms
           updateTimeout = setTimeout(() => {
             if (isMountedRef.current) {
               setParkingData(prevData => {
-                // Only update if data actually changed
                 if (JSON.stringify(prevData.floors) !== JSON.stringify(data.floors)) {
                   checkParkingChanges(data);
                   return data;
@@ -479,14 +405,12 @@ const HomeScreen: React.FC = () => {
           
           fallbackTimer = setTimeout(() => {
             if (isMountedRef.current && loading && isAuthenticated) {
-              console.log('⏰ Fallback timer triggered, fetching data directly');
               fetchParkingDataDirect();
             }
           }, 3000);
         }
-
       } catch (error) {
-        console.error('💥 Error setting up services:', error);
+        console.error('Error setting up services:', error);
         if (isMountedRef.current && isAuthenticated) {
           fetchParkingDataDirect();
         }
@@ -496,9 +420,7 @@ const HomeScreen: React.FC = () => {
     setupParkingService();
 
     return () => {
-      console.log('🧹 Cleaning up parking service');
       servicesInitializedRef.current = false;
-
       if (fallbackTimer) clearTimeout(fallbackTimer);
       if (unsubscribeParkingUpdates) unsubscribeParkingUpdates();
       if (unsubscribeConnectionStatus) unsubscribeConnectionStatus();
@@ -509,24 +431,16 @@ const HomeScreen: React.FC = () => {
         console.error('Error stopping RealTimeParkingService:', error);
       }
     };
-  }, [isAuthenticated, checkParkingChanges, fetchParkingDataDirect]);
+  }, [isAuthenticated, checkParkingChanges, fetchParkingDataDirect, loading]);
 
-  // 🔥 EFFECT 4: Notification Management
   useEffect(() => {
     if (!currentUserId) return;
 
     let unsubscribeNotifications: (() => void) | undefined;
 
     const setupNotifications = () => {
-      console.log('🔔 Setting up notifications for user:', currentUserId);
-
       unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
         if (!isMountedRef.current) return;
-        
-        const userNotifications = notifications.filter(n => 
-          !n.data?.userId || n.data.userId === currentUserId
-        );
-        
         setUnreadNotificationCount(NotificationManager.getUnreadCount());
       });
     };
@@ -534,33 +448,27 @@ const HomeScreen: React.FC = () => {
     setupNotifications();
 
     return () => {
-      console.log('🧹 Cleaning up notifications');
       if (unsubscribeNotifications) unsubscribeNotifications();
     };
   }, [currentUserId]);
 
-  // 🔥 EFFECT 5: Periodic Feedback Checks
   useEffect(() => {
     if (!currentUserId || !isAuthenticated) return;
 
     const checkFeedbackInterval = setInterval(async () => {
       try {
-        console.log('🔔 Periodic check for new feedback replies...');
         await checkForNewReplies();
       } catch (error) {
         console.error('Error in periodic feedback check:', error);
       }
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    }, FEEDBACK_CHECK_INTERVAL);
 
     return () => {
       clearInterval(checkFeedbackInterval);
     };
   }, [currentUserId, isAuthenticated, checkForNewReplies]);
 
-  // Don't render if not authenticated
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (!isAuthenticated) return null;
 
   if (loading) {
     return (
@@ -580,11 +488,7 @@ const HomeScreen: React.FC = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
       
-      {/*Header*/}
-      <LinearGradient
-        colors={['#B22020', '#4C0E0E']}
-        style={styles.header}
-      >
+      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoSection}>
             <View style={styles.logoContainer}>
@@ -599,7 +503,6 @@ const HomeScreen: React.FC = () => {
           </View>
           
           <View style={styles.headerIcons}>
-            {/* ENHANCED NOTIFICATION BUTTON WITH BADGE */}
             <TouchableOpacity 
               style={styles.iconButton} 
               onPress={() => setShowNotifications(true)}
@@ -621,12 +524,10 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
 
-        {/*Campus Overall Card*/}
         <View style={styles.campusCard}>
           <Text style={styles.campusTitle}>USJ-R Quadricentennial Campus</Text>
           
           <View style={styles.circularProgressRow}>
-            {/* Available */}
             <View style={styles.progressItem}>
               <CircularProgress
                 size={80}
@@ -641,7 +542,6 @@ const HomeScreen: React.FC = () => {
               <Text style={styles.progressLabel}>Available</Text>
             </View>
 
-            {/* Occupied */}
             <View style={styles.progressItem}>
               <CircularProgress
                 size={80}
@@ -656,7 +556,6 @@ const HomeScreen: React.FC = () => {
               <Text style={styles.progressLabel}>Occupied</Text>
             </View>
 
-            {/* Total Spots */}
             <View style={styles.progressItem}>
               <CircularProgress
                 size={80}
@@ -683,7 +582,6 @@ const HomeScreen: React.FC = () => {
         </View>
       </LinearGradient>
 
-      {/* Floor Selection */}
       <ScrollView
         style={styles.scrollContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -699,8 +597,7 @@ const HomeScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Dynamic floor real data using memoized floorsToDisplay */}
-          {floorsToDisplay.map((floor, index) => {
+          {floorsToDisplay.map((floor) => {
             const status = getFloorStatus(floor.available, floor.total);
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
             const isFull = status.text === 'FULL';
@@ -790,7 +687,6 @@ const HomeScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Progress Container */}
                 <View style={styles.progressBarContainer}>
                   <View style={styles.progressBarBackground}>
                     <View 
@@ -817,14 +713,18 @@ const HomeScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Tab Bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity style={[styles.tabItem, styles.activeTab]} onPress={() => navigation.navigate('Home')}>
           <Ionicons name="home" size={24} color="white" />
+          <Text style={styles.tabText}>Home</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('ParkingMap')}>
           <Ionicons name="map" size={24} color="white" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Feedback')}>
+          <Ionicons name="chatbubble-outline" size={24} color="white" />
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -832,10 +732,6 @@ const HomeScreen: React.FC = () => {
           onPress={() => navigation.navigate('Profile', currentUserId ? { userId: currentUserId } : undefined)}
         >
           <Ionicons name="person-outline" size={24} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Feedback')}>
-          <Ionicons name="chatbubble-outline" size={24} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -845,7 +741,6 @@ const HomeScreen: React.FC = () => {
         userId={currentUserId || undefined}
       />
 
-      {/* Full Alert Modal */}
       {showFullAlert && (
         <Modal visible={showFullAlert} transparent animationType="fade">
           <View style={styles.modalOverlay}>
