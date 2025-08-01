@@ -30,6 +30,7 @@ const CHANNELS = {
   DEFAULT: 'default'
 } as const;
 
+
 class NotificationServiceClass {
   private expoPushToken: string | null = null;
 
@@ -47,7 +48,7 @@ class NotificationServiceClass {
 
       await Promise.all([
         Platform.OS === 'android' ? this.createNotificationChannels() : Promise.resolve(),
-        this.registerForPushNotifications()
+        this.registerPushNotif()
       ]);
     } catch (error) {
       console.error('Error initializing NotificationService:', error);
@@ -90,7 +91,12 @@ class NotificationServiceClass {
     );
   }
 
-  private async registerForPushNotifications(): Promise<string | null> {
+  private async registerPushNotif(): Promise<string | null> {
+    if (!Device.isDevice) {
+      console.warn('Must use physical device for Push Notifications');
+      return null;
+    }
+
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNELS.DEFAULT, {
         name: 'default',
@@ -98,11 +104,6 @@ class NotificationServiceClass {
         vibrationPattern: DEFAULT_VIBRATION,
         lightColor: '#B71C1C',
       });
-    }
-
-    if (!Device.isDevice) {
-      console.warn('Must use physical device for Push Notifications');
-      return null;
     }
 
     try {
@@ -128,28 +129,68 @@ class NotificationServiceClass {
     }
   }
 
-  async showSpotAvailableNotification(spotsAvailable: number, floor?: number): Promise<void> {
+  async showSpotAvailableNotificationSmart(
+    spotsAvailable: number, 
+    floor?: number, 
+    spotIds?: string[],
+    forceShow: boolean = false
+  ): Promise<void> {
     if (spotsAvailable <= 0) return;
 
     try {
       const settings = await this.getNotificationSettings();
-      if (!settings.spotAvailable) return;
+      if (!settings.spotAvailable && !forceShow) return;
 
-      const title = 'Parking Spots Available!';
-      const message = floor 
-        ? `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}`
-        : `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available`;
+      let title: string;
+      let message: string;
 
-      await Promise.all([
-        NotificationManager.addSpotAvailableNotification(spotsAvailable, floor),
-        this.showLocalNotification(
+      if (spotIds && spotIds.length > 0) {
+        if (spotIds.length === 1) {
+          title = 'New Parking Spot Available!';
+          message = floor 
+            ? `Spot ${spotIds[0]} just became available on Floor ${floor}`
+            : `Spot ${spotIds[0]} just became available`;
+        } else if (spotIds.length <= 3) {
+          title = 'New Parking Spots Available!';
+          const spotList = spotIds.join(', ');
+          message = floor 
+            ? `Spots ${spotList} just became available on Floor ${floor}`
+            : `Spots ${spotList} just became available`;
+        } else {
+          title = 'Multiple New Spots Available!';
+          const firstSpots = spotIds.slice(0, 2).join(', ');
+          message = floor 
+            ? `${spotsAvailable} new spots on Floor ${floor} (including ${firstSpots}...)`
+            : `${spotsAvailable} new spots available (including ${firstSpots}...)`;
+        }
+      } else {
+        title = 'New Parking Spots Available!';
+        message = floor 
+          ? `${spotsAvailable} new spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}`
+          : `${spotsAvailable} new spot${spotsAvailable > 1 ? 's' : ''} available`;
+      }
+
+      const notificationData = { 
+        type: 'spot-available', 
+        spotsAvailable, 
+        floor, 
+        spotIds: spotIds || [],
+        timestamp: Date.now(),
+        uniqueId: `${Date.now()}_${Math.random()}`,
+        isNewUpdate: true
+      };
+
+      if (spotIds && spotIds.length > 0) {
+        await NotificationManager.addSpotAvailableNotification(spotsAvailable, floor, spotIds);
+      } else {
+        await this.showLocalNotification(
           title,
           message,
-          { type: 'spot-available', spotsAvailable, floor, timestamp: Date.now() },
+          notificationData,
           CHANNELS.SPOT_AVAILABLE,
           settings
-        )
-      ]);
+        );
+      }
     } catch (error) {
       console.error('Error showing spot notification:', error);
     }
@@ -161,18 +202,40 @@ class NotificationServiceClass {
     totalSpots: number,
     previousAvailable?: number
   ): Promise<void> {
-    if (availableSpots <= 0 || (previousAvailable !== undefined && availableSpots <= previousAvailable)) {
-      return;
-    }
+    if (availableSpots <= 0) return;
 
     try {
       const settings = await this.getNotificationSettings();
       if (!settings.floorUpdates) return;
 
+      let title = 'Floor Update';
+      let message: string;
+
+      if (previousAvailable !== undefined) {
+        const difference = availableSpots - previousAvailable;
+        if (difference > 0) {
+          message = `Floor ${floor}: ${difference} more spot${difference > 1 ? 's' : ''} available (${availableSpots}/${totalSpots} total)`;
+        } else {
+          message = `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`;
+        }
+      } else {
+        message = `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`;
+      }
+
+      const notificationData = {
+        type: 'floor-update', 
+        floor, 
+        availableSpots, 
+        totalSpots, 
+        previousAvailable,
+        timestamp: Date.now(),
+        uniqueId: `floor_${floor}_${Date.now()}_${Math.random()}`
+      };
+
       await this.showLocalNotification(
-        'Floor Update',
-        `Floor ${floor}: ${availableSpots}/${totalSpots} spots available`,
-        { type: 'floor-update', floor, availableSpots, totalSpots, timestamp: Date.now() },
+        title,
+        message,
+        notificationData,
         CHANNELS.FLOOR_UPDATES,
         settings
       );
@@ -181,8 +244,8 @@ class NotificationServiceClass {
     }
   }
 
+  // Rest of the methods remain the same...
   async showConnectionStatusNotification(): Promise<void> {
-    // Connection status notifications are disabled
   }
 
   async showFeedbackReplyNotification(
@@ -308,7 +371,6 @@ class NotificationServiceClass {
 
   async initializeWithManager(): Promise<void> {
     await this.initialize();
-    console.log('NotificationService initialized (overlay only shows parking & feedback notifications)');
   }
 
   async simulateFeedbackReply(
@@ -320,9 +382,18 @@ class NotificationServiceClass {
     await this.showFeedbackReplyNotification(feedbackId, originalFeedback, adminReply, adminName);
   }
 
+  async showSpotAvailableNotification(
+    spotsAvailable: number, 
+    floor?: number, 
+    spotIds?: string[]
+  ): Promise<void> {
+    return this.showSpotAvailableNotificationSmart(spotsAvailable, floor, spotIds, false);
+  }
+  
   async simulateParkingNotifications(): Promise<void> {
-    await this.showSpotAvailableNotification(3, 4);
-    setTimeout(() => this.showFloorUpdateNotification(4, 5, 42, 2), 2000);
+    await this.showSpotAvailableNotification(1, 4, ['4B1']);
+    setTimeout(() => this.showSpotAvailableNotification(3, 4, ['4B2', '4B3', '4C1']), 2000);
+    setTimeout(() => this.showFloorUpdateNotification(4, 5, 42, 2), 4000);
   }
 
   getStatus() {
@@ -343,7 +414,7 @@ class NotificationServiceClass {
       deviceSupport: Device.isDevice,
       channels: Platform.OS === 'android' ? 3 : 0,
       integrations: ['NotificationManager (filtered)', 'AsyncStorage', 'Expo'],
-      overlayTypes: ['spot_available', 'floor_update', 'feedback_reply'],
+      overlayTypes: ['spot_available', 'feedback_reply'],
     };
   }
 

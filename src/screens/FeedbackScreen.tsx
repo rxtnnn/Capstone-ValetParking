@@ -24,7 +24,7 @@ import {
 } from '@expo-google-fonts/poppins';
 import ApiService from '../services/ApiService';
 import { useFeedback } from '../hooks/useFeedback';
-import { FeedbackData } from '../types/feedback';
+import { FeedbackData, FEEDBACK_CATEGORIES } from '../types/feedback';
 import { getBasicDeviceInfo } from '../utils/deviceInfo';
 import { styles } from './styles/FeedbackScreen.style';
 import { NotificationManager } from '../services/NotifManager';
@@ -151,16 +151,10 @@ const FEEDBACK_TYPES: FeedbackType[] = [
   },
 ];
 
-const COMMON_ISSUES = [
-  'Sensor accuracy',
-  'App crashes',
-  'Slow loading',
-  'Wrong spot status',
-  'Map navigation',
-  'Notifications',
-  'Login issues',
-  'Data sync',
-];
+const getCommonIssuesForType = (type: FeedbackData['type']): string[] => {
+  const category = FEEDBACK_CATEGORIES.find(c => c.value === type);
+  return category?.commonIssues || [];
+};
 
 const RATING_LABELS = ['Very Poor 😞', 'Poor 😐', 'Average 🙂', 'Good 😊', 'Excellent 🤩'];
 
@@ -381,7 +375,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         }
 
         showCustomAlert(
-          'Thank You! 🙏',
+          'Thank You!',
           'Your feedback has been submitted successfully. We truly appreciate you taking the time to help us improve VALET.\n\nWe\'ll notify you when our team responds to your feedback.',
           [
             { text: 'Submit Another', style: 'default' },
@@ -686,8 +680,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               </View>
             )}
-
-            {(feedbackType === 'technical' || feedbackType === 'parking') && (
+            {getCommonIssuesForType(feedbackType).length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Issues</Text>
                 <Text style={styles.sectionSubtitle}>
@@ -695,7 +688,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 </Text>
                 <View style={styles.card}>
                   <View style={styles.chipsContainer}>
-                    {COMMON_ISSUES.map((issue) => (
+                    {getCommonIssuesForType(feedbackType).map((issue) => (
                       <TouchableOpacity
                         key={issue}
                         style={[
@@ -713,7 +706,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                       </TouchableOpacity>
                     ))}
                   </View>
-                </View>
+                </View>  
               </View>
             )}
 

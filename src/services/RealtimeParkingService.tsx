@@ -52,6 +52,14 @@ class RealTimeParkingServiceClass {
   private consecutiveErrors = 0;
   private maxConsecutiveErrors = 5;
 
+  private readonly SENSOR_ID_TO_LABEL: Record<number, string> = {
+    1: 'B4',
+    2: 'B3',
+    3: 'B2',
+    4: 'B1',
+    5: 'C1'
+  };
+
   start(): void {
     if (this.isRunning) return;
     
@@ -336,45 +344,61 @@ class RealTimeParkingServiceClass {
   }
 
   private checkForChanges(newData: ParkingStats): void {
-    if (!this.lastData) return;
+    if (!this.lastData || !this.lastData.sensorData || !newData.sensorData) return;
 
     const oldData = this.lastData;
+    const oldAvailableSpotIds = new Set(
+      (oldData.sensorData ?? []).filter(s => !s.is_occupied).map(s => s.sensor_id)
+    );
 
-    try {
-      // Check for new available spots (only notify if significant increase)
-      if (newData.availableSpots > oldData.availableSpots) {
-        const increase = newData.availableSpots - oldData.availableSpots;
-        
-        // Only send notification for 1+ spots
-        if (increase >= 1) {
-          const bestFloor = newData.floors.reduce((prev, current) => 
-            prev.available > current.available ? prev : current
-          );
-          
-          NotificationService.showSpotAvailableNotification(
-            newData.availableSpots,
-            bestFloor.floor
-          );
-        }
+    const currentAvailableSpots = newData.sensorData.filter(s => !s.is_occupied);
+    const currentAvailableSpotIds = new Set(currentAvailableSpots.map(s => s.sensor_id));
+
+    // Detect newly available spots by comparing against previous state
+    const newlyAvailableSpots = currentAvailableSpots.filter(
+      s => !oldAvailableSpotIds.has(s.sensor_id)
+    );
+
+    if (newlyAvailableSpots.length > 0) {
+      const floorGrouped: Record<number, string[]> = {};
+
+      for (const spot of newlyAvailableSpots) {
+        const floor = this.extractFloorFromLocation(spot.floor_level);
+        if (!floorGrouped[floor]) floorGrouped[floor] = [];
+
+        // Generate a user-friendly spot ID (replace with actual spot label if available)
+        const spotId = this.SENSOR_ID_TO_LABEL[spot.sensor_id] || `S${spot.sensor_id}`;
+        floorGrouped[floor].push(spotId);
       }
-      
-      // Check floor status changes (only increases)
-      for (const newFloor of newData.floors) {
-        const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-        
-        if (oldFloor && newFloor.available > oldFloor.available) {
-          NotificationService.showFloorUpdateNotification(
-            newFloor.floor,
-            newFloor.available,
-            newFloor.total,
-            oldFloor.available
-          );
-        }
+
+      // Trigger notification per floor
+      for (const floorStr in floorGrouped) {
+        const floor = parseInt(floorStr);
+        const spotIds = floorGrouped[floor];
+        NotificationService.showSpotAvailableNotification(
+          spotIds.length,
+          floor,
+          spotIds
+        );
       }
-    } catch (error) {
-      console.error('Error checking for changes:', error);
     }
-  }
+
+    // Continue sending floor-level updates if total available count increased
+    for (const newFloor of newData.floors) {
+      const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
+
+      if (oldFloor && newFloor.available > oldFloor.available) {
+        NotificationService.showFloorUpdateNotification(
+          newFloor.floor,
+          newFloor.available,
+          newFloor.total,
+          oldFloor.available
+        );
+      }
+    }
+}
+
+
 
   private notifyParkingUpdate(data: ParkingStats): void {
     for (const callback of this.updateCallbacks) {

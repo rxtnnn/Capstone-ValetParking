@@ -38,11 +38,11 @@ interface NotificationSettings {
 const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
 
 const DEFAULT_SETTINGS: NotificationSettings = {
-  spotAvailable: true,
-  floorUpdates: true,
+  spotAvailable: false,
+  floorUpdates: false,
   maintenanceAlerts: false,
-  vibration: true,
-  sound: true,
+  vibration: false,
+  sound: false,
 };
 
 const SWITCH_COLORS = {

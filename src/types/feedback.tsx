@@ -219,8 +219,8 @@ export const FEEDBACK_CATEGORIES: FeedbackCategory[] = [
   },
   {
     value: 'technical',
-    label: 'Technical Problems',
-    icon: 'settings-outline',
+    label: 'Bug Reports',
+    icon: 'bug-outline',
     description: 'App bugs, crashes, and technical difficulties',
     requiresRating: false,
     commonIssues: [

@@ -20,6 +20,7 @@ import { useFeedback } from '../hooks/useFeedback';
 import ApiService from '../services/ApiService';
 import { useNavigation } from '@react-navigation/native';
 import { styles } from './styles/NotifOverlay.style';
+
 interface NotificationOverlayProps {
   visible: boolean;
   onClose: () => void;
@@ -185,42 +186,6 @@ const SwipeableNotificationItem: React.FC<SwipeableNotificationItemProps> = ({
             ]}>
               {notification.message}
             </Text>
-
-            {isFeedbackReply && notificationData?.feedbackId && (
-              <View style={styles.feedbackDetails}>
-                <View style={styles.feedbackIdContainer}>
-                  <Text style={styles.feedbackIdText}>
-                    Feedback #{notificationData.feedbackId}
-                  </Text>
-                </View>
-                {notificationData.feedbackPreview && (
-                  <Text style={styles.feedbackPreview}>
-                    Re: "{notificationData.feedbackPreview}"
-                  </Text>
-                )}
-                <Text style={styles.actionHint}>
-                  Tap to view reply in Feedback screen
-                </Text>
-              </View>
-            )}
-
-            {isSpotAvailable && (
-              <View style={styles.parkingDetails}>
-                {notificationData?.floor && (
-                  <Text style={styles.floorInfo}>
-                    Floor {notificationData.floor}
-                  </Text>
-                )}
-                {notificationData?.spotsAvailable && (
-                  <Text style={styles.spotsInfo}>
-                    {notificationData.spotsAvailable} spot{notificationData.spotsAvailable > 1 ? 's' : ''} available
-                  </Text>
-                )}
-                <Text style={styles.actionHint}>
-                  Tap to view parking map
-                </Text>
-              </View>
-            )}
           </View>
         </TouchableOpacity>
       </Animated.View>
@@ -403,11 +368,16 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
       case 'unread':
         return userNotifications.filter(n => !n.isRead);
       case 'spots':
-        return userNotifications.filter(n => n.type === 'spot_available');
+        return userNotifications.filter(
+          n => n.type === 'spot_available' && n.data?.spotIds && n.data.spotIds.length > 0
+        );
       case 'feedback':
         return userNotifications.filter(n => n.type === 'feedback_reply');
-      default:
-        return userNotifications;
+     default:
+      return userNotifications.filter(
+        n =>
+          (n.type !== 'spot_available' || (n.data?.spotIds && n.data.spotIds.length > 0))
+      );
     }
   }, [notifications, filter, userId, currentUserId, userInfo.id]);
 
@@ -551,7 +521,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
                     },
                     { 
                       key: 'spots',
-                      label: 'Parking Spots', 
+                      label: 'Spots', 
                       count: getNotificationCount('spots')
                     },
                     { 

@@ -129,9 +129,31 @@ class NotificationManagerClass {
     }
   }
 
+  private isDuplicateNotification(notification: CreateNotificationInput): boolean {
+    const fiveMinutesAgo = Date.now() - 300000;
+    
+    return this.notifications.some((existing: AppNotification) => {
+      if (notification.type === 'feedback_reply' && existing.type === 'feedback_reply') {
+        const existingId = (existing.data as any)?.feedbackId;
+        const newId = (notification.data as any)?.feedbackId;
+        return existingId && newId && existingId === newId;
+      } 
+      
+      return existing.type === notification.type &&
+             existing.title === notification.title &&
+             existing.message === notification.message &&
+             existing.timestamp > fiveMinutesAgo &&
+             getNotificationUserId(existing) === getNotificationUserId({ ...notification, id: '', timestamp: 0, isRead: false } as AppNotification);
+    });
+  }
+
   async addNotification(notification: CreateNotificationInput): Promise<void> {
     if (!ALLOWED_TYPES.includes(notification.type as any) || 
         BLOCKED_TITLES.some(blocked => notification.title.includes(blocked))) {
+      return;
+    }
+
+    if (this.isDuplicateNotification(notification)) {
       return;
     }
 
@@ -143,34 +165,35 @@ class NotificationManagerClass {
       data: setNotificationUserId(notification.data, this.currentUserId)
     } as AppNotification;
 
-    const fiveMinutesAgo = Date.now() - 300000;
-    const isDuplicate = this.notifications.some(existing => {
-      if (notification.type === 'feedback_reply' && existing.type === 'feedback_reply') {
-        const existingId = (existing.data as any)?.feedbackId;
-        const newId = (newNotification.data as any)?.feedbackId;
-        return existingId && newId && existingId === newId;
-      }
-      
-      return existing.type === newNotification.type &&
-             existing.title === newNotification.title &&
-             existing.timestamp > fiveMinutesAgo &&
-             getNotificationUserId(existing) === getNotificationUserId(newNotification);
-    });
-
-    if (isDuplicate) return;
-
     this.notifications.unshift(newNotification);
     await this.saveNotifications();
     this.notifyListeners();
   }
 
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
-    if (spotsAvailable <= 0) return;
+    if (spotsAvailable <= 0 || !spotIds || spotIds.length === 0) return;
 
-    const title = 'Parking Spots Available!';
-    const message = floor 
-      ? `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available on Floor ${floor}. Tap to view parking map.`
-      : `${spotsAvailable} spot${spotsAvailable > 1 ? 's' : ''} available. Tap to view parking map.`;
+    let title: string;
+    let message: string;
+
+    if (spotIds.length === 1) {
+      title = 'Parking Spot Available!';
+      message = floor 
+        ? `Spot ${spotIds[0]} is now available on Floor ${floor}. Tap to view parking map.`
+        : `Spot ${spotIds[0]} is now available. Tap to view parking map.`;
+    } else if (spotIds.length <= 3) {
+      title = 'Parking Spots Available!';
+      const spotList = spotIds.join(', ');
+      message = floor 
+        ? `Spots ${spotList} are now available on Floor ${floor}. Tap to view parking map.`
+        : `Spots ${spotList} are now available. Tap to view parking map.`;
+    } else {
+      title = 'Multiple Parking Spots Available!';
+      const firstSpots = spotIds.slice(0, 2).join(', ');
+      message = floor 
+        ? `${spotsAvailable} spots available on Floor ${floor} (including ${firstSpots}...). Tap to view parking map.`
+        : `${spotsAvailable} spots available (including ${firstSpots}...). Tap to view parking map.`;
+    }
 
     const notification = createSpotAvailableNotification(
       title, message, spotsAvailable, floor, spotIds, this.currentUserId || undefined
@@ -178,6 +201,7 @@ class NotificationManagerClass {
 
     await this.addNotification(notification);
   }
+
 
   async addFeedbackReplyNotification(
     feedbackId: number | undefined,

@@ -16,14 +16,6 @@ export interface SpotAvailableData {
   userId?: number;
 }
 
-export interface FloorUpdateData {
-  floor: number;
-  availableSpots: number;
-  totalSpots: number;
-  previousAvailable?: number;
-  userId?: number;
-}
-
 export interface FeedbackReplyData {
   feedbackId: number;
   originalFeedback: string;
@@ -43,11 +35,6 @@ export interface SpotAvailableNotification extends BaseNotification {
   data: SpotAvailableData;
 }
 
-export interface FloorUpdateNotification extends BaseNotification {
-  type: 'floor_update';
-  data: FloorUpdateData;
-}
-
 export interface FeedbackReplyNotification extends BaseNotification {
   type: 'feedback_reply';
   data: FeedbackReplyData;
@@ -60,17 +47,12 @@ export interface GenericNotification extends BaseNotification {
 
 export type AppNotification = 
   | SpotAvailableNotification 
-  | FloorUpdateNotification 
   | FeedbackReplyNotification
   | GenericNotification;
 
 // Type guards for safe type checking
 export const isSpotAvailableNotification = (notification: AppNotification): notification is SpotAvailableNotification => {
   return notification.type === 'spot_available';
-};
-
-export const isFloorUpdateNotification = (notification: AppNotification): notification is FloorUpdateNotification => {
-  return notification.type === 'floor_update';
 };
 
 export const isFeedbackReplyNotification = (notification: AppNotification): notification is FeedbackReplyNotification => {
@@ -107,28 +89,6 @@ export const createSpotAvailableNotification = (
     spotsAvailable,
     floor,
     spotIds,
-    userId
-  }
-});
-
-export const createFloorUpdateNotification = (
-  title: string,
-  message: string,
-  floor: number,
-  availableSpots: number,
-  totalSpots: number,
-  previousAvailable?: number,
-  userId?: number
-): Omit<FloorUpdateNotification, 'id' | 'timestamp' | 'isRead'> => ({
-  type: 'floor_update',
-  title,
-  message,
-  priority: 'normal',
-  data: {
-    floor,
-    availableSpots,
-    totalSpots,
-    previousAvailable,
     userId
   }
 });
