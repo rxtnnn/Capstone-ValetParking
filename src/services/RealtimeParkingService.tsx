@@ -44,28 +44,21 @@ class RealTimeParkingServiceClass {
   private retryCount = 0;
   private maxRetries = 3;
   private lastFetchTime = 0;
-  
-  // Prevent multiple simultaneous requests
   private isFetching = false;
   private fetchController: AbortController | null = null;
   private shouldStop = false;
-  private consecutiveErrors = 0;
+  private consecErrors = 0;
   private maxConsecutiveErrors = 5;
 
   private readonly SENSOR_ID_TO_LABEL: Record<number, string> = {
-    1: 'B4',
-    2: 'B3',
-    3: 'B2',
-    4: 'B1',
-    5: 'C1'
-  };
+    1: 'B4', 2: 'B3', 3: 'B2', 4: 'B1', 5: 'C1' };
 
   start(): void {
     if (this.isRunning) return;
     
     this.isRunning = true;
     this.shouldStop = false;
-    this.consecutiveErrors = 0;
+    this.consecErrors = 0;
     this.retryCount = 0;
     
     this.fetchAndUpdate();
@@ -157,27 +150,24 @@ class RealTimeParkingServiceClass {
   }
 
   private async fetchAndUpdate(): Promise<void> {
-    // Early exit checks - optimized for performance
-    if (this.isFetching || this.shouldStop || !this.isRunning) return;
+    if (this.isFetching || this.shouldStop || !this.isRunning) return; //para dili mag double fetch
 
-    const now = Date.now();
+    const now = Date.now(); //track last fetch time
     
-    // Rate limiting - minimum 2 seconds between requests
-    if (now - this.lastFetchTime < 2000) return;
+    if (now - this.lastFetchTime < 5000) return; //every 2 secs to avoid flooding 
 
-    // Check consecutive errors limit
-    if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
-      console.error(`Too many consecutive errors (${this.consecutiveErrors}), stopping service`);
+  
+    if (this.consecErrors >= this.maxConsecutiveErrors) { // Stop if too many errors
+      console.error(`Too many consecutive errors (${this.consecErrors}), stopping service`);
       this.stop();
       return;
     }
     
     this.isFetching = true;
     this.lastFetchTime = now;
+    this.fetchController = new AbortController(); //if server is slow
 
-    // Create abort controller with timeout
-    this.fetchController = new AbortController();
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => { //if it takes 8 sec, abort from fetching
       if (this.fetchController) {
         this.fetchController.abort();
       }
@@ -196,16 +186,13 @@ class RealTimeParkingServiceClass {
         signal: this.fetchController.signal,
       });
 
-      clearTimeout(timeoutId);
+      clearTimeout(timeoutId); //if completed before timeout
+      if (this.fetchController.signal.aborted) return; //if ni abort due to timeout, exit
 
-      // Handle aborted requests
-      if (this.fetchController.signal.aborted) return;
-
-      // Handle authentication errors
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401 || response.status === 403) { //invalid token
         console.error(`API authentication error: ${response.status}`);
         this.setConnectionStatus('error');
-        this.consecutiveErrors++;
+        this.consecErrors++;
         return;
       }
 
@@ -213,49 +200,43 @@ class RealTimeParkingServiceClass {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const rawData: ParkingSpace[] = await response.json();
-      
-      // Validate response
-      if (!Array.isArray(rawData)) {
+      const rawData: ParkingSpace[] = await response.json(); //convert response to JSON
+      if (!Array.isArray(rawData)) { //ensures response is an array
         throw new Error('Invalid response format from server');
       }
       
-      // Check if service was stopped during fetch
-      if (this.shouldStop || !this.isRunning) return;
+      if (this.shouldStop || !this.isRunning) return; //skip if the user stopped the service
 
       const newData = this.transformRawData(rawData, rawData);
-      this.checkForChanges(newData);
+      this.checkForChanges(newData);//trigger for notif to notify user for nw spots available
       
       this.lastData = newData;
       this.notifyParkingUpdate(newData);
       this.setConnectionStatus('connected'); 
       this.retryCount = 0;
-      this.consecutiveErrors = 0;
+      this.consecErrors = 0;
       
     } catch (error: any) {
       clearTimeout(timeoutId);
-      
-      // Don't log errors if the request was aborted
-      if (error.name === 'AbortError' || this.shouldStop) return;
+      if (error.name === 'AbortError' || this.shouldStop) return; // if aborted or stopped, exit
 
       this.retryCount++;
-      this.consecutiveErrors++;
+      this.consecErrors++;
       console.error(`Fetch error (attempt ${this.retryCount}/${this.maxRetries}):`, error.message);
       
       this.setConnectionStatus('error');
       
-      if (this.lastData) {
-        const staleData = {
+      if (this.lastData) { //if api fetch failed, use last data
+        const oldData = {
           ...this.lastData,
           isLive: false,
           lastUpdated: `Error: ${error.message}`,
         };
-        this.notifyParkingUpdate(staleData);
+        this.notifyParkingUpdate(oldData); //to notify pages that the data is not live
       }
       
-      // Retry with exponential backoff
-      if (this.retryCount <= this.maxRetries && this.consecutiveErrors < this.maxConsecutiveErrors && this.isRunning && !this.shouldStop) {
-        const delay = Math.min(2000 * Math.pow(2, this.retryCount), 30000);
+      if (this.retryCount <= this.maxRetries && this.consecErrors < this.maxConsecutiveErrors && this.isRunning && !this.shouldStop) {
+        const delay = Math.min(2000 * Math.pow(2, this.retryCount), 30000); //retry with longer delay
         
         setTimeout(() => {
           if (this.isRunning && !this.shouldStop) {
@@ -347,32 +328,23 @@ class RealTimeParkingServiceClass {
     if (!this.lastData || !this.lastData.sensorData || !newData.sensorData) return;
 
     const oldData = this.lastData;
-    const oldAvailableSpotIds = new Set(
-      (oldData.sensorData ?? []).filter(s => !s.is_occupied).map(s => s.sensor_id)
-    );
-
-    const currentAvailableSpots = newData.sensorData.filter(s => !s.is_occupied);
-    const currentAvailableSpotIds = new Set(currentAvailableSpots.map(s => s.sensor_id));
+    const oldAvailableSpotIds = new Set((oldData.sensorData ?? []).filter(s => !s.is_occupied).map(s => s.sensor_id)) //store previous available spot IDs;
+    const currentAvailableSpots = newData.sensorData.filter(s => !s.is_occupied); // Get current available spots
 
     // Detect newly available spots by comparing against previous state
-    const newlyAvailableSpots = currentAvailableSpots.filter(
-      s => !oldAvailableSpotIds.has(s.sensor_id)
-    );
+    const newlyAvailableSpots = currentAvailableSpots.filter(s => !oldAvailableSpotIds.has(s.sensor_id));
 
     if (newlyAvailableSpots.length > 0) {
-      const floorGrouped: Record<number, string[]> = {};
+      const floorGrouped: Record<number, string[]> = {}; //group spots by floor
 
       for (const spot of newlyAvailableSpots) {
         const floor = this.extractFloorFromLocation(spot.floor_level);
         if (!floorGrouped[floor]) floorGrouped[floor] = [];
-
-        // Generate a user-friendly spot ID (replace with actual spot label if available)
-        const spotId = this.SENSOR_ID_TO_LABEL[spot.sensor_id] || `S${spot.sensor_id}`;
+        const spotId = this.SENSOR_ID_TO_LABEL[spot.sensor_id] || `S${spot.sensor_id}`;  // sensor_id to label mapping
         floorGrouped[floor].push(spotId);
       }
 
-      // Trigger notification per floor
-      for (const floorStr in floorGrouped) {
+      for (const floorStr in floorGrouped) { // Trigger notification per floor
         const floor = parseInt(floorStr);
         const spotIds = floorGrouped[floor];
         NotificationService.showSpotAvailableNotification(
@@ -397,8 +369,6 @@ class RealTimeParkingServiceClass {
       }
     }
 }
-
-
 
   private notifyParkingUpdate(data: ParkingStats): void {
     for (const callback of this.updateCallbacks) {
@@ -426,63 +396,10 @@ class RealTimeParkingServiceClass {
 
   async forceUpdate(): Promise<void> {
     if (!this.isRunning || this.isFetching) return;
-
-    // Reset error counters for manual refresh
-    this.consecutiveErrors = 0;
+    this.consecErrors = 0; // reset error counters for manual refresh
     this.retryCount = 0;
     
     await this.fetchAndUpdate();
-  }
-
-  async testConnection(): Promise<{ success: boolean; message: string }> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(this.apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_TOKEN}`,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.status === 401) {
-        return {
-          success: false,
-          message: 'API token is invalid or expired',
-        };
-      }
-
-      if (response.status === 403) {
-        return {
-          success: false,
-          message: 'API token does not have permission to access parking data',
-        };
-      }
-
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          success: true,
-          message: `Connection successful! Found ${Array.isArray(data) ? data.length : 0} parking spaces.`,
-        };
-      }
-
-      return {
-        success: false,
-        message: `Server error: ${response.status} ${response.statusText}`,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: `Connection failed: ${error.message}`,
-      };
-    }
   }
 
   getServiceStats() {
@@ -494,30 +411,11 @@ class RealTimeParkingServiceClass {
       lastUpdate: this.lastData?.lastUpdated || 'Never',
       subscriberCount: this.updateCallbacks.length,
       retryCount: this.retryCount,
-      consecutiveErrors: this.consecutiveErrors,
+      consecErrors: this.consecErrors,
       apiEndpoint: this.apiUrl,
       hasValidToken: !!this.API_TOKEN,
       sensorCount: this.lastData?.sensorData?.length || 0,
     };
-  }
-
-  getRawSensorData(): ParkingSpace[] | null {
-    return this.lastData?.sensorData || null;
-  }
-
-  getSensorById(sensorId: number): ParkingSpace | null {
-    return this.lastData?.sensorData?.find(sensor => sensor.sensor_id === sensorId) || null;
-  }
-
-  resetErrorCounters(): void {
-    this.retryCount = 0;
-    this.consecutiveErrors = 0;
-  }
-
-  isHealthy(): boolean {
-    return this.isRunning && 
-           this.consecutiveErrors < this.maxConsecutiveErrors && 
-           this.connectionStatus !== 'error';
   }
 }
 

@@ -217,39 +217,6 @@ const ParkingMapScreen: React.FC = () => {
       if (servicesInitializedRef.current || !isMountedRef.current) return;
 
       servicesInitializedRef.current = true;
-      
-      if (!connectionTestedRef.current) {
-        connectionTestedRef.current = true;
-        
-        try {
-          const result = await RealTimeParkingService.testConnection();
-          
-          if (!isMountedRef.current) return;
-          
-          if (result.success) {
-            RealTimeParkingService.start();
-            setIsServiceRunning(true);
-          } else {
-            Alert.alert(
-              'Connection Error',
-              `Unable to connect to parking service: ${result.message}`,
-              [
-                { 
-                  text: 'Retry', 
-                  onPress: () => {
-                    connectionTestedRef.current = false;
-                    servicesInitializedRef.current = false;
-                    initializeServices();
-                  }
-                }, 
-                { text: 'OK' }
-              ]
-            );
-          }
-        } catch (error) {
-          console.error('Error testing connection:', error);
-        }
-      }
 
       unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
         if (!isMountedRef.current) return;

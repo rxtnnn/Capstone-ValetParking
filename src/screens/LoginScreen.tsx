@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { styles } from './styles/RegisterScreen.style';
+import { styles } from './styles/LoginScreen.style';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -49,9 +49,7 @@ const LoginScreen: React.FC = () => {
     }
   }, [isAuthenticated, loading, navigation]);
 
-  useEffect(() => {
-    return clearError;
-  }, [clearError]);
+  useEffect(() => clearError, []);
 
   useEffect(() => {
     if (error) {

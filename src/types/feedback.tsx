@@ -248,7 +248,6 @@ export const FEEDBACK_CATEGORIES: FeedbackCategory[] = [
       'Better notification system',
       'Dark mode option',
       'Offline mode support',
-      'Integration with calendar',
       'Voice guidance features'
     ],
     placeholder: 'What feature or improvement would you like to see in VALET? How would it make your parking experience better?'

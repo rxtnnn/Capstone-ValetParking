@@ -1,19 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  AppNotification, 
-  CreateNotificationInput,
-  createSpotAvailableNotification,
-  createFeedbackReplyNotification,
-  getNotificationUserId,
-  setNotificationUserId
-} from '../types/NotifTypes';
+import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
+  getNotificationUserId, setNotificationUserId } from '../types/NotifTypes';
 import { FeedbackData } from '../types/feedback';
 
 const STORAGE_KEYS = {
   NOTIFICATIONS: '@valet_notifications',
   FEEDBACK_CHECK: '@valet_last_feedback_check',
-  PROCESSED_REPLIES: '@valet_processed_replies'
-} as const;
+  PROCESSED_REPLIES: '@valet_processed_replies' } as const;
 
 const MAX_NOTIFICATIONS = 100;
 const ALLOWED_TYPES = ['spot_available', 'feedback_reply'] as const;
@@ -198,10 +191,8 @@ class NotificationManagerClass {
     const notification = createSpotAvailableNotification(
       title, message, spotsAvailable, floor, spotIds, this.currentUserId || undefined
     );
-
     await this.addNotification(notification);
   }
-
 
   async addFeedbackReplyNotification(
     feedbackId: number | undefined,
@@ -235,7 +226,6 @@ class NotificationManagerClass {
       console.warn('No current user ID - cannot process feedback replies');
       return;
     }
-
     try {
       const userFeedback = feedbackArray.filter(feedback => 
         feedback.user_id === this.currentUserId && 
@@ -309,9 +299,8 @@ class NotificationManagerClass {
     if (index === -1) return;
 
     const notification = this.notifications[index];
-    const belongsToUser = !this.currentUserId || 
-      !getNotificationUserId(notification) || 
-      getNotificationUserId(notification) === this.currentUserId;
+    const belongsToUser = !this.currentUserId || !getNotificationUserId(notification) || 
+    getNotificationUserId(notification) === this.currentUserId;
     
     if (belongsToUser) {
       this.notifications.splice(index, 1);
@@ -336,9 +325,7 @@ class NotificationManagerClass {
 
   private isValidNotification = (n: AppNotification): boolean => {
     const isAllowedType = ALLOWED_TYPES.includes(n.type as any);
-    const belongsToUser = !this.currentUserId || 
-      !getNotificationUserId(n) || 
-      getNotificationUserId(n) === this.currentUserId;
+    const belongsToUser = !this.currentUserId || !getNotificationUserId(n) || getNotificationUserId(n) === this.currentUserId;
     return isAllowedType && belongsToUser;
   };
 

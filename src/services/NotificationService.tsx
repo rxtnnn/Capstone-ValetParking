@@ -433,18 +433,6 @@ class NotificationServiceClass {
     }
   }
 
-  async reset(): Promise<void> {
-    try {
-      await Promise.all([
-        this.clearNotificationChannels(),
-        AsyncStorage.removeItem(SETTINGS_KEY)
-      ]);
-      this.expoPushToken = null;
-      console.log('NotificationService reset complete');
-    } catch (error) {
-      console.error('Error resetting NotificationService:', error);
-    }
-  }
 }
 
 export const NotificationService = new NotificationServiceClass();
