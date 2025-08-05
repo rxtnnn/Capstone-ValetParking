@@ -118,6 +118,11 @@ const HomeScreen: React.FC = () => {
   const isMountedRef = useRef(true);
   const servicesInitializedRef = useRef(false);
   const userIdFetchedRef = useRef(false);
+  const unsubscribeFunctionsRef = useRef<{
+    parkingUpdates?: () => void;
+    connectionStatus?: () => void;
+    notifications?: () => void;
+  }>({});
 
   const extractFloorFromLocation = useCallback((floor_level: string): number => {
     if (!floor_level) return 1;
@@ -312,48 +317,89 @@ const HomeScreen: React.FC = () => {
     }
   }, [getFloorStatus, navigation]);
 
+   const setupPersistentServices = useCallback(async () => {
+    if (!isAuthenticated || servicesInitializedRef.current) return;
+    servicesInitializedRef.current = true;
+
+    try {
+      const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
+        if (!isMountedRef.current) return;
+        
+        setParkingData(prevData => {
+          if (JSON.stringify(prevData.floors) !== JSON.stringify(data.floors)) {
+            checkParkingChanges(data);
+            return data;
+          }
+          return { ...prevData, lastUpdated: data.lastUpdated, isLive: data.isLive };
+        });
+        setLoading(false);
+      });
+
+      const unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status: 'connected' | 'disconnected' | 'error') => {
+        if (!isMountedRef.current) return;
+        setConnectionStatus(status);
+      });
+
+      // Store unsubscribe functions
+      unsubscribeFunctionsRef.current = {
+        parkingUpdates: unsubscribeParkingUpdates,
+        connectionStatus: unsubscribeConnectionStatus,
+      };
+      RealTimeParkingService.start();
+      
+      setTimeout(() => {
+        if (isMountedRef.current && loading && connectionStatus !== 'connected') {
+          fetchParkingDataDirect();
+        }
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error setting up persistent services:', error);
+      if (isMountedRef.current && isAuthenticated) {
+        fetchParkingDataDirect();
+      }
+    }
+  }, [isAuthenticated, checkParkingChanges, fetchParkingDataDirect, loading, connectionStatus]);
+
+  const setupNotifications = useCallback(() => {
+    if (!currentUserId || unsubscribeFunctionsRef.current.notifications) return;
+
+    const unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
+      if (!isMountedRef.current) return;
+      setUnreadNotificationCount(NotificationManager.getUnreadCount());
+    });
+
+    unsubscribeFunctionsRef.current.notifications = unsubscribeNotifications;
+  }, [currentUserId]);
+
   useFocusEffect(
     React.useCallback(() => {
-      let isActive = true;
-      let timeoutId: NodeJS.Timeout;
-
-      const checkAuth = async () => {
-        if (!isActive || !isMountedRef.current) return;
-
-        try {
-          if (!isAuthenticated) {
-            await NotificationManager.setCurrentUserId(null);
-            timeoutId = setTimeout(() => {
-              if (isActive) {
-                navigation.navigate('Login');
-              }
-            }, 100);
-            return;
-          }
-
-          if (!userIdFetchedRef.current && isActive) {
-            await getCurrentUserId();
-            userIdFetchedRef.current = true;
-          }
-        } catch (error) {
-          console.error('Auth check error:', error);
-        }
-      };
-
-      checkAuth();
-
-      return () => {
-        isActive = false;
-        if (timeoutId) clearTimeout(timeoutId);
-      };
-    }, [isAuthenticated, getCurrentUserId, navigation])
+      
+      if (!isAuthenticated) {
+        navigation.navigate('Login');
+        return;
+      }
+      if (!userIdFetchedRef.current) {
+        getCurrentUserId().then(() => {
+          userIdFetchedRef.current = true;
+        });
+      }
+      setupPersistentServices();
+      setupNotifications();
+    }, [isAuthenticated, getCurrentUserId, setupPersistentServices, setupNotifications, navigation])
   );
 
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     return () => {
       isMountedRef.current = false;
+      Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
+      unsubscribeFunctionsRef.current = {};
       servicesInitializedRef.current = false;
       userIdFetchedRef.current = false;
     };
@@ -433,24 +479,7 @@ const HomeScreen: React.FC = () => {
     };
   }, [isAuthenticated, checkParkingChanges, fetchParkingDataDirect, loading]);
 
-  useEffect(() => {
-    if (!currentUserId) return;
-
-    let unsubscribeNotifications: (() => void) | undefined;
-
-    const setupNotifications = () => {
-      unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
-        if (!isMountedRef.current) return;
-        setUnreadNotificationCount(NotificationManager.getUnreadCount());
-      });
-    };
-
-    setupNotifications();
-
-    return () => {
-      if (unsubscribeNotifications) unsubscribeNotifications();
-    };
-  }, [currentUserId]);
+  
 
   useEffect(() => {
     if (!currentUserId || !isAuthenticated) return;

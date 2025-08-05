@@ -598,9 +598,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   </View>
                 )}
               </View>
-              {(user?.department || authUser?.department) && (
-                <Text style={styles.userDepartment}>{user?.department || authUser?.department}</Text>
-              )}
             </View>
           </View>
         </LinearGradient>

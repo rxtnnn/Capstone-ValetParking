@@ -1,24 +1,22 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NotificationManager } from '../services/NotifManager';
+import { TokenManager } from '../config/api';
+import apiClient from '../config/api';
 
-interface NotificationSettings {
+export interface NotificationSettings {
   spotAvailable: boolean;
   floorUpdates: boolean;
-  maintenanceAlerts: boolean;
   vibration: boolean;
   sound: boolean;
 }
 
-const SETTINGS_KEY = '@valet_notification_settings';
 const DEFAULT_VIBRATION = [0, 250, 250, 250];
 const DEFAULT_SETTINGS: NotificationSettings = {
   spotAvailable: true,
   floorUpdates: true,
-  maintenanceAlerts: false,
   vibration: true,
   sound: true,
 };
@@ -30,21 +28,45 @@ const CHANNELS = {
   DEFAULT: 'default'
 } as const;
 
-
 class NotificationServiceClass {
   private expoPushToken: string | null = null;
 
   async initialize(): Promise<void> {
     try {
+      // FIX 1: Add missing properties to NotificationBehavior
       Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,      
-          shouldPlaySound: true,    
-          shouldSetBadge: false,  
-          shouldShowBanner: true,     
-          shouldShowList: true, 
-        }),
+        handleNotification: async (notification) => {
+          const settings = await this.getNotificationSettings();
+          return {
+            shouldShowAlert: true,
+            shouldPlaySound: settings.sound,
+            shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          };
+        },
       });
+
+      if (Platform.OS === 'android' || Device.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync({
+            android: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+            },
+          });
+          finalStatus = status;
+        }
+        
+        if (finalStatus !== 'granted') {
+          console.warn('Push notification permissions not granted');
+          return;
+        }
+      }
 
       await Promise.all([
         Platform.OS === 'android' ? this.createNotificationChannels() : Promise.resolve(),
@@ -55,7 +77,9 @@ class NotificationServiceClass {
     }
   }
 
-  private async createNotificationChannels(): Promise<void> {
+   private async createNotificationChannels(): Promise<void> {
+    const settings = await this.getNotificationSettings();
+    
     const channels = [
       {
         id: CHANNELS.SPOT_AVAILABLE,
@@ -63,6 +87,10 @@ class NotificationServiceClass {
         description: 'Notifications when new parking spots become available',
         importance: Notifications.AndroidImportance.HIGH,
         lightColor: '#4CAF50',
+        vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined, // FIX: Proper sound setting
+        enableLights: true,
       },
       {
         id: CHANNELS.FLOOR_UPDATES,
@@ -70,6 +98,10 @@ class NotificationServiceClass {
         description: 'Updates about floor occupancy changes',
         importance: Notifications.AndroidImportance.DEFAULT,
         lightColor: '#2196F3',
+        vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined,
+        enableLights: true,
       },
       {
         id: CHANNELS.FEEDBACK_REPLIES,
@@ -77,18 +109,24 @@ class NotificationServiceClass {
         description: 'Admin replies to your feedback',
         importance: Notifications.AndroidImportance.HIGH,
         lightColor: '#B22020',
+        vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined,
+        enableLights: true,
       }
     ];
 
     await Promise.all(
       channels.map(channel =>
-        Notifications.setNotificationChannelAsync(channel.id, {
-          ...channel,
-          vibrationPattern: DEFAULT_VIBRATION,
-          sound: 'default',
-        })
+        Notifications.setNotificationChannelAsync(channel.id, channel)
       )
     );
+  }
+
+   async updateNotificationChannels(): Promise<void> {
+    if (Platform.OS === 'android') {
+      await this.createNotificationChannels();
+    }
   }
 
   private async registerPushNotif(): Promise<string | null> {
@@ -98,11 +136,16 @@ class NotificationServiceClass {
     }
 
     if (Platform.OS === 'android') {
+      const settings = await this.getNotificationSettings();
+      
       await Notifications.setNotificationChannelAsync(CHANNELS.DEFAULT, {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: DEFAULT_VIBRATION,
+        vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         lightColor: '#B71C1C',
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined, // FIX: Proper sound setting
+        enableLights: true,
       });
     }
 
@@ -126,6 +169,72 @@ class NotificationServiceClass {
     } catch (error) {
       console.error('Error getting push token:', error);
       return null;
+    }
+  }
+
+  private getUserStorageKey(): string {
+    const user = TokenManager.getUser();
+    const userId = user?.id;
+    
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+    return `valet_notification_settings_${userId}`;
+  }
+
+  async getNotificationSettings(): Promise<NotificationSettings> {
+    try {
+      const key = this.getUserStorageKey();
+      const stored = await AsyncStorage.getItem(key);
+      if (stored) {
+        return { ...DEFAULT_SETTINGS, ...(JSON.parse(stored) as NotificationSettings) };
+      }
+    } catch (e) {
+      console.error('Load settings error:', e);
+    }
+    return DEFAULT_SETTINGS;
+  }
+
+  async saveNotificationSettings(settings: NotificationSettings): Promise<void> {
+    try {
+      await this.saveSettingsLocally(settings);
+      await this.updateNotificationChannels();
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: settings.sound,
+          shouldSetBadge: false,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+      
+    } catch (error) {
+      throw new Error('Failed to save notification settings');
+    }
+  }
+
+  private async saveSettingsLocally(settings: NotificationSettings): Promise<void> {
+    const key = this.getUserStorageKey();
+    await AsyncStorage.setItem(key, JSON.stringify(settings));
+  }
+
+  private async saveSettings(settings: NotificationSettings): Promise<void> {
+    try {
+      await this.saveSettingsLocally(settings);
+    } catch (error) {
+      console.error('Error saving notification settings locally:', error);
+      throw error;
+    }
+  }
+
+
+  async clearUserSettings(): Promise<void> {
+    try {
+      const storageKey = this.getUserStorageKey();
+      await AsyncStorage.removeItem(storageKey);
+    } catch (error) {
+      console.error('Error clearing notification settings:', error);
     }
   }
 
@@ -177,20 +286,17 @@ class NotificationServiceClass {
         spotIds: spotIds || [],
         timestamp: Date.now(),
         uniqueId: `${Date.now()}_${Math.random()}`,
-        isNewUpdate: true
+        isNewUpdate: true,
+        userId: TokenManager.getUser()?.id
       };
 
-      if (spotIds && spotIds.length > 0) {
-        await NotificationManager.addSpotAvailableNotification(spotsAvailable, floor, spotIds);
-      } else {
-        await this.showLocalNotification(
-          title,
-          message,
-          notificationData,
-          CHANNELS.SPOT_AVAILABLE,
-          settings
-        );
-      }
+      await this.showLocalNotification(
+        title,
+        message,
+        notificationData,
+        CHANNELS.SPOT_AVAILABLE,
+        settings
+      );
     } catch (error) {
       console.error('Error showing spot notification:', error);
     }
@@ -229,7 +335,8 @@ class NotificationServiceClass {
         totalSpots, 
         previousAvailable,
         timestamp: Date.now(),
-        uniqueId: `floor_${floor}_${Date.now()}_${Math.random()}`
+        uniqueId: `floor_${floor}_${Date.now()}_${Math.random()}`,
+        userId: TokenManager.getUser()?.id
       };
 
       await this.showLocalNotification(
@@ -244,10 +351,6 @@ class NotificationServiceClass {
     }
   }
 
-  // Rest of the methods remain the same...
-  async showConnectionStatusNotification(): Promise<void> {
-  }
-
   async showFeedbackReplyNotification(
     feedbackId: number,
     originalFeedback: string,
@@ -259,23 +362,21 @@ class NotificationServiceClass {
       const title = 'Admin Reply Received';
       const message = `Your feedback has been responded to by ${adminName || 'Admin'}`;
 
-      await Promise.all([
-        NotificationManager.addFeedbackReplyNotification(feedbackId, originalFeedback, adminReply, adminName),
-        this.showLocalNotification(
-          title,
-          message,
-          { 
-            type: 'feedback-reply',
-            feedbackId,
-            originalFeedback: originalFeedback.substring(0, 50) + '...',
-            adminReply: adminReply.substring(0, 50) + '...',
-            adminName,
-            timestamp: Date.now()
-          },
-          CHANNELS.FEEDBACK_REPLIES,
-          settings
-        )
-      ]);
+      await this.showLocalNotification(
+        title,
+        message,
+        { 
+          type: 'feedback-reply',
+          feedbackId,
+          originalFeedback: originalFeedback.substring(0, 50) + '...',
+          adminReply: adminReply.substring(0, 50) + '...',
+          adminName,
+          timestamp: Date.now(),
+          userId: TokenManager.getUser()?.id
+        },
+        CHANNELS.FEEDBACK_REPLIES,
+        settings
+      );
     } catch (error) {
       console.error('Error showing feedback reply notification:', error);
     }
@@ -289,17 +390,33 @@ class NotificationServiceClass {
     settings: NotificationSettings
   ): Promise<void> {
     try {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        console.warn('Notification permissions not granted');
+        return;
+      }
+
+      const notificationContent: Notifications.NotificationContentInput = {
+        title,
+        body: message,
+        data: data || {},
+        sound: settings.sound ? 'default' : false, // FIX: Explicit sound setting
+        vibrate: settings.vibration ? DEFAULT_VIBRATION : [0], // FIX: Explicit vibration
+      };
+
+      // FIX 5: Use proper identifier and trigger
       await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body: message,
-          data: data || {},
-          sound: settings.sound ? 'default' : undefined,
-          vibrate: settings.vibration ? DEFAULT_VIBRATION : undefined,
-        },
-        trigger: null,
+        content: notificationContent,
+        trigger: null, // Show immediately
         identifier: `valet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       });
+
+      console.log('Notification scheduled with settings:', {
+        sound: settings.sound,
+        vibration: settings.vibration,
+        channel: channelId
+      });
+      
     } catch (error) {
       console.error('Error scheduling notification:', error);
     }
@@ -311,30 +428,12 @@ class NotificationServiceClass {
       await this.showLocalNotification(
         title,
         message,
-        data || { type: 'general', timestamp: Date.now() },
+        data || { type: 'general', timestamp: Date.now(), userId: TokenManager.getUser()?.id },
         CHANNELS.DEFAULT,
         settings
       );
     } catch (error) {
       console.error('Error showing simple notification:', error);
-    }
-  }
-
-  async getNotificationSettings(): Promise<NotificationSettings> {
-    try {
-      const settings = await AsyncStorage.getItem(SETTINGS_KEY);
-      return settings ? JSON.parse(settings) : DEFAULT_SETTINGS;
-    } catch (error) {
-      console.error('Error loading settings:', error);
-      return DEFAULT_SETTINGS;
-    }
-  }
-
-  async saveNotificationSettings(settings: NotificationSettings): Promise<void> {
-    try {
-      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch (error) {
-      console.error('Error saving notification settings:', error);
     }
   }
 
@@ -361,27 +460,28 @@ class NotificationServiceClass {
     return this.expoPushToken;
   }
 
-  async testNotification(): Promise<void> {
-    await this.showSimpleNotification(
-      'VALET Test',
-      'This is a test notification to verify your settings work!',
-      { type: 'test', timestamp: Date.now() }
-    );
+  async checkNotificationPermissions(): Promise<{
+    granted: boolean;
+    canPlaySound: boolean;
+    android?: {
+      importance: number;
+    };
+  }> {
+    const { status, android } = await Notifications.getPermissionsAsync();
+    
+    return {
+      granted: status === 'granted',
+      canPlaySound: Platform.OS === 'android' ? false : true,
+      android: Platform.OS === 'android' ? {
+        importance: android?.importance ?? 0,
+      } : undefined,
+    };
   }
 
   async initializeWithManager(): Promise<void> {
     await this.initialize();
   }
-
-  async simulateFeedbackReply(
-    feedbackId: number = 1,
-    originalFeedback: string = 'Test feedback message',
-    adminReply: string = 'Thank you for your feedback! We are working on this issue.',
-    adminName: string = 'Admin Team'
-  ): Promise<void> {
-    await this.showFeedbackReplyNotification(feedbackId, originalFeedback, adminReply, adminName);
-  }
-
+  
   async showSpotAvailableNotification(
     spotsAvailable: number, 
     floor?: number, 
@@ -397,25 +497,64 @@ class NotificationServiceClass {
   }
 
   getStatus() {
+    const user = TokenManager.getUser();
     return {
       hasToken: !!this.expoPushToken,
       token: this.expoPushToken?.substring(0, 20) + '...',
       platform: Platform.OS,
       isDevice: Device.isDevice,
+      currentUser: user ? `${user.name} (ID: ${user.id})` : 'Not logged in',
       overlayFilter: 'parking & feedback only',
     };
   }
 
   getNotificationStats() {
+    const user = TokenManager.getUser();
     return {
       service: 'NotificationService',
       pushToken: !!this.expoPushToken,
       platform: Platform.OS,
       deviceSupport: Device.isDevice,
       channels: Platform.OS === 'android' ? 3 : 0,
-      integrations: ['NotificationManager (filtered)', 'AsyncStorage', 'Expo'],
+      integrations: ['NotificationManager (filtered)', 'TokenManager', 'Dynamic API'],
       overlayTypes: ['spot_available', 'feedback_reply'],
+      currentUser: user ? `${user.name} (${user.id})` : 'None',
+      userSpecific: true,
     };
+  }
+
+  async resetToDefaults(): Promise<void> {
+    await this.saveNotificationSettings(DEFAULT_SETTINGS);
+  }
+
+  // enable/disable all notifications at once for current user
+  async setAllNotifications(enabled: boolean): Promise<void> {
+    const settings: NotificationSettings = {
+      spotAvailable: enabled,
+      floorUpdates: enabled,
+      vibration: enabled,
+      sound: enabled,
+    };
+    
+    await this.saveNotificationSettings(settings);
+  }
+
+  //check if user has any notifs enabled
+  async hasNotificationsEnabled(): Promise<boolean> {
+    try {
+      const settings = await this.getNotificationSettings();
+      return Object.values(settings).some(enabled => enabled === true);
+    } catch {
+      return false;
+    }
+  }
+
+  getCurrentSettingsKey(): string | null {
+    try {
+      return this.getUserStorageKey();
+    } catch {
+      return null;
+    }
   }
 
   async clearNotificationChannels(): Promise<void> {
@@ -426,13 +565,40 @@ class NotificationServiceClass {
           Notifications.deleteNotificationChannelAsync(CHANNELS.FLOOR_UPDATES),
           Notifications.deleteNotificationChannelAsync(CHANNELS.FEEDBACK_REPLIES)
         ]);
-        console.log('Notification channels cleared');
       } catch (error) {
         console.error('Error clearing notification channels:', error);
       }
     }
   }
 
+  async getStorageInfo(): Promise<{ key: string; hasSettings: boolean; settingsPreview?: any }> {
+    try {
+      const key = this.getUserStorageKey();
+      const stored = await AsyncStorage.getItem(key);
+      
+      return {
+        key,
+        hasSettings: !!stored,
+        settingsPreview: stored ? JSON.parse(stored) : null
+      };
+    } catch (error) {
+      return {
+        key: 'Error getting key',
+        hasSettings: false,
+        settingsPreview: null
+      };
+    }
+  }
+
+  async syncWithServer(): Promise<void> {
+    try {
+      const localSettings = await this.getNotificationSettings();
+      await this.saveSettings(localSettings);
+    } catch (error) {
+      console.error('Failed to sync settings with server:', error);
+    }
+  }
 }
 
-export const NotificationService = new NotificationServiceClass();
+export { NotificationServiceClass };
+export default new NotificationServiceClass();

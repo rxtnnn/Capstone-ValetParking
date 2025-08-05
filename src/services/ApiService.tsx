@@ -1,11 +1,6 @@
 import axios from 'axios';
-import apiClient from '../config/api';
+import apiClient, { TokenManager } from '../config/api';
 import { FeedbackData, APIResponse } from '../types/feedback';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const STORAGE_KEYS = {
-  USER_DATA: 'valet_user_data'
-} as const;
 
 const ERROR_MESSAGES = {
   NOT_AUTHENTICATED: 'User not authenticated. Please log in again.',
@@ -20,10 +15,10 @@ const DEFAULT_STATS = { total: 0, withReplies: 0, pending: 0, recent: 0 };
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 class ApiService {
-  private async getCurrentUserId(): Promise<number | null> {
+  private getCurrentUserId(): number | null {
     try {
-      const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
-      return userData ? (JSON.parse(userData).id || null) : null;
+      const user = TokenManager.getUser();
+      return user?.id || null;
     } catch (error) {
       console.error('Error getting current user ID:', error);
       return null;
@@ -44,6 +39,7 @@ class ApiService {
     const { status, data } = error.response;
     
     if (status === 401) {
+      TokenManager.clearToken();
       return new Error(ERROR_MESSAGES.AUTH_FAILED);
     }
     
@@ -64,13 +60,12 @@ class ApiService {
     if (data?.message) {
       return new Error(data.message);
     }
-
     return new Error(ERROR_MESSAGES.CONNECTION_FAILED);
   }
 
   async submitFeedback(feedbackData: Omit<FeedbackData, 'id' | 'status' | 'created_at' | 'user_id'>): Promise<string> {
     try {
-      const currentUserId = await this.getCurrentUserId();
+      const currentUserId = this.getCurrentUserId();
       if (!currentUserId) {
         throw new Error(ERROR_MESSAGES.NOT_AUTHENTICATED);
       }
@@ -105,9 +100,8 @@ class ApiService {
 
   async getUserFeedback(userId?: number, perPage: number = 50): Promise<FeedbackData[]> {
     try {
-      const targetUserId = userId || await this.getCurrentUserId();
+      const targetUserId = userId || this.getCurrentUserId();
       if (!targetUserId) {
-        console.warn('No user ID provided for getUserFeedback');
         return [];
       }
 
@@ -128,7 +122,7 @@ class ApiService {
 
   async getUserFeedbackWithReplies(userId?: number): Promise<FeedbackData[]> {
     try {
-      const targetUserId = userId || await this.getCurrentUserId();
+      const targetUserId = userId || this.getCurrentUserId();
       if (!targetUserId) return [];
 
       const feedbackList = await this.getFeedbackList({
@@ -153,7 +147,7 @@ class ApiService {
 
   async getNewFeedbackReplies(userId?: number, since?: string): Promise<FeedbackData[]> {
     try {
-      const targetUserId = userId || await this.getCurrentUserId();
+      const targetUserId = userId || this.getCurrentUserId();
       if (!targetUserId) return [];
 
       const params = {
@@ -189,7 +183,7 @@ class ApiService {
 
   async getFeedbackById(feedbackId: number, userId?: number): Promise<FeedbackData | null> {
     try {
-      const targetUserId = userId || await this.getCurrentUserId();
+      const targetUserId = userId || this.getCurrentUserId();
       if (!targetUserId) return null;
 
       const response = await apiClient.get<APIResponse<FeedbackData>>(`/feedbacks/${feedbackId}`, {
@@ -228,6 +222,7 @@ class ApiService {
         const status = error.response.status;
         if (status === 401) {
           console.error('Authentication issue - check token');
+          TokenManager.clearToken(); // Clear invalid token
         } else if (status === 404) {
           console.error('Endpoint not found - check backend deployment');
         } else if (error.code === 'ECONNABORTED') {
@@ -244,14 +239,16 @@ class ApiService {
     return this.getUserFeedback(undefined, perPage);
   }
 
-  async getCurrentUserInfo(): Promise<{ id: number | null; email?: string }> {
+  getCurrentUserInfo(): { id: number | null; email?: string; name?: string; role?: string; employee_id?: string } {
     try {
-      const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
-      if (userData) {
-        const user = JSON.parse(userData);
+      const user = TokenManager.getUser();
+      if (user) {
         return {
-          id: user.id || null,
-          email: user.email
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          employee_id: user.employee_id
         };
       }
       return { id: null };
@@ -268,7 +265,7 @@ class ApiService {
     recent: number;
   }> {
     try {
-      const targetUserId = userId || await this.getCurrentUserId();
+      const targetUserId = userId || this.getCurrentUserId();
       if (!targetUserId) return DEFAULT_STATS;
 
       const allFeedback = await this.getUserFeedback(targetUserId);
@@ -287,6 +284,26 @@ class ApiService {
       console.error('Error getting feedback stats:', error);
       return DEFAULT_STATS;
     }
+  }
+
+  // Additional utility methods for user management
+  isUserAuthenticated(): boolean {
+    return TokenManager.getToken() !== null && this.getCurrentUserId() !== null;
+  }
+
+  getCurrentUserName(): string | null {
+    const user = TokenManager.getUser();
+    return user?.name || null;
+  }
+
+  getCurrentUserRole(): string | null {
+    const user = TokenManager.getUser();
+    return user?.role || null;
+  }
+
+  getCurrentUserEmail(): string | null {
+    const user = TokenManager.getUser();
+    return user?.email || null;
   }
 }
 

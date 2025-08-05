@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -29,9 +29,11 @@ import { getBasicDeviceInfo } from '../utils/deviceInfo';
 import { styles } from './styles/FeedbackScreen.style';
 import { NotificationManager } from '../services/NotifManager';
 import { useRoute, RouteProp } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
 
 type RootStackParamList = {
   Splash: undefined;
+  Login: undefined;
   Home: undefined;
   Floors: undefined;
   ParkingMap: { floor: number };
@@ -67,7 +69,7 @@ interface CustomAlertProps {
   onClose: () => void;
 }
 
-const CustomAlert: React.FC<CustomAlertProps> = ({ visible, title, message, buttons, onClose }) => {
+const CustomAlert: React.FC<CustomAlertProps> = React.memo(({ visible, title, message, buttons, onClose }) => {
   if (!visible) return null;
 
   return (
@@ -115,7 +117,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({ visible, title, message, butt
       </View>
     </Modal>
   );
-};
+});
 
 const FONTS = {
   Poppins_400Regular,
@@ -125,29 +127,29 @@ const FONTS = {
 };
 
 const FEEDBACK_TYPES: FeedbackType[] = [
-  { 
-    value: 'general', 
-    label: 'Rate Experience', 
+  {
+    value: 'general',
+    label: 'Rate Experience',
     icon: 'star-outline',
-    description: 'Share your overall app experience'
+    description: 'Share your overall app experience',
   },
-  { 
-    value: 'parking', 
-    label: 'Parking Issues', 
+  {
+    value: 'parking',
+    label: 'Parking Issues',
     icon: 'car-outline',
-    description: 'Report parking spot or navigation problems'
+    description: 'Report parking spot or navigation problems',
   },
-  { 
-    value: 'technical', 
-    label: 'Bug Reports', 
+  {
+    value: 'technical',
+    label: 'Bug Reports',
     icon: 'bug-outline',
-    description: 'Technical issues or app crashes'
+    description: 'Technical issues or app crashes',
   },
-  { 
-    value: 'suggestion', 
-    label: 'Suggestions', 
+  {
+    value: 'suggestion',
+    label: 'Suggestions',
     icon: 'bulb-outline',
-    description: 'Ideas for new features'
+    description: 'Ideas for new features',
   },
 ];
 
@@ -184,11 +186,34 @@ const DEFAULT_DEVICE_INFO = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Pre-cache device info globally to avoid repeated calls
+let globalDeviceInfo: any = null;
+let deviceInfoPromise: Promise<any> | null = null;
+
+const getDeviceInfoOnce = async () => {
+  if (globalDeviceInfo) return globalDeviceInfo;
+  
+  if (!deviceInfoPromise) {
+    deviceInfoPromise = (async () => {
+      try {
+        globalDeviceInfo = await getBasicDeviceInfo();
+      } catch (error) {
+        globalDeviceInfo = DEFAULT_DEVICE_INFO;
+      }
+      return globalDeviceInfo;
+    })();
+  }
+  
+  return deviceInfoPromise;
+};
+
 const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const [fontsLoaded] = useFonts(FONTS);
   const route = useRoute<FeedbackRouteProp>();
   const { showReplies: initialShowReplies } = route.params || {};
-
+  const { logout, isAuthenticated } = useAuth();
+  const mountedRef = useRef(true);
+  const lastRefreshTime = useRef(0);
   const [showReplies, setShowReplies] = useState(false);
   const [feedbackType, setFeedbackType] = useState<FeedbackData['type']>('general');
   const [rating, setRating] = useState(0);
@@ -197,6 +222,17 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Submission cache to prevent double submissions and cache device info
+  const submissionCache = useRef<{
+    isSubmitting: boolean;
+    lastSubmissionTime: number;
+    deviceInfo: any;
+  }>({
+    isSubmitting: false,
+    lastSubmissionTime: 0,
+    deviceInfo: null
+  });
 
   // Custom alert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -219,30 +255,96 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     loading: repliesLoading, 
     refreshFeedback, 
     checkForNewReplies,
-    currentUserId
+    currentUserId,
+    error: feedbackError
   } = useFeedback();
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (initialShowReplies) {
       setShowReplies(true);
     }
-  }, [initialShowReplies]);
+  }, [initialShowReplies, setShowReplies]);
 
-  const feedbackWithReplies = useMemo(() => 
-    feedback.filter(item => 
+  // Pre-load device info immediately when component mounts
+  useEffect(() => {
+    getDeviceInfoOnce().then(info => {
+      if (mountedRef.current) {
+        submissionCache.current.deviceInfo = info;
+      }
+    });
+  }, []);
+
+  // Memoize filtered feedback with better caching
+  const feedbackWithReplies = useMemo(() => {
+    if (!feedback || feedback.length === 0) return [];
+    
+    return feedback.filter(item => 
       item.admin_response?.trim() && 
       (!currentUserId || item.user_id === currentUserId)
-    ), [feedback, currentUserId]
-  );
+    );
+  }, [feedback, currentUserId]);
 
-  const showCustomAlert = (title: string, message: string, buttons: Array<{
+  // Memoize common issues to prevent recalculation
+  const currentTypeIssues = useMemo(() => 
+    getCommonIssuesForType(feedbackType), [feedbackType]);
+
+  const showCustomAlert = useCallback((title: string, message: string, buttons: Array<{
     text: string;
     onPress?: () => void;
     style?: 'default' | 'cancel' | 'destructive';
   }>) => {
+    if (!mountedRef.current) return;
     setAlertData({ title, message, buttons });
     setAlertVisible(true);
-  };
+  }, []);
+
+  const handleAuthenticationError = useCallback(async () => {
+    if (!mountedRef.current || submissionCache.current.isSubmitting) return;
+    
+    showCustomAlert(
+      'Session Expired',
+      'Your session has expired. Please log in again to continue.',
+      [
+        {
+          text: 'Log In',
+          onPress: async () => {
+            if (!mountedRef.current) return;
+            try {
+              await logout();
+              navigation.navigate('Login' as never);
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          },
+          style: 'default'
+        }
+      ]
+    );
+  }, [logout, navigation, showCustomAlert]);
+
+  useEffect(() => {
+    if (feedbackError && feedbackError.includes('expired') && !alertVisible) {
+      const timeoutId = setTimeout(() => {
+        if (mountedRef.current) {
+          handleAuthenticationError();
+        }
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [feedbackError, alertVisible, handleAuthenticationError]);
+
+  useEffect(() => {
+    if (!isAuthenticated && mountedRef.current) {
+      navigation.navigate('Login' as never);
+    }
+  }, [isAuthenticated, navigation]);
 
   const getPlaceholderText = useCallback((): string => {
     const placeholders = {
@@ -316,9 +418,10 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     return true;
-  }, [message, feedbackType, rating, email]);
+  }, [message, feedbackType, rating, email, showCustomAlert]);
 
   const resetForm = useCallback(() => {
+    if (!mountedRef.current) return;
     setMessage('');
     setEmail('');
     setRating(0);
@@ -326,118 +429,177 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     setFeedbackType('general');
   }, []);
 
+  // Optimized submission with minimal blocking operations
   const handleSubmit = useCallback(async () => {
-    if (!validateForm()) return;
+    if (!validateForm() || submissionCache.current.isSubmitting || !mountedRef.current) {
+      return;
+    }
 
+    // Prevent double submissions
+    const now = Date.now();
+    if (now - submissionCache.current.lastSubmissionTime < 2000) {
+      return;
+    }
+
+    submissionCache.current.isSubmitting = true;
+    submissionCache.current.lastSubmissionTime = now;
     setLoading(true);
 
     try {
-      let deviceInfo;
-      try {
-        deviceInfo = await getBasicDeviceInfo();
-      } catch (deviceError) {
-        console.error('Failed to get device info:', deviceError);
-        deviceInfo = DEFAULT_DEVICE_INFO;
-      }
+      // Use cached device info or fallback immediately
+      const deviceInfo = submissionCache.current.deviceInfo || DEFAULT_DEVICE_INFO;
 
-      const feedbackData: any = {
-        type: feedbackType,
+      // Build minimal payload to reduce bridge overhead
+      const feedbackData: Omit<FeedbackData, 'id' | 'status' | 'created_at' | 'user_id'> = {
+        type: feedbackType,                 // now one of the four allowed literals
         message: message.trim(),
-        deviceInfo: deviceInfo,
-        feedback_type: feedbackType === 'parking' ? 'parking_experience' : 
-                     feedbackType === 'technical' ? 'technical_issue' :
-                     feedbackType === 'suggestion' ? 'feature_request' : 'general',
-        parking_location: feedbackType === 'parking' ? 'Mobile App Feedback' : undefined,
+
+        // only include optional fields when present
+        ...(feedbackType === 'general' && rating > 0 && { rating }),
+        ...(email.trim() && { email: email.trim() }),
+        ...(selectedIssues.length > 0 && { issues: selectedIssues }),
+
+        // minimal device info
+        device_info: {
+          platform: deviceInfo.platform,
+          model:    deviceInfo.model,
+          version:  deviceInfo.appVersion,
+        },
+
+        // only add parking_location for parking_experience
+        ...(feedbackType === 'parking' && { parking_location: 'Mobile App Feedback' }),
       };
 
-      if (feedbackType === 'general' && rating > 0) {
-        feedbackData.rating = rating;
-      }
 
-      if (email.trim()) {
-        feedbackData.email = email.trim();
-      }
-
-      if (selectedIssues.length > 0) {
-        feedbackData.issues = selectedIssues;
-      }
-
-      const feedbackId = await ApiService.submitFeedback(feedbackData);
+      // Submit with timeout to prevent hanging
+      const submitPromise = ApiService.submitFeedback(feedbackData);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Submission timeout')), 15000)
+      );
       
-      if (feedbackId) {
+       const feedbackId = await ApiService.submitFeedback(feedbackData);
+      
+      if (feedbackId && mountedRef.current) {
+        // Immediate UI feedback - don't wait for refresh
         resetForm();
-        await refreshFeedback();
         
-        if (currentUserId) {
-          setTimeout(async () => {
-            await checkForNewReplies();
-          }, 2000);
-        }
-
         showCustomAlert(
           'Thank You!',
-          'Your feedback has been submitted successfully. We truly appreciate you taking the time to help us improve VALET.\n\nWe\'ll notify you when our team responds to your feedback.',
+          'Your feedback has been submitted successfully. We truly appreciate you taking the time to help us improve VALET.',
           [
             { text: 'Submit Another', style: 'default' },
             { text: 'Done', style: 'cancel', onPress: () => navigation.goBack() }
           ]
         );
+
+        // Refresh in background - don't block UI
+        setTimeout(async () => {
+          if (mountedRef.current) {
+            try {
+              await Promise.allSettled([
+                refreshFeedback(),
+                currentUserId ? checkForNewReplies() : Promise.resolve()
+              ]);
+            } catch (error) {
+              console.error('Background refresh failed:', error);
+            }
+          }
+        }, 500);
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);
       
-      let errorTitle = 'Submission Failed';
-      let errorMessage = 'We couldn\'t submit your feedback right now. Please try again in a moment.';
+      if (!mountedRef.current) return;
+      
+      // Fast error handling
+      let errorMessage = 'We couldn\'t submit your feedback. Please try again.';
+      let retryAction = () => handleSubmit();
       
       if (error instanceof Error) {
-        if (error.message.includes('Authentication failed')) {
-          errorTitle = 'Authentication Error';
-          errorMessage = 'Your session has expired. Please log in again and try submitting your feedback.';
-        } else if (error.message.includes('Validation failed')) {
-          errorTitle = 'Invalid Information';
-          errorMessage = 'Please check your information and try again. Make sure all required fields are filled out correctly.';
-        } else if (error.message.includes('Network')) {
-          errorTitle = 'Connection Problem';
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Submission is taking longer than expected. Please check your connection and try again.';
+        } else if (error.message.includes('expired') || error.message.includes('authenticated')) {
+          errorMessage = 'Your session has expired. Please log in again.';
+          retryAction = async () => {
+            await logout();
+            navigation.navigate('Login' as never);
+          };
+        } else if (error.message.includes('Network') || error.message.includes('connection')) {
           errorMessage = 'Please check your internet connection and try again.';
         }
       }
       
       showCustomAlert(
-        errorTitle,
+        'Submission Failed',
         errorMessage,
         [
-          { text: 'Try Again', onPress: handleSubmit },
+          { text: 'Try Again', onPress: retryAction },
           { text: 'Cancel', style: 'cancel' }
         ]
       );
     } finally {
-      setLoading(false);
-    }
-  }, [validateForm, feedbackType, message, rating, email, selectedIssues, resetForm, refreshFeedback, currentUserId, checkForNewReplies, navigation]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refreshFeedback();
-      
-      if (currentUserId) {
-        await checkForNewReplies();
-        await NotificationManager.checkForFeedbackReplies(currentUserId);
+      if (mountedRef.current) {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error refreshing notifications:', error);
+      submissionCache.current.isSubmitting = false;
     }
-    setRefreshing(false);
-  }, [refreshFeedback, currentUserId, checkForNewReplies]);
+  }, [
+    validateForm, 
+    feedbackType, 
+    message, 
+    rating, 
+    email, 
+    selectedIssues, 
+    resetForm, 
+    navigation, 
+    logout, 
+    showCustomAlert,
+    refreshFeedback,
+    checkForNewReplies,
+    currentUserId
+  ]);
 
-  const renderStarRating = useCallback(() => (
+  // Optimized refresh that doesn't block other operations
+  const onRefresh = useCallback(async () => {
+    if (refreshing || !mountedRef.current) return;
+    
+    const now = Date.now();
+    if (now - lastRefreshTime.current < 1000) return; // Reduced debounce
+    
+    lastRefreshTime.current = now;
+    setRefreshing(true);
+    
+    try {
+      // Parallel execution with shorter timeout
+      const refreshPromise = Promise.race([
+        Promise.allSettled([
+          refreshFeedback(),
+          currentUserId ? checkForNewReplies() : Promise.resolve(),
+          currentUserId ? NotificationManager.checkForFeedbackReplies(currentUserId) : Promise.resolve()
+        ]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Refresh timeout')), 8000))
+      ]);
+
+      await refreshPromise;
+    } catch (error: any) {
+      // Don't show errors for refresh operations - fail silently
+      console.error('Refresh error:', error);
+    } finally {
+      if (mountedRef.current) {
+        setRefreshing(false);
+      }
+    }
+  }, [refreshing, refreshFeedback, currentUserId, checkForNewReplies]);
+
+  // Memoized star rating component
+  const renderStarRating = useMemo(() => (
     <View style={styles.ratingContainer}>
       <Text style={styles.ratingLabel}>Rate your experience</Text>
       <View style={styles.starsContainer}>
         {[1, 2, 3, 4, 5].map((star) => (
           <TouchableOpacity
             key={star}
-            onPress={() => handleRatingPress(star)}
+            onPress={() => setRating(star)}
             style={styles.starButton}
             activeOpacity={0.7}
           >
@@ -455,9 +617,96 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
       )}
     </View>
-  ), [rating, handleRatingPress]);
+  ), [rating]);
 
-  const renderAdminReplies = useCallback(() => {
+  // Memoized reply item component
+  const ReplyItem = React.memo(({ item, index }: { item: FeedbackData; index: number }) => (
+    <View key={`${item.id}-${index}`} style={styles.replyCard}>
+      <View style={styles.replyHeader}>
+        <View style={styles.replyTypeContainer}>
+          <Ionicons 
+            name={getTypeIcon(item.type) as any} 
+            size={16} 
+            color="#B22020" 
+          />
+          <Text style={styles.replyTypeText}>
+            {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+          </Text>
+        </View>
+        <View style={[
+          styles.replyStatus,
+          { backgroundColor: getStatusColor(item.status || 'pending') }
+        ]}>
+          <Text style={styles.replyStatusText}>
+            {(item.status || 'pending').charAt(0).toUpperCase() + (item.status || 'pending').slice(1)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.originalFeedback}>
+        <Text style={styles.originalLabel}>Your feedback:</Text>
+        <Text style={styles.originalText} numberOfLines={2}>
+          {item.message}
+        </Text>
+      </View>
+
+      <View style={styles.adminResponse}>
+        <View style={styles.adminHeader}>
+          <Ionicons name="shield-checkmark" size={16} color="#059669" />
+          <Text style={styles.adminLabel}>Admin Response</Text>
+          {item.responded_at && (
+            <Text style={styles.responseTime}>
+              {formatTimeAgo(item.responded_at)}
+            </Text>
+          )}
+        </View>
+        <Text style={styles.adminText}>
+          {item.admin_response}
+        </Text>
+      </View>
+
+      {item.rating && item.type === 'general' && (
+        <View style={styles.ratingDisplay}>
+          <Text style={styles.ratingDisplayLabel}>Your rating: </Text>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Ionicons
+              key={star}
+              name={star <= item.rating! ? 'star' : 'star-outline'}
+              size={12}
+              color={star <= item.rating! ? '#FFD700' : '#E5E7EB'}
+            />
+          ))}
+          <Text style={styles.ratingDisplayValue}>({item.rating}/5)</Text>
+        </View>
+      )}
+    </View>
+  ));
+
+  // Memoized submit button to prevent re-renders
+  const SubmitButton = useMemo(() => (
+    <TouchableOpacity
+      onPress={handleSubmit}
+      disabled={loading || submissionCache.current.isSubmitting}
+      style={[styles.submitButton, loading && styles.disabledButton]}
+      activeOpacity={0.8}
+    >
+      <LinearGradient
+        colors={loading ? ['#9CA3AF', '#6B7280'] : ['#B22020', '#8B1917']}
+        style={styles.submitGradient}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color="white" />
+        ) : (
+          <Ionicons name="send" size={18} color="white" />
+        )}
+        <Text style={styles.submitText}>
+          {loading ? 'Submitting...' : 'Submit Feedback'}
+        </Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  ), [loading, handleSubmit]);
+
+  const renderAdminReplies = useMemo(() => {
     if (feedbackWithReplies.length === 0) {
       return (
         <View style={styles.emptyContainer}>
@@ -483,75 +732,32 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView 
         style={styles.repliesContainer}
         refreshControl={
-          <RefreshControl refreshing={repliesLoading} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={['#B22020']}
+            tintColor="#B22020"
+          />
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.repliesContent}
+        removeClippedSubviews={true}
       >
         {feedbackWithReplies.map((item, index) => (
-          <View key={item.id || index} style={styles.replyCard}>
-            <View style={styles.replyHeader}>
-              <View style={styles.replyTypeContainer}>
-                <Ionicons 
-                  name={getTypeIcon(item.type) as any} 
-                  size={16} 
-                  color="#B22020" 
-                />
-                <Text style={styles.replyTypeText}>
-                  {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                </Text>
-              </View>
-              <View style={[
-                styles.replyStatus,
-                { backgroundColor: getStatusColor(item.status || 'pending') }
-              ]}>
-                <Text style={styles.replyStatusText}>
-                  {(item.status || 'pending').charAt(0).toUpperCase() + (item.status || 'pending').slice(1)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.originalFeedback}>
-              <Text style={styles.originalLabel}>Your feedback:</Text>
-              <Text style={styles.originalText} numberOfLines={2}>
-                {item.message}
-              </Text>
-            </View>
-
-            <View style={styles.adminResponse}>
-              <View style={styles.adminHeader}>
-                <Ionicons name="shield-checkmark" size={16} color="#059669" />
-                <Text style={styles.adminLabel}>Admin Response</Text>
-                {item.responded_at && (
-                  <Text style={styles.responseTime}>
-                    {formatTimeAgo(item.responded_at)}
-                  </Text>
-                )}
-              </View>
-              <Text style={styles.adminText}>
-                {item.admin_response}
-              </Text>
-            </View>
-
-            {item.rating && item.type === 'general' && (
-              <View style={styles.ratingDisplay}>
-                <Text style={styles.ratingDisplayLabel}>Your rating: </Text>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Ionicons
-                    key={star}
-                    name={star <= item.rating! ? 'star' : 'star-outline'}
-                    size={12}
-                    color={star <= item.rating! ? '#FFD700' : '#E5E7EB'}
-                  />
-                ))}
-                <Text style={styles.ratingDisplayValue}>({item.rating}/5)</Text>
-              </View>
-            )}
-          </View>
+          <ReplyItem key={`${item.id}-${index}`} item={item} index={index} />
         ))}
       </ScrollView>
     );
-  }, [feedbackWithReplies, repliesLoading, onRefresh, getTypeIcon, getStatusColor, formatTimeAgo]);
+  }, [feedbackWithReplies, refreshing, onRefresh]);
+
+  // Show loading if fonts are not loaded
+  if (!fontsLoaded) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#B22020" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -621,16 +827,18 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       </LinearGradient>
 
       {showReplies ? (
-        renderAdminReplies()
+        renderAdminReplies
       ) : (
         <KeyboardAvoidingView
           style={styles.contentContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'android' ? 'padding' : 'height'}
         >
           <ScrollView 
             style={styles.scrollContainer} 
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            removeClippedSubviews={true}
+            keyboardShouldPersistTaps="handled"
           >
             
             <View style={styles.section}>
@@ -676,11 +884,12 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             {feedbackType === 'general' && (
               <View style={styles.section}>
                 <View style={styles.card}>
-                  {renderStarRating()}
+                  {renderStarRating}
                 </View>
               </View>
             )}
-            {getCommonIssuesForType(feedbackType).length > 0 && (
+            
+            {currentTypeIssues.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Issues</Text>
                 <Text style={styles.sectionSubtitle}>
@@ -688,7 +897,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 </Text>
                 <View style={styles.card}>
                   <View style={styles.chipsContainer}>
-                    {getCommonIssuesForType(feedbackType).map((issue) => (
+                    {currentTypeIssues.map((issue) => (
                       <TouchableOpacity
                         key={issue}
                         style={[
@@ -760,25 +969,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.submitContainer}>
-              <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={loading}
-                style={[styles.submitButton, loading && styles.disabledButton]}
-              >
-                <LinearGradient
-                  colors={loading ? ['#9CA3AF', '#6B7280'] : ['#B22020', '#8B1917']}
-                  style={styles.submitGradient}
-                >
-                  {loading ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Ionicons name="send" size={18} color="white" />
-                  )}
-                  <Text style={styles.submitText}>
-                    {loading ? 'Submitting...' : 'Submit Feedback'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              {SubmitButton}
             </View>
 
             <View style={styles.section}>

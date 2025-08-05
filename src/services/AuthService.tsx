@@ -1,12 +1,13 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TokenManager } from '../config/api';
+import apiClient from '../config/api';
 
 export interface User {
   id: number;
   email: string;
-  name?: string;
-  role?: string;
+  name: string;
+  role: string;
+  employee_id: string;
   role_display?: string;
-  employee_id?: string;
   department?: string;
   is_active?: boolean;
   created_at?: string;
@@ -25,27 +26,9 @@ export interface LoginResponse {
 }
 
 const API_CONFIG = {
-  BASE_URL: 'https://valet.up.railway.app/api/public',
-  USERS_URL: 'https://valet.up.railway.app/api/public/users',
-  TOKEN: '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad',
-  HEADERS: {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-  },
-  STORAGE_KEYS: {
-    TOKEN: 'valet_user_auth_token',
-    USER: 'valet_user_data'
-  }
+  BASE_URL: 'https://valet.up.railway.app/api',
+  USERS_URL: 'https://valet.up.railway.app/api/users',
 } as const;
-
-const AUTH_ENDPOINTS = [
-  `${API_CONFIG.BASE_URL}/auth/login`,
-  `${API_CONFIG.BASE_URL}/login`,
-  `${API_CONFIG.BASE_URL}/authenticate`,
-  'https://valet.up.railway.app/api/auth/login',
-  'https://valet.up.railway.app/api/login',
-  'https://valet.up.railway.app/api/public/authenticate',
-];
 
 const ERROR_MESSAGES = {
   EMAIL_REQUIRED: 'Email is required',
@@ -67,13 +50,6 @@ const ERROR_MESSAGES = {
 } as const;
 
 class AuthService {
-  private getAuthHeaders() {
-    return {
-      ...API_CONFIG.HEADERS,
-      'Authorization': `Bearer ${API_CONFIG.TOKEN}`,
-    };
-  }
-
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     // Input validation
     const email = credentials.email?.trim();
@@ -81,72 +57,75 @@ class AuthService {
     if (!email.includes('@')) return { success: false, message: ERROR_MESSAGES.INVALID_EMAIL };
     if (!credentials.password?.trim()) return { success: false, message: ERROR_MESSAGES.PASSWORD_REQUIRED };
 
-    const result = await this.loginWithServerAuth(credentials);
-    if (result.success || result.message !== 'server_auth_unavailable') {
-      return result;
-    }
+    try {
+      const requestBody = {
+        email: email.toLowerCase(),
+        password: credentials.password,
+      };
 
-    console.error('No authentication endpoint found');
-    return { success: false, message: ERROR_MESSAGES.AUTH_UNAVAILABLE };
-  }
+      // Use the main login endpoint
+      const response = await fetch(`${API_CONFIG.BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-  private async loginWithServerAuth(credentials: LoginCredentials): Promise<LoginResponse> {
-    const requestBody = {
-      email: credentials.email.trim().toLowerCase(),
-      password: credentials.password,
-    };
-
-    for (const endpoint of AUTH_ENDPOINTS) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify(requestBody),
-        });
-
-        if (response.status === 404) continue;
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.user) {
-            const token = data.token || `server_auth_${data.user.id}_${Date.now()}`;
-            await this.storeAuthData(token, data.user);
-            return {
-              success: true,
-              message: data.message || 'Login successful',
-              user: data.user,
-              token,
-            };
-          }
-          return { success: false, message: data.message || 'Authentication failed' };
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success && data.user && data.token) {
+          // Store using TokenManager (await the async operation)
+          await TokenManager.saveToStorage(data.token, data.user);
+          
+          return {
+            success: true,
+            message: data.message || 'Login successful',
+            user: data.user,
+            token: data.token,
+          };
         }
-
-        // Handle specific error codes
-        if (response.status === 401 || response.status === 422) {
-          try {
-            const errorData = await response.json();
-            return { success: false, message: errorData.message || ERROR_MESSAGES.INVALID_CREDENTIALS };
-          } catch {
-            return { success: false, message: ERROR_MESSAGES.INVALID_CREDENTIALS };
-          }
-        }
-
-        if (response.status === 500) {
-          return { success: false, message: ERROR_MESSAGES.SERVER_ERROR };
-        }
-
-        if (response.status === 403) {
-          return { success: false, message: ERROR_MESSAGES.ACCESS_DENIED };
-        }
-      } catch (error: any) {
-        if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
-          continue;
-        }
-        continue;
+        
+        return { 
+          success: false, 
+          message: data.message || ERROR_MESSAGES.INVALID_CREDENTIALS 
+        };
       }
-    }
 
-    return { success: false, message: 'server_auth_unavailable' };
+      // Handle specific error codes
+      if (response.status === 401 || response.status === 422) {
+        try {
+          const errorData = await response.json();
+          return { 
+            success: false, 
+            message: errorData.message || ERROR_MESSAGES.INVALID_CREDENTIALS 
+          };
+        } catch {
+          return { success: false, message: ERROR_MESSAGES.INVALID_CREDENTIALS };
+        }
+      }
+
+      if (response.status === 500) {
+        return { success: false, message: ERROR_MESSAGES.SERVER_ERROR };
+      }
+
+      if (response.status === 403) {
+        return { success: false, message: ERROR_MESSAGES.ACCESS_DENIED };
+      }
+
+      return { success: false, message: ERROR_MESSAGES.SERVER_ERROR };
+
+    } catch (error: any) {
+      console.error('Login error:', error);
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
+        return { success: false, message: ERROR_MESSAGES.CONNECTION_ERROR };
+      }
+      
+      return { success: false, message: ERROR_MESSAGES.SERVER_ERROR };
+    }
   }
 
   private extractUsersArray(data: any): any[] {
@@ -156,25 +135,13 @@ class AuthService {
     return [];
   }
 
-  private handleApiResponse(response: Response) {
-    const status = response.status;
-    if (status === 401) return { success: false, message: ERROR_MESSAGES.API_ACCESS_DENIED };
-    if (status === 403) return { success: false, message: ERROR_MESSAGES.API_TOKEN_INVALID };
-    if (status === 404) return { success: false, message: ERROR_MESSAGES.API_NOT_FOUND };
-    return { success: false, message: `Server error: ${status}` };
-  }
 
   async findUserInAPI(email: string): Promise<{ success: boolean; user?: User; message?: string }> {
     try {
-      const response = await fetch(API_CONFIG.USERS_URL, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) return this.handleApiResponse(response);
-
-      const data = await response.json();
-      const users = this.extractUsersArray(data);
+      // Use apiClient which automatically includes the dynamic token
+      const response = await apiClient.get('/users');
+      
+      const users = this.extractUsersArray(response.data);
 
       if (users.length === 0) {
         return { success: false, message: ERROR_MESSAGES.NO_USERS };
@@ -189,6 +156,10 @@ class AuthService {
     } catch (error: any) {
       console.error('Error finding user:', error);
       
+      if (error.response?.status === 401) {
+        return { success: false, message: ERROR_MESSAGES.API_ACCESS_DENIED };
+      }
+      
       if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
         return { success: false, message: ERROR_MESSAGES.CONNECTION_ERROR };
       }
@@ -197,101 +168,40 @@ class AuthService {
     }
   }
 
-  async testAPIConnection(): Promise<{ success: boolean; message: string; userCount?: number }> {
-    try {
-      const response = await fetch(API_CONFIG.USERS_URL, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const users = this.extractUsersArray(data);
-        return {
-          success: true,
-          message: `API connection successful! Found ${users.length} users.`,
-          userCount: users.length,
-        };
-      }
-
-      const errorResponse = this.handleApiResponse(response);
-      return {
-        success: false,
-        message: errorResponse.message,
-      };
-    } catch (error: any) {
-      console.error('API test error:', error);
-      return {
-        success: false,
-        message: 'Cannot connect to API. Check internet connection.',
-      };
-    }
-  }
-
   async getAvailableUsers(): Promise<{ success: boolean; users: string[]; message: string }> {
     try {
-      const response = await fetch(API_CONFIG.USERS_URL, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
+      const response = await apiClient.get('/users');
+      const users = this.extractUsersArray(response.data);
 
-      if (response.ok) {
-        const data = await response.json();
-        const users = this.extractUsersArray(data);
-
-        if (users.length > 0) {
-          const emails = users.map(u => u.email).filter(Boolean);
-          return {
-            success: true,
-            users: emails,
-            message: `Found ${emails.length} users`,
-          };
-        }
-        
+      if (users.length > 0) {
+        const emails = users.map(u => u.email).filter(Boolean);
         return {
-          success: false,
-          users: [],
-          message: ERROR_MESSAGES.NO_USERS,
+          success: true,
+          users: emails,
+          message: `Found ${emails.length} users`,
         };
       }
-
+      
       return {
         success: false,
         users: [],
-        message: `Cannot fetch users: HTTP ${response.status}`,
+        message: ERROR_MESSAGES.NO_USERS,
       };
     } catch (error: any) {
+      console.error('Error fetching users:', error);
+      
       return {
         success: false,
         users: [],
-        message: `Error fetching users: ${error.message}`,
+        message: `Error fetching users: ${error.response?.data?.message || error.message}`,
       };
-    }
-  }
-
-  private async storeAuthData(token: string, user: User): Promise<void> {
-    try {
-      await Promise.all([
-        AsyncStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, token),
-        AsyncStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(user)),
-      ]);
-      console.log('User auth data stored successfully');
-    } catch (error) {
-      console.error('Error storing auth data:', error);
     }
   }
 
   async getStoredAuthData(): Promise<{ token: string | null; user: User | null }> {
     try {
-      const [token, userData] = await Promise.all([
-        AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.TOKEN),
-        AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.USER),
-      ]);
-
-      return {
-        token,
-        user: userData ? JSON.parse(userData) : null
-      };
+      const { token, user } = await TokenManager.loadFromStorage();
+      return { token, user };
     } catch (error) {
       console.error('Error getting stored auth data:', error);
       return { token: null, user: null };
@@ -300,7 +210,19 @@ class AuthService {
 
   async isAuthenticated(): Promise<boolean> {
     try {
-      const { token, user } = await this.getStoredAuthData();
+      const token = TokenManager.getToken();
+      const user = TokenManager.getUser();
+      return !!(token && user);
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      return false;
+    }
+  }
+
+  isAuthenticatedSync(): boolean {
+    try {
+      const token = TokenManager.getToken();
+      const user = TokenManager.getUser();
       return !!(token && user);
     } catch (error) {
       console.error('Error checking authentication:', error);
@@ -310,37 +232,104 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      await Promise.all([
-        AsyncStorage.removeItem(API_CONFIG.STORAGE_KEYS.TOKEN),
-        AsyncStorage.removeItem(API_CONFIG.STORAGE_KEYS.USER),
-      ]);
-      console.log('User logged out successfully');
+      try {
+        await apiClient.post('/logout');
+      } catch (error) {
+        console.warn('Logout endpoint call failed:', error);
+      }
+      await TokenManager.removeFromStorage();
     } catch (error) {
       console.error('Error during logout:', error);
     }
   }
 
-  async getCurrentUser(): Promise<User | null> {
-    const { user } = await this.getStoredAuthData();
-    return user;
+  getCurrentUser(): User | null {
+    return TokenManager.getUser();
   }
 
-  async getUserToken(): Promise<string | null> {
-    const { token } = await this.getStoredAuthData();
-    return token;
+  getCurrentUserAsync(): Promise<User | null> {
+    return Promise.resolve(TokenManager.getUser());
   }
 
   async validateToken(): Promise<boolean> {
-    return this.isAuthenticated();
+    try {
+      await apiClient.get('/user'); 
+      return true;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        TokenManager.clearToken(); // clear if invalid token
+        return false;
+      }
+      
+      // Other errors don't necessarily mean invalid token
+      console.warn('Token validation error:', error);
+      return true; // Assume token is still valid
+    }
   }
 
   getServerInfo() {
     return {
-      usersEndpoint: API_CONFIG.USERS_URL,
-      authEndpoints: AUTH_ENDPOINTS.slice(0, 3),
-      hasToken: !!API_CONFIG.TOKEN,
-      recommendation: 'Implement POST /api/public/auth/login endpoint on your server for secure bcrypt authentication',
+      loginEndpoint: `${API_CONFIG.BASE_URL}/login`,
+      usersEndpoint: `${API_CONFIG.BASE_URL}/users`,
+      hasToken: !!TokenManager.getToken(),
+      currentUser: TokenManager.getUser(),
+      recommendation: 'Using dynamic token authentication with proper token management',
     };
+  }
+
+  // Additional utility methods
+  getUserRole(): string | null {
+    const user = TokenManager.getUser();
+    return user?.role || null;
+  }
+
+  hasRole(role: string): boolean {
+    const userRole = this.getUserRole();
+    return userRole === role;
+  }
+
+  hasAnyRole(roles: string[]): boolean {
+    const userRole = this.getUserRole();
+    return userRole ? roles.includes(userRole) : false;
+  }
+
+  // Get current user info with all fields
+  getCurrentUserInfo(): { 
+    id: number | null; 
+    name?: string; 
+    email?: string; 
+    role?: string; 
+    employee_id?: string;
+    department?: string;
+    is_active?: boolean;
+  } {
+    const user = TokenManager.getUser();
+    if (user) {
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        employee_id: user.employee_id,
+      };
+    }
+    return { id: null };
+  }
+
+  // Check if the current user has admin privileges
+  isAdmin(): boolean {
+    return this.hasRole('admin');
+  }
+
+  // Check if the current user is a manager
+  isManager(): boolean {
+    return this.hasAnyRole(['admin', 'manager']);
+  }
+
+  // Get user display name
+  getUserDisplayName(): string {
+    const user = TokenManager.getUser();
+    return user?.name || user?.email || 'Unknown User';
   }
 }
 

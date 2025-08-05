@@ -1,205 +1,220 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode, useRef } from 'react';
-import AuthService, { User, LoginCredentials, LoginResponse } from '../services/AuthService';
+// Update your AuthContext.tsx file to include notification sync
 
-export interface AuthState {
-  isAuthenticated: boolean;
-  user: User | null;
-  token: string | null;
-  loading: boolean;
-  error: string | null;
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { login as apiLogin, logout as apiLogout, TokenManager } from '../config/api';
+import { NotificationManager } from '../services/NotifManager';
+import NotificationService from '../services/NotificationService';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  employee_id: string;
 }
 
-type AuthAction =
-  | { type: 'LOADING' }
-  | { type: 'LOGIN_SUCCESS'; payload: { user: User; token: string } }
-  | { type: 'LOGIN_FAILURE'; payload: string }
-  | { type: 'LOGOUT' }
-  | { type: 'CLEAR_ERROR' }
-  | { type: 'UPDATE_USER'; payload: User }
-  | { type: 'INIT_COMPLETE' };
+interface LoginCredentials {
+  email: string;
+  password: string;
+}
 
-interface AuthContextType extends AuthState {
-  login: (credentials: LoginCredentials) => Promise<LoginResponse>;
+interface LoginResult {
+  success: boolean;
+  message?: string;
+  user?: User;
+}
+
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
+  login: (credentials: LoginCredentials) => Promise<LoginResult>;
   logout: () => Promise<void>;
   clearError: () => void;
-  isInitialized: boolean;
+  checkAuthStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const authReducer = (state: AuthState, action: AuthAction): AuthState => {
-  switch (action.type) {
-    case 'LOADING':
-      return {
-        ...state,
-        loading: true,
-        error: null,
-      };
-    case 'LOGIN_SUCCESS':
-      return {
-        ...state,
-        isAuthenticated: true,
-        user: action.payload.user,
-        token: action.payload.token,
-        loading: false,
-        error: null,
-      };
-    case 'LOGIN_FAILURE':
-      console.error('Login failed:', action.payload);
-      return {
-        ...state,
-        isAuthenticated: false,
-        user: null,
-        token: null,
-        loading: false,
-        error: action.payload,
-      };
-    case 'LOGOUT':
-      return {
-        isAuthenticated: false,
-        user: null,
-        token: null,
-        loading: false,
-        error: null,
-      };
-    case 'CLEAR_ERROR':
-      return {
-        ...state,
-        error: null,
-      };
-    case 'UPDATE_USER':
-      return {
-        ...state,
-        user: action.payload,
-      };
-    case 'INIT_COMPLETE':
-      return {
-        ...state,
-        loading: false,
-      };
-    default:
-      return state;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
+  return context;
 };
 
-const initialState: AuthState = {
-  isAuthenticated: false,
-  user: null,
-  token: null,
-  loading: true,
-  error: null,
-};
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
-  const initializationRef = useRef(false);
-  const logoutInProgressRef = useRef(false);
-
-  useEffect(() => {
-    const checkStoredAuth = async () => {
-      if (initializationRef.current) return;
-      
-      initializationRef.current = true;
-
-      try {
-        const { token, user } = await AuthService.getStoredAuthData();
-        
-        if (token && user) {
-          dispatch({
-            type: 'LOGIN_SUCCESS',
-            payload: { user, token },
-          });
-        } else {
-          dispatch({ type: 'LOGOUT' });
-        }
-      } catch (error) {
-        console.error('Error checking stored auth:', error);
-        dispatch({ type: 'LOGOUT' });
-      } finally {
-        dispatch({ type: 'INIT_COMPLETE' });
-      }
-    };
-
-    checkStoredAuth();
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
 
-  const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    dispatch({ type: 'LOADING' });
-
+  const syncNotificationServices = async (user: User | null) => {
     try {
-      const result = await AuthService.login(credentials);
-
-      if (result.success && result.user && result.token) {
-        dispatch({
-          type: 'LOGIN_SUCCESS',
-          payload: {
-            user: result.user,
-            token: result.token,
-          },
-        });
+      if (user) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await NotificationManager.setCurrentUserId(user.id);
+        await NotificationManager.onUserLogin();
+        await NotificationService.initialize();
+        await NotificationService.getNotificationSettings();
       } else {
-        dispatch({
-          type: 'LOGIN_FAILURE',
-          payload: result.message,
-        });
+        await NotificationManager.onUserLogout();
+        await NotificationService.clearUserSettings();
       }
-
-      return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
-      console.error('Login error:', errorMessage);
-      dispatch({
-        type: 'LOGIN_FAILURE',
-        payload: errorMessage,
-      });
+      console.error('Error syncing notification services:', error);
+    }
+  };
+
+  const checkAuthStatus = useCallback(async () => {
+    try {
+      setLoading(true);
+      await TokenManager.initialize();
+      const storedUser = TokenManager.getUser();
+      const token = TokenManager.getToken();
+      
+      if (token && storedUser) {
+        setUser(storedUser);
+        setIsAuthenticated(true);
+        await syncNotificationServices(storedUser);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const login = useCallback(async (credentials: LoginCredentials): Promise<LoginResult> => {
+    try {
+      setError(null);
+      const previousUser = TokenManager.getUser();
+      if (previousUser) {
+        await NotificationManager.onUserLogout();
+      }
+      
+      const response = await apiLogin(credentials);
+      
+      if (response.success && response.user) {
+        setUser(response.user);
+        setIsAuthenticated(true);
+        await syncNotificationServices(response.user);
+        
+        try { //for offline access
+          await AsyncStorage.setItem('valet_user_data', JSON.stringify(response.user));
+        } catch (error) {
+          console.error('Error storing user data:', error);
+        }
+        
+        return {
+          success: true,
+          message: response.message || 'Login successful',
+          user: response.user,
+        };
+      } else {
+        const errorMessage = response.message || 'Login failed';
+        setError(errorMessage);
+        return {
+          success: false,
+          message: errorMessage,
+        };
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred';
+      setError(errorMessage);
       return {
         success: false,
         message: errorMessage,
       };
     }
-  };
+  }, []);
 
-  const logout = async (): Promise<void> => {
-    if (logoutInProgressRef.current) return;
-
-    logoutInProgressRef.current = true;
-
+  const logout = useCallback(async () => {
     try {
-      dispatch({ type: 'LOGOUT' });
-      await AuthService.logout();
+      const currentUser = user;
+      
+      
+      if (currentUser) { // clear notif data for current user
+        await NotificationManager.onUserLogout();
+        await NotificationService.clearUserSettings();
+      }
+    
+      await apiLogout();
+      setUser(null);
+      setIsAuthenticated(false);
+      setError(null);
+    
+      try {
+        await AsyncStorage.removeItem('valet_user_data');
+      } catch (error) {
+        console.error('Error clearing stored user data:', error);
+      }
+      
     } catch (error) {
-      console.error('Logout error:', error);
-      dispatch({ type: 'LOGOUT' });
-    } finally {
-      setTimeout(() => {
-        logoutInProgressRef.current = false;
-      }, 1000);
+      console.error('Error during logout:', error);
+      
+      setUser(null); // if logout fails, clear local state
+      setIsAuthenticated(false);
+      setError(null);
+      
+      await TokenManager.removeFromStorage(); // force clear token and notification data
+      await NotificationManager.onUserLogout();
     }
-  };
+  }, [user]);
 
-  const clearError = (): void => {
-    dispatch({ type: 'CLEAR_ERROR' });
-  };
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
 
-  const value: AuthContextType = {
-    ...state,
+  useEffect(() => {
+    const checkUserChange = async () => {
+      const tokenUser = TokenManager.getUser();
+      const currentUserId = user?.id;
+      const tokenUserId = tokenUser?.id;
+      
+      if (tokenUserId !== currentUserId) { //update user if token has changed
+        if (tokenUser) {
+          setUser(tokenUser);
+          setIsAuthenticated(true);
+          await syncNotificationServices(tokenUser);
+        } else if (currentUserId) {
+          setUser(null);
+          setIsAuthenticated(false);
+          await syncNotificationServices(null);
+        }
+      }
+    };
+
+    const interval = setInterval(checkUserChange, 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const contextValue: AuthContextType = {
+    user,
+    isAuthenticated,
+    loading,
+    error,
     login,
     logout,
     clearError,
-    isInitialized: !state.loading,
+    checkAuthStatus,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

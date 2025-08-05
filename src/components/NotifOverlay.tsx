@@ -12,7 +12,6 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet } from 'react-native';
 import { AppNotification, getNotificationUserId } from '../types/NotifTypes';
 import { NotificationManager } from '../services/NotifManager';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
@@ -162,10 +161,7 @@ const SwipeableNotificationItem: React.FC<SwipeableNotificationItemProps> = ({
                 {getNotificationIcon(notification.type)}
               </View>
               <View style={styles.notificationTextContainer}>
-                <Text style={[
-                  styles.notificationTitle,
-                  !notification.isRead && styles.unreadText
-                ]}>
+                <Text style={[styles.notificationTitle, !notification.isRead && styles.unreadText ]}>
                   {notification.title}
                 </Text>
                 <Text style={styles.notificationTime}>
@@ -173,17 +169,13 @@ const SwipeableNotificationItem: React.FC<SwipeableNotificationItemProps> = ({
                 </Text>
               </View>
               {!notification.isRead && (
-                <View style={styles.unreadDot} />
-              )}
+                <View style={styles.unreadDot} /> )}
               <View style={styles.swipeIndicator}>
                 <Ionicons name="chevron-back" size={12} color="#ccc" />
               </View>
             </View>
             
-            <Text style={[
-              styles.notificationMessage,
-              !notification.isRead && styles.unreadText
-            ]}>
+            <Text style={[styles.notificationMessage, !notification.isRead && styles.unreadText]}>
               {notification.message}
             </Text>
           </View>
@@ -194,10 +186,7 @@ const SwipeableNotificationItem: React.FC<SwipeableNotificationItemProps> = ({
 };
 
 const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
-  visible,
-  onClose,
-  userId,
-}) => {
+  visible, onClose, userId, }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isRefreshIconLoading, setIsRefreshIconLoading] = useState(false);
@@ -205,7 +194,6 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.9));
   const [spinAnim] = useState(new Animated.Value(0));
-
   const navigation = useNavigation();
   const { checkForNewReplies, currentUserId, feedbackStats } = useFeedback();
   const [userInfo, setUserInfo] = useState<{ id: number | null; email?: string }>({ id: null });
@@ -231,6 +219,24 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
   }, [visible]);
 
   useEffect(() => {
+    // Subscribe to user changes in NotificationManager
+    const unsubscribeUserChange = NotificationManager.subscribeToUserChanges(() => {
+      // Force refresh notifications
+      NotificationManager.forceRefresh().then(() => {
+        const effectiveUserId = userId || currentUserId || userInfo.id;
+        if (effectiveUserId) {
+          NotificationManager.checkForFeedbackReplies(effectiveUserId);
+          checkForNewReplies();
+        }
+      });
+    });
+
+    return () => {
+      unsubscribeUserChange();
+    };
+  }, [userId, currentUserId, userInfo.id, checkForNewReplies]);
+
+  useEffect(() => {
     if (visible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -246,15 +252,18 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
         }),
       ]).start();
 
-      const unsubscribe = NotificationManager.subscribe(setNotifications);
-      
-      const effectiveUserId = userId || currentUserId || userInfo.id;
-      if (effectiveUserId) {
-        NotificationManager.checkForFeedbackReplies(effectiveUserId);
-        checkForNewReplies();
-      }
+      // Force refresh when opening overlay
+      NotificationManager.forceRefresh().then(() => {
+        const unsubscribe = NotificationManager.subscribe(setNotifications);
+        
+        const effectiveUserId = userId || currentUserId || userInfo.id || NotificationManager.getCurrentUserContext().id;
+        if (effectiveUserId) {
+          NotificationManager.checkForFeedbackReplies(effectiveUserId);
+          checkForNewReplies();
+        }
 
-      return unsubscribe;
+        return unsubscribe;
+      });
     } else {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -271,32 +280,32 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     }
   }, [visible, userId, currentUserId, userInfo.id, fadeAnim, scaleAnim, checkForNewReplies]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const effectiveUserId = userId || currentUserId || userInfo.id;
-      
-      if (effectiveUserId) {
-        const [allFeedback, feedbackWithReplies] = await Promise.all([
-          ApiService.getUserFeedback(effectiveUserId),
-          ApiService.getUserFeedbackWithReplies(effectiveUserId)
-        ]);
+    const onRefresh = async () => {
+      setRefreshing(true);
+      try {
+        const effectiveUserId = userId || currentUserId || userInfo.id;
         
-        if (allFeedback.length > 0) {
-          await NotificationManager.processFeedbackReplies(allFeedback);
+        if (effectiveUserId) {
+          const [allFeedback, feedbackWithReplies] = await Promise.all([
+            ApiService.getUserFeedback(effectiveUserId),
+            ApiService.getUserFeedbackWithReplies(effectiveUserId)
+          ]);
+          
+          if (allFeedback.length > 0) {
+            await NotificationManager.processFeedbackReplies(allFeedback);
+          }
+          
+          await checkForNewReplies();
+        } else {
+          console.warn('No user ID available for refresh');
         }
-        
-        await checkForNewReplies();
-      } else {
-        console.warn('No user ID available for refresh');
+      } catch (error) {
+        console.error('Error refreshing notifications:', error);
       }
-    } catch (error) {
-      console.error('Error refreshing notifications:', error);
-    }
-    setRefreshing(false);
-  };
+      setRefreshing(false);
+    };
 
-  const handleRefreshIconPress = async () => {
+    const handleRefreshIconPress = async () => {
     setIsRefreshIconLoading(true);
     
     spinAnim.setValue(0);
@@ -310,7 +319,10 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     spinAnimation.start();
     
     try {
-      const effectiveUserId = userId || currentUserId || userInfo.id;
+      // Force refresh from NotificationManager first
+      await NotificationManager.forceRefresh();
+      
+      const effectiveUserId = userId || currentUserId || userInfo.id || NotificationManager.getCurrentUserContext().id;
       
       if (effectiveUserId) {
         await Promise.all([
@@ -352,34 +364,34 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
     }, 1000);
   };
 
-  const filteredNotifications = useMemo(() => {
-    const effectiveUserId = userId || currentUserId || userInfo.id;
-    
-    let userNotifications = notifications;
-    
-    if (effectiveUserId) {
-      userNotifications = notifications.filter(n => {
-        const notifUserId = getNotificationUserId(n);
-        return !notifUserId || notifUserId === effectiveUserId;
-      });
-    }
-    
-    switch (filter) {
-      case 'unread':
-        return userNotifications.filter(n => !n.isRead);
-      case 'spots':
+    const filteredNotifications = useMemo(() => {
+      const effectiveUserId = userId || currentUserId || userInfo.id;
+      
+      let userNotifications = notifications;
+      
+      if (effectiveUserId) {
+        userNotifications = notifications.filter(n => {
+          const notifUserId = getNotificationUserId(n);
+          return !notifUserId || notifUserId === effectiveUserId;
+        });
+      }
+      
+      switch (filter) {
+        case 'unread':
+          return userNotifications.filter(n => !n.isRead);
+        case 'spots':
+          return userNotifications.filter(
+            n => n.type === 'spot_available' && n.data?.spotIds && n.data.spotIds.length > 0
+          );
+        case 'feedback':
+          return userNotifications.filter(n => n.type === 'feedback_reply');
+      default:
         return userNotifications.filter(
-          n => n.type === 'spot_available' && n.data?.spotIds && n.data.spotIds.length > 0
+          n =>
+            (n.type !== 'spot_available' || (n.data?.spotIds && n.data.spotIds.length > 0))
         );
-      case 'feedback':
-        return userNotifications.filter(n => n.type === 'feedback_reply');
-     default:
-      return userNotifications.filter(
-        n =>
-          (n.type !== 'spot_available' || (n.data?.spotIds && n.data.spotIds.length > 0))
-      );
-    }
-  }, [notifications, filter, userId, currentUserId, userInfo.id]);
+      }
+    }, [notifications, filter, userId, currentUserId, userInfo.id]);
 
   const getNotificationIcon = (type: AppNotification['type']) => {
     switch (type) {

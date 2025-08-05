@@ -1,48 +1,42 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Alert,
   Switch,
+  ActivityIndicator,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { NotificationService } from '../services/NotificationService';
+import { NotificationSettings } from '../services/NotificationService';
+import { NotificationManager } from '../services/NotifManager';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { styles } from './styles/SettingsScreen.style';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
   Home: undefined;
   Settings: undefined;
   Login: undefined;
   Profile: { userId?: number } | undefined;
-  ApiTest: undefined;
   ParkingMap: undefined;
   Feedback: undefined;
 };
 
 type SettingsScreenNavigationProp = NavigationProp<RootStackParamList>;
 
-interface NotificationSettings {
-  spotAvailable: boolean;
-  floorUpdates: boolean;
-  maintenanceAlerts: boolean;
-  vibration: boolean;
-  sound: boolean;
-}
-
 const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
 
 const DEFAULT_SETTINGS: NotificationSettings = {
-  spotAvailable: false,
-  floorUpdates: false,
-  maintenanceAlerts: false,
-  vibration: false,
-  sound: false,
+  spotAvailable: true,
+  floorUpdates: true,
+  vibration: true,
+  sound: true,
 };
 
 const SWITCH_COLORS = {
@@ -60,58 +54,91 @@ interface SettingItem {
 }
 
 const SETTING_ITEMS: SettingItem[] = [
-  {
-    key: 'spotAvailable',
-    icon: 'car',
-    iconColor: '#48D666',
-    title: 'Parking Spots Available',
-    desc: 'Get notified when parking spots become available'
-  },
-  {
-    key: 'floorUpdates',
-    icon: 'layers',
-    iconColor: '#2196F3',
-    title: 'Floor Updates',
-    desc: 'Receive updates about floor occupancy changes'
-  },
-  {
-    key: 'maintenanceAlerts',
-    icon: 'construct',
-    iconColor: '#FF9801',
-    title: 'Maintenance Alerts',
-    desc: 'Get notified about system maintenance'
-  },
-  {
-    key: 'vibration',
-    icon: 'vibrate',
-    iconColor: '#9C27B0',
-    title: 'Vibration',
-    desc: 'Enable vibration for notifications',
-    isMatCommunity: true
-  },
-  {
-    key: 'sound',
-    icon: 'volume-high',
-    iconColor: '#4CAF50',
-    title: 'Sound',
-    desc: 'Play sound with notifications'
-  }
+  { key: 'spotAvailable', icon: 'car', iconColor: '#48D666', title: 'Parking Spots Available', desc: 'Get notified when parking spots become available' },
+  { key: 'floorUpdates', icon: 'layers', iconColor: '#2196F3', title: 'Floor Updates', desc: 'Receive updates about floor occupancy changes' },
+  { key: 'vibration', icon: 'vibrate', iconColor: '#9C27B0', title: 'Vibration', desc: 'Enable vibration for notifications', isMatCommunity: true },
+  { key: 'sound', icon: 'volume-high', iconColor: '#4CAF50', title: 'Sound', desc: 'Play sound with notifications' },
 ];
 
 const APP_SETTINGS = [
-  {
-    icon: 'person-outline',
-    title: 'Profile',
-    desc: 'View and edit your profile information',
-    navigate: 'Profile' as keyof RootStackParamList
-  },
-  {
-    icon: 'chatbubble-outline',
-    title: 'Feedback',
-    desc: 'Send feedback and suggestions',
-    navigate: 'Feedback' as keyof RootStackParamList
-  }
+  { icon: 'person-outline', title: 'Profile', desc: 'View and edit your profile', navigate: 'Profile' as keyof RootStackParamList },
+  { icon: 'chatbubble-outline', title: 'Feedback', desc: 'Send feedback & suggestions', navigate: 'Feedback' as keyof RootStackParamList }
 ] as const;
+
+// Custom Alert Modal Component
+interface CustomAlertProps {
+  visible: boolean;
+  title: string;
+  message: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  cancelText?: string;
+  confirmText?: string;
+  type?: 'default' | 'logout' | 'error';
+}
+
+const CustomAlert: React.FC<CustomAlertProps> = ({
+  visible,
+  title,
+  message,
+  onCancel,
+  onConfirm,
+  cancelText = 'Cancel',
+  confirmText = 'OK',
+  type = 'default'
+}) => {
+  const { width } = Dimensions.get('window');
+
+  const getIcon = () => {
+    switch (type) {
+      case 'logout':
+        return <Ionicons name="log-out-outline" size={32} color="#E53E3E" />;
+      case 'error':
+        return <Ionicons name="alert-circle-outline" size={32} color="#B22020" />;
+      default:
+        return <Ionicons name="information-circle-outline" size={32} color="#2196F3" />;
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        <View style={styles.alertcontainer}>
+          <View style={styles.alertheader}>
+            {getIcon()}
+            <Text style={styles.title}>{title}</Text>
+          </View>
+          
+          <Text style={styles.message}>{message}</Text>
+          
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={onCancel}
+            >
+              <Text style={styles.cancelButtonText}>{cancelText}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.button, 
+                type === 'error' ? styles.errorConfirmButton : styles.confirmButton
+              ]}
+              onPress={onConfirm}
+            >
+              <Text style={styles.confirmButtonText}>{confirmText}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
@@ -120,8 +147,77 @@ const SettingsScreen: React.FC = () => {
 
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [savingSettings, setSavingSettings] = useState<Set<keyof NotificationSettings>>(new Set());
+  const [userContext, setUserContext] = useState<{ id: number | null; name?: string; isAuthenticated: boolean }>({
+    id: null,
+    isAuthenticated: false
+  });
+
+  // Alert modal states
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    cancelText?: string;
+    confirmText?: string;
+    type?: 'default' | 'logout' | 'error';
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  
   const isMountedRef = useRef(true);
   const logoutInProgressRef = useRef(false);
+
+  const getSettingsKey = () => {
+    const uid = user?.id;
+    if (!uid) throw new Error('User not authenticated');
+    return `valet_notification_settings_${uid}`;
+  };
+
+  // Custom alert function
+  const showAlert = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void, 
+    cancelText = 'Cancel', 
+    confirmText = 'OK',
+    type: 'default' | 'logout' | 'error' = 'default'
+  ) => {
+    setAlertConfig({
+      visible: true,
+      title,
+      message,
+      onConfirm,
+      cancelText,
+      confirmText,
+      type,
+    });
+  };
+
+  const hideAlert = () => {
+    setAlertConfig(prev => ({ ...prev, visible: false }));
+  };
+
+  // Update user context when auth state changes
+  useEffect(() => {
+    if (user && isAuthenticated) {
+      setUserContext({
+        id: user.id,
+        name: user.name,
+        isAuthenticated: true
+      });
+    } else {
+      setUserContext({
+        id: null,
+        isAuthenticated: false
+      });
+    }
+  }, [user, isAuthenticated]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -131,9 +227,16 @@ const SettingsScreen: React.FC = () => {
     }, [isAuthenticated, navigation])
   );
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated && user) {
+        loadNotificationSettings();
+      }
+    }, [isAuthenticated, user])
+  );
+
   useEffect(() => {
     isMountedRef.current = true;
-    loadNotificationSettings();
     
     return () => {
       isMountedRef.current = false;
@@ -141,115 +244,108 @@ const SettingsScreen: React.FC = () => {
   }, []);
 
   const loadNotificationSettings = useCallback(async () => {
-    if (!isMountedRef.current) return;
-    
+    if (!isMountedRef.current || !isAuthenticated || !user) return;
+    setSettingsLoading(true);
     try {
-      const settings = await NotificationService.getNotificationSettings();
-      if (isMountedRef.current) {
-        setNotificationSettings(settings);
+      const key = getSettingsKey();
+      const stored = await AsyncStorage.getItem(key);
+      if (stored) {
+        setNotificationSettings(JSON.parse(stored));
+      } else {
+        setNotificationSettings(DEFAULT_SETTINGS);
       }
     } catch (error) {
-      console.error('Error loading notification settings:', error);
+      console.error('Error loading settings:', error);
+      showAlert(
+        'Settings Error',
+        'Could not load preferences, using defaults.',
+        () => {
+          hideAlert();
+          setNotificationSettings(DEFAULT_SETTINGS);
+        },
+        '',
+        'OK',
+        'error'
+      );
+    } finally {
+      if (isMountedRef.current) setSettingsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, user]);
 
-  const saveNotificationSettings = useCallback(async (newSettings: NotificationSettings) => {
-    if (!isMountedRef.current) return;
-    
+  const saveNotificationSettings = useCallback(async (newSettings: NotificationSettings, changedKey?: keyof NotificationSettings) => {
+    if (!isMountedRef.current || !isAuthenticated || !user) return;
+    if (changedKey) setSavingSettings(prev => new Set(prev).add(changedKey));
     try {
-      await NotificationService.saveNotificationSettings(newSettings);
-      if (isMountedRef.current) {
-        setNotificationSettings(newSettings);
-      }
+      const key = getSettingsKey();
+      await AsyncStorage.setItem(key, JSON.stringify(newSettings));
+      setNotificationSettings(newSettings);
     } catch (error) {
-      console.error('Error saving notification settings:', error);
-      if (isMountedRef.current) {
-        Alert.alert('Error', 'Failed to save settings. Please try again.');
+      console.error('Error saving settings:', error);
+      showAlert(
+        'Save Error',
+        'Failed to save preferences.',
+        () => {
+          hideAlert();
+          loadNotificationSettings();
+        },
+        '',
+        'OK',
+        'error'
+      );
+    } finally {
+      if (changedKey && isMountedRef.current) {
+        setSavingSettings(prev => { const s = new Set(prev); s.delete(changedKey); return s; });
       }
     }
-  }, []);
+  }, [isAuthenticated, user, loadNotificationSettings]);
 
   const handleSettingChange = useCallback((key: keyof NotificationSettings, value: boolean) => {
-    if (!isMountedRef.current) return;
-    
-    const newSettings = { ...notificationSettings, [key]: value };
-    saveNotificationSettings(newSettings);
-  }, [notificationSettings, saveNotificationSettings]);
+    if (savingSettings.has(key)) return;
+    const updated = { ...notificationSettings, [key]: value };
+    saveNotificationSettings(updated, key);
+  }, [notificationSettings, saveNotificationSettings, savingSettings]);
 
   const performLogout = useCallback(async () => {
-    if (logoutInProgressRef.current || !isMountedRef.current) return;
-
+    if (logoutInProgressRef.current) return;
     logoutInProgressRef.current = true;
-
+    setLoading(true);
+    hideAlert();
     try {
-      if (isMountedRef.current) {
-        setLoading(true);
-      }
-
+      // clear storage
+      await AsyncStorage.removeItem(getSettingsKey());
+      await NotificationManager.onUserLogout();
       await logout();
-      
-      setTimeout(() => {
-        if (isMountedRef.current) {
-          navigation.navigate('Login');
-        }
-      }, 100);
-
+      navigation.navigate('Login');
     } catch (error) {
-      console.error('Logout error in Settings:', error);
-      
-      if (isMountedRef.current) {
-        Alert.alert(
-          'Logout Error', 
-          'There was an issue logging you out. Please try again.',
-          [
-            {
-              text: 'Retry',
-              onPress: () => {
-                logoutInProgressRef.current = false;
-                performLogout();
-              }
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => {
-                logoutInProgressRef.current = false;
-              }
-            }
-          ]
-        );
-      }
+      console.error('Logout error:', error);
+      showAlert(
+        'Logout Error',
+        'Please try again.',
+        hideAlert,
+        '',
+        'OK',
+        'error'
+      );
     } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-      
-      setTimeout(() => {
-        logoutInProgressRef.current = false;
-      }, 1000);
+      setLoading(false);
+      logoutInProgressRef.current = false;
     }
-  }, [logout, navigation]);
+  }, [logout, navigation, user]);
 
   const handleLogout = useCallback(() => {
-    if (logoutInProgressRef.current) return;
-
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: performLogout
-        }
-      ]
+    if (!user) return;
+    showAlert(
+      'Sign Out',
+      `Are you sure you want to sign out of VALET? You'll need to sign in again to use the app.`,
+      performLogout,
+      'Cancel',
+      'Sign Out',
+      'logout'
     );
-  }, [performLogout]);
+  }, [performLogout, user]);
 
   const handleNavigation = useCallback((screen: keyof RootStackParamList) => {
     if (loading) return;
-    
     if (screen === 'Profile') {
       navigation.navigate(screen, { userId: user?.id });
     } else {
@@ -259,6 +355,7 @@ const SettingsScreen: React.FC = () => {
 
   const renderSettingItem = useCallback((item: SettingItem, index: number) => {
     const IconComponent = item.isMatCommunity ? MaterialCommunityIcons : Ionicons;
+    const isSaving = savingSettings.has(item.key);
     
     return (
       <React.Fragment key={item.key}>
@@ -270,18 +367,27 @@ const SettingsScreen: React.FC = () => {
               <Text style={styles.settingDesc}>{item.desc}</Text>
             </View>
           </View>
-          <Switch
-            value={notificationSettings[item.key]}
-            onValueChange={(value) => handleSettingChange(item.key, value)}
-            trackColor={SWITCH_COLORS}
-            thumbColor={notificationSettings[item.key] ? '#FFFFFF' : '#F4F3F4'}
-            disabled={loading}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {isSaving && (
+              <ActivityIndicator 
+                size="small" 
+                color="#B22020" 
+                style={{ marginRight: 8 }} 
+              />
+            )}
+            <Switch
+              value={notificationSettings[item.key]}
+              onValueChange={(value) => handleSettingChange(item.key, value)}
+              trackColor={SWITCH_COLORS}
+              thumbColor={notificationSettings[item.key] ? '#FFFFFF' : '#F4F3F4'}
+              disabled={loading || settingsLoading || isSaving || !user}
+            />
+          </View>
         </View>
         {index < SETTING_ITEMS.length - 1 && <View style={styles.divider} />}
       </React.Fragment>
     );
-  }, [notificationSettings, handleSettingChange, loading]);
+  }, [notificationSettings, handleSettingChange, loading, settingsLoading, savingSettings, user]);
 
   const renderAppSettingItem = useCallback((item: typeof APP_SETTINGS[number], index: number) => (
     <React.Fragment key={item.navigate}>
@@ -326,24 +432,25 @@ const SettingsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
-      
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="notifications" size={24} color="#B22020" />
-            <Text style={styles.cardTitle}>Notification Settings</Text>
-          </View>
-          
-          {SETTING_ITEMS.map(renderSettingItem)}
+          {settingsLoading ? (
+            <View style={styles.settingsLoading}>
+              <ActivityIndicator size="large" color="#B22020" />
+              <Text style={styles.loadingText}>Loading your preferences...</Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.cardHeader}>
+                <Ionicons name="notifications" size={24} color="#B22020" />
+                <Text style={styles.cardTitle}>Notifications</Text>
+              </View>
+              {SETTING_ITEMS.map(renderSettingItem)}
+            </>
+          )}
         </View>
 
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="settings" size={24} color="#B22020" />
-            <Text style={styles.cardTitle}>App Settings</Text>
-          </View>
-          
           {APP_SETTINGS.map(renderAppSettingItem)}
         </View>
 
@@ -356,7 +463,7 @@ const SettingsScreen: React.FC = () => {
           <TouchableOpacity 
             style={[styles.settingItem, loading && styles.disabledItem]} 
             onPress={handleLogout}
-            disabled={loading || logoutInProgressRef.current}
+            disabled={loading || logoutInProgressRef.current || !user}
           >
             <View style={styles.settingLeft}>
               <Ionicons name="log-out-outline" size={20} color={loading ? "#ccc" : "#F44336"} />
@@ -364,18 +471,27 @@ const SettingsScreen: React.FC = () => {
                 <Text style={[styles.settingTitle, { color: loading ? "#ccc" : '#F44336' }]}>
                   {logoutInProgressRef.current ? 'Logging out...' : 'Logout'}
                 </Text>
-                <Text style={[styles.settingDesc, loading && styles.disabledText]}>Sign out of your VALET account</Text>
+                <Text style={[styles.settingDesc, loading && styles.disabledText]}>
+                  Sign out of your VALET account
+                </Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={loading ? "#ccc" : "#F44336"} />
           </TouchableOpacity>
         </View>
-
-        <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>VALET v1.0.0</Text>
-          <Text style={styles.appInfoSubtext}>Your Virtual Parking Buddy</Text>
-        </View>
       </ScrollView>
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onCancel={hideAlert}
+        onConfirm={alertConfig.onConfirm}
+        cancelText={alertConfig.cancelText}
+        confirmText={alertConfig.confirmText}
+        type={alertConfig.type}
+      />
     </View>
   );
 };

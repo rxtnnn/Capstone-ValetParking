@@ -1,4 +1,6 @@
+// src/services/NotifManager.ts - FIXED VERSION
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
   getNotificationUserId, setNotificationUserId } from '../types/NotifTypes';
 import { FeedbackData } from '../types/feedback';
@@ -6,7 +8,8 @@ import { FeedbackData } from '../types/feedback';
 const STORAGE_KEYS = {
   NOTIFICATIONS: '@valet_notifications',
   FEEDBACK_CHECK: '@valet_last_feedback_check',
-  PROCESSED_REPLIES: '@valet_processed_replies' } as const;
+  PROCESSED_REPLIES: '@valet_processed_replies' 
+} as const;
 
 const MAX_NOTIFICATIONS = 100;
 const ALLOWED_TYPES = ['spot_available', 'feedback_reply'] as const;
@@ -17,43 +20,98 @@ type NotificationListener = (notifications: AppNotification[]) => void;
 class NotificationManagerClass {
   private notifications: AppNotification[] = [];
   private listeners: NotificationListener[] = [];
-  private currentUserId: number | null = null;
   private processedReplies = new Set<string>();
+  private currentUserId: number | null = null;
+  private userChangeListeners: (() => void)[] = [];
+  private isInitializing = false; // FIX: Prevent race conditions
 
   constructor() {
     this.init();
+    this.setupUserChangeMonitoring();
   }
 
   private async init(): Promise<void> {
+    this.currentUserId = this.getCurrentUserId();
+    
     await Promise.all([
       this.loadNotifications(),
-      this.loadProcessedReplies(),
-      this.getCurrentUserId()
+      this.loadProcessedReplies()
     ]);
   }
 
-  private async getCurrentUserId(): Promise<void> {
+  private setupUserChangeMonitoring(): void {
+    setInterval(() => {
+      const newUserId = this.getCurrentUserId();
+      if (newUserId !== this.currentUserId && !this.isInitializing) {
+        this.handleUserChange(newUserId);
+      }
+    }, 1000);
+  }
+
+  // FIX: Improved user change handling
+  private async handleUserChange(newUserId: number | null): Promise<void> {
+    if (this.isInitializing) return; // Prevent multiple simultaneous changes
+    
+    this.isInitializing = true;
+    const oldUserId = this.currentUserId;
+    
     try {
-      const userData = await AsyncStorage.getItem('valet_user_data');
-      this.currentUserId = userData ? (JSON.parse(userData).id || null) : null;
+      // Update current user immediately to prevent mismatch warnings
+      this.currentUserId = newUserId;
+
+      // Clear current data
+      this.notifications = [];
+      this.processedReplies.clear();
+
+      // Load data for new user
+      if (newUserId) {
+        await Promise.all([
+          this.loadNotifications(),
+          this.loadProcessedReplies()
+        ]);
+      } 
+
+      // Notify all listeners about the change
+      this.notifyListeners();
+      this.notifyUserChangeListeners();
+      
     } catch (error) {
-      console.error('Error getting current user ID:', error);
+      console.error('Error during user change:', error);
+    } finally {
+      this.isInitializing = false;
     }
   }
 
+  private getCurrentUserId(): number | null {
+    const user = TokenManager.getUser();
+    return user?.id || null;
+  }
+
+  private getCurrentUserInfo(): { id: number | null; name?: string; email?: string } {
+    const user = TokenManager.getUser();
+    return {
+      id: user?.id || null,
+      name: user?.name,
+      email: user?.email
+    };
+  }
+
+  // FIX: Better user ID setting with immediate update
   async setCurrentUserId(userId: number | null): Promise<void> {
-    this.currentUserId = userId;
-    
-    if (userId === null) {
-      await Promise.all([this.clearAllNotifications(), this.clearProcessedReplies()]);
-    } else {
-      await Promise.all([this.loadNotifications(), this.loadProcessedReplies()]);
+    if (userId !== this.currentUserId && !this.isInitializing) {
+      await this.handleUserChange(userId);
     }
   }
 
   private async loadProcessedReplies(): Promise<void> {
     try {
-      const stored = await AsyncStorage.getItem(this.getUserStorageKey(STORAGE_KEYS.PROCESSED_REPLIES));
+      const key = this.getUserStorageKey(STORAGE_KEYS.PROCESSED_REPLIES);
+      if (!key) {
+        this.processedReplies = new Set();
+        return;
+      }
+      
+      const stored = await AsyncStorage.getItem(key);
       this.processedReplies = stored ? new Set(JSON.parse(stored)) : new Set();
     } catch (error) {
       console.error('Error loading processed replies:', error);
@@ -64,6 +122,8 @@ class NotificationManagerClass {
   private async saveProcessedReplies(): Promise<void> {
     try {
       const key = this.getUserStorageKey(STORAGE_KEYS.PROCESSED_REPLIES);
+      if (!key) return;
+      
       await AsyncStorage.setItem(key, JSON.stringify(Array.from(this.processedReplies)));
     } catch (error) {
       console.error('Error saving processed replies:', error);
@@ -72,7 +132,10 @@ class NotificationManagerClass {
 
   private async clearProcessedReplies(): Promise<void> {
     try {
-      await AsyncStorage.removeItem(this.getUserStorageKey(STORAGE_KEYS.PROCESSED_REPLIES));
+      const key = this.getUserStorageKey(STORAGE_KEYS.PROCESSED_REPLIES);
+      if (key) {
+        await AsyncStorage.removeItem(key);
+      }
       this.processedReplies.clear();
     } catch (error) {
       console.error('Error clearing processed replies:', error);
@@ -84,38 +147,55 @@ class NotificationManagerClass {
     return `feedback_${feedback.id}_${time}`;
   }
 
-  private getUserStorageKey(key: string): string {
-    return this.currentUserId ? `${key}_user_${this.currentUserId}` : key;
+  private getUserStorageKey(key: string): string | null {
+    if (!this.currentUserId) return null;
+    return `${key}_user_${this.currentUserId}`;
   }
 
   private async loadNotifications(): Promise<void> {
     try {
-      const stored = await AsyncStorage.getItem(this.getUserStorageKey(STORAGE_KEYS.NOTIFICATIONS));
-      if (!stored) return;
+      const key = this.getUserStorageKey(STORAGE_KEYS.NOTIFICATIONS);
+      if (!key) {
+        this.notifications = [];
+        this.notifyListeners();
+        return;
+      }
+
+      const stored = await AsyncStorage.getItem(key);
+      if (!stored) {
+        this.notifications = [];
+        this.notifyListeners();
+        return;
+      }
 
       const storedNotifications = JSON.parse(stored);
+      
+      // Filter notifications for current user
       this.notifications = this.currentUserId 
         ? storedNotifications.filter((notif: AppNotification) => {
             const userId = getNotificationUserId(notif);
             return !userId || userId === this.currentUserId;
           })
-        : storedNotifications;
-      
-      this.notifyListeners();
+        : [];
+      this.notifyListeners();      
     } catch (error) {
       console.error('Error loading notifications:', error);
+      this.notifications = [];
+      this.notifyListeners();
     }
   }
 
   private async saveNotifications(): Promise<void> {
     try {
+      const key = this.getUserStorageKey(STORAGE_KEYS.NOTIFICATIONS);
+      if (!key) return;
+
       if (this.notifications.length > MAX_NOTIFICATIONS) {
         this.notifications = this.notifications
           .sort((a, b) => b.timestamp - a.timestamp)
           .slice(0, MAX_NOTIFICATIONS);
       }
       
-      const key = this.getUserStorageKey(STORAGE_KEYS.NOTIFICATIONS);
       await AsyncStorage.setItem(key, JSON.stringify(this.notifications));
     } catch (error) {
       console.error('Error saving notifications:', error);
@@ -136,7 +216,7 @@ class NotificationManagerClass {
              existing.title === notification.title &&
              existing.message === notification.message &&
              existing.timestamp > fiveMinutesAgo &&
-             getNotificationUserId(existing) === getNotificationUserId({ ...notification, id: '', timestamp: 0, isRead: false } as AppNotification);
+             getNotificationUserId(existing) === this.currentUserId;
     });
   }
 
@@ -147,6 +227,11 @@ class NotificationManagerClass {
     }
 
     if (this.isDuplicateNotification(notification)) {
+      return;
+    }
+
+    if (!this.currentUserId) {
+      console.warn('No current user - cannot add notification');
       return;
     }
 
@@ -165,6 +250,11 @@ class NotificationManagerClass {
 
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
     if (spotsAvailable <= 0 || !spotIds || spotIds.length === 0) return;
+
+    if (!this.currentUserId) {
+      console.warn('No current user - cannot add spot notification');
+      return;
+    }
 
     let title: string;
     let message: string;
@@ -189,7 +279,7 @@ class NotificationManagerClass {
     }
 
     const notification = createSpotAvailableNotification(
-      title, message, spotsAvailable, floor, spotIds, this.currentUserId || undefined
+      title, message, spotsAvailable, floor, spotIds, this.currentUserId
     );
     await this.addNotification(notification);
   }
@@ -203,6 +293,11 @@ class NotificationManagerClass {
   ): Promise<void> {
     if (!feedbackId) return;
 
+    if (!this.currentUserId) {
+      console.warn('No current user - cannot add feedback notification');
+      return;
+    }
+
     const replyId = `feedback_${feedbackId}_${respondedAt ? new Date(respondedAt).getTime() : Date.now()}`;
     if (this.processedReplies.has(replyId)) return;
 
@@ -213,7 +308,7 @@ class NotificationManagerClass {
       originalFeedback.substring(0, 200) + (originalFeedback.length > 200 ? '...' : ''),
       adminReply,
       adminName,
-      this.currentUserId || undefined
+      this.currentUserId
     );
 
     await this.addNotification(notification);
@@ -226,6 +321,7 @@ class NotificationManagerClass {
       console.warn('No current user ID - cannot process feedback replies');
       return;
     }
+
     try {
       const userFeedback = feedbackArray.filter(feedback => 
         feedback.user_id === this.currentUserId && 
@@ -251,10 +347,12 @@ class NotificationManagerClass {
     }
   }
 
+  // FIX: Improved feedback replies checking with better user validation
   async checkForFeedbackReplies(userId: number, feedbackArray?: FeedbackData[]): Promise<void> {
     try {
+      // FIX: Accept the requested userId and update if different
       if (this.currentUserId !== userId) {
-        this.currentUserId = userId;
+        await this.setCurrentUserId(userId);
       }
       
       if (feedbackArray) {
@@ -268,9 +366,13 @@ class NotificationManagerClass {
   async markAsRead(notificationId: string): Promise<void> {
     const notification = this.notifications.find(n => n.id === notificationId);
     if (notification && !notification.isRead) {
-      notification.isRead = true;
-      await this.saveNotifications();
-      this.notifyListeners();
+      const notifUserId = getNotificationUserId(notification);
+      
+      if (!notifUserId || notifUserId === this.currentUserId) {
+        notification.isRead = true;
+        await this.saveNotifications();
+        this.notifyListeners();
+      }
     }
   }
 
@@ -300,7 +402,7 @@ class NotificationManagerClass {
 
     const notification = this.notifications[index];
     const belongsToUser = !this.currentUserId || !getNotificationUserId(notification) || 
-    getNotificationUserId(notification) === this.currentUserId;
+      getNotificationUserId(notification) === this.currentUserId;
     
     if (belongsToUser) {
       this.notifications.splice(index, 1);
@@ -349,6 +451,15 @@ class NotificationManagerClass {
     };
   }
 
+  subscribeToUserChanges(listener: () => void): () => void {
+    this.userChangeListeners.push(listener);
+    
+    return () => {
+      const index = this.userChangeListeners.indexOf(listener);
+      if (index > -1) this.userChangeListeners.splice(index, 1);
+    };
+  }
+
   private notifyListeners(): void {
     const notifications = this.getNotifications();
     for (const listener of this.listeners) {
@@ -356,6 +467,16 @@ class NotificationManagerClass {
         listener(notifications);
       } catch (error) {
         console.error('Error in notification listener:', error);
+      }
+    }
+  }
+
+  private notifyUserChangeListeners(): void {
+    for (const listener of this.userChangeListeners) {
+      try {
+        listener();
+      } catch (error) {
+        console.error('Error in user change listener:', error);
       }
     }
   }
@@ -408,41 +529,75 @@ class NotificationManagerClass {
   }
 
   async getDebugInfo(): Promise<any> {
+    const userInfo = this.getCurrentUserInfo();
+    
     const keys = {
-      notifications: this.getUserStorageKey(STORAGE_KEYS.NOTIFICATIONS),
-      lastFeedbackCheck: this.getUserStorageKey(STORAGE_KEYS.FEEDBACK_CHECK),
-      processedReplies: this.getUserStorageKey(STORAGE_KEYS.PROCESSED_REPLIES)
+      notifications: this.getUserStorageKey(STORAGE_KEYS.NOTIFICATIONS) || 'No user',
+      lastFeedbackCheck: this.getUserStorageKey(STORAGE_KEYS.FEEDBACK_CHECK) || 'No user',
+      processedReplies: this.getUserStorageKey(STORAGE_KEYS.PROCESSED_REPLIES) || 'No user'
     };
     
     try {
-      const [notifications, lastCheck, processedReplies] = await Promise.all([
-        AsyncStorage.getItem(keys.notifications),
-        AsyncStorage.getItem(keys.lastFeedbackCheck),
-        AsyncStorage.getItem(keys.processedReplies)
-      ]);
-
       const summary = this.getSummary();
 
       return {
-        currentUserId: this.currentUserId,
+        currentUser: {
+          id: this.currentUserId,
+          name: userInfo.name,
+          email: userInfo.email
+        },
+        isInitializing: this.isInitializing,
         storageKeys: keys,
-        storedNotifications: notifications ? JSON.parse(notifications).length : 0,
-        lastFeedbackCheck: lastCheck ? new Date(parseInt(lastCheck)).toISOString() : 'never',
-        processedRepliesCount: this.processedReplies.size,
         activeNotifications: this.notifications.length,
         unreadCount: this.getUnreadCount(),
         summary,
         notificationTypes: {
           parkingSpots: summary.parkingSpots,
           feedbackReplies: summary.feedbackReplies
+        },
+        tokenManager: {
+          hasUser: !!TokenManager.getUser(),
+          hasToken: !!TokenManager.getToken(),
+          userId: TokenManager.getUser()?.id
         }
       };
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : String(error),
-        currentUserId: this.currentUserId
+        currentUser: {
+          id: this.currentUserId,
+          name: userInfo.name,
+          email: userInfo.email
+        },
+        isInitializing: this.isInitializing
       };
     }
+  }
+  async onUserLogin(): Promise<void> {
+    const newUserId = this.getCurrentUserId();
+    
+    if (newUserId !== this.currentUserId) {
+      await this.handleUserChange(newUserId);
+    }
+  }
+  
+  async onUserLogout(): Promise<void> {
+    await this.handleUserChange(null);
+  }
+
+  getCurrentUserContext(): { id: number | null; name?: string; isAuthenticated: boolean } {
+    const userInfo = this.getCurrentUserInfo();
+    return {
+      id: this.currentUserId,
+      name: userInfo.name,
+      isAuthenticated: !!this.currentUserId
+    };
+  }
+  
+  async forceRefresh(): Promise<void> {
+    await this.loadNotifications();
+    await this.loadProcessedReplies();
+    this.notifyListeners();
   }
 }
 

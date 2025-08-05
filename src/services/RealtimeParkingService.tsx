@@ -1,6 +1,6 @@
 // src/services/RealTimeParkingService.ts
-import { NotificationService } from './NotificationService';
-
+import NotificationService from './NotificationService';
+import { NotificationManager } from './NotifManager';
 export interface ParkingSpace {
   id: number;
   sensor_id: number;
@@ -77,8 +77,7 @@ class RealTimeParkingServiceClass {
     this.shouldStop = true;
     this.isRunning = false;
     
-    // Cancel any ongoing request
-    if (this.fetchController) {
+    if (this.fetchController) {  // Cancel any ongoing request
       this.fetchController.abort();
       this.fetchController = null;
     }
@@ -154,9 +153,8 @@ class RealTimeParkingServiceClass {
 
     const now = Date.now(); //track last fetch time
     
-    if (now - this.lastFetchTime < 5000) return; //every 2 secs to avoid flooding 
+    if (now - this.lastFetchTime < 5000) return; //every 5 secs to avoid flooding 
 
-  
     if (this.consecErrors >= this.maxConsecutiveErrors) { // Stop if too many errors
       console.error(`Too many consecutive errors (${this.consecErrors}), stopping service`);
       this.stop();
@@ -325,50 +323,64 @@ class RealTimeParkingServiceClass {
   }
 
   private checkForChanges(newData: ParkingStats): void {
-    if (!this.lastData || !this.lastData.sensorData || !newData.sensorData) return;
+  if (!this.lastData?.sensorData || !newData.sensorData) return;
 
-    const oldData = this.lastData;
-    const oldAvailableSpotIds = new Set((oldData.sensorData ?? []).filter(s => !s.is_occupied).map(s => s.sensor_id)) //store previous available spot IDs;
-    const currentAvailableSpots = newData.sensorData.filter(s => !s.is_occupied); // Get current available spots
+  const oldData = this.lastData;
+  const oldAvailable = new Set((oldData.sensorData ?? []).filter(s => !s.is_occupied).map(s => s.sensor_id));
 
-    // Detect newly available spots by comparing against previous state
-    const newlyAvailableSpots = currentAvailableSpots.filter(s => !oldAvailableSpotIds.has(s.sensor_id));
+  // Find newly available spots
+  const newlyAvailableSpots = newData.sensorData.filter(
+    s => !s.is_occupied && !oldAvailable.has(s.sensor_id)
+  );
 
-    if (newlyAvailableSpots.length > 0) {
-      const floorGrouped: Record<number, string[]> = {}; //group spots by floor
-
-      for (const spot of newlyAvailableSpots) {
-        const floor = this.extractFloorFromLocation(spot.floor_level);
-        if (!floorGrouped[floor]) floorGrouped[floor] = [];
-        const spotId = this.SENSOR_ID_TO_LABEL[spot.sensor_id] || `S${spot.sensor_id}`;  // sensor_id to label mapping
-        floorGrouped[floor].push(spotId);
-      }
-
-      for (const floorStr in floorGrouped) { // Trigger notification per floor
-        const floor = parseInt(floorStr);
-        const spotIds = floorGrouped[floor];
-        NotificationService.showSpotAvailableNotification(
-          spotIds.length,
-          floor,
-          spotIds
-        );
-      }
+  if (newlyAvailableSpots.length > 0) {
+    const floorGrouped: Record<number, string[]> = {};
+    for (const spot of newlyAvailableSpots) {
+      const floor = this.extractFloorFromLocation(spot.floor_level);
+      const label = this.SENSOR_ID_TO_LABEL[spot.sensor_id] || `S${spot.sensor_id}`;
+      (floorGrouped[floor] = floorGrouped[floor] || []).push(label);
     }
 
-    // Continue sending floor-level updates if total available count increased
-    for (const newFloor of newData.floors) {
-      const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
+    for (const floorStr in floorGrouped) {
+      const floor = parseInt(floorStr, 10);
+      const spotIds = floorGrouped[floor];
 
-      if (oldFloor && newFloor.available > oldFloor.available) {
-        NotificationService.showFloorUpdateNotification(
-          newFloor.floor,
-          newFloor.available,
-          newFloor.total,
-          oldFloor.available
-        );
-      }
+      // 1️⃣ OS push notification
+      NotificationService.showSpotAvailableNotification(
+        spotIds.length,
+        floor,
+        spotIds
+      );
+
+      // 2️⃣ In-app overlay entry
+      NotificationService.getNotificationSettings()
+        .then(settings => {
+          if (settings.spotAvailable) {
+            NotificationManager.addSpotAvailableNotification(
+              spotIds.length,
+              floor,
+              spotIds
+            );
+          }
+        })
+        .catch(err => console.error('Error fetching settings:', err));
     }
+  }
+
+  // existing floor update logic...
+  for (const newFloor of newData.floors) {
+    const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
+    if (oldFloor && newFloor.available > oldFloor.available) {
+      NotificationService.showFloorUpdateNotification(
+        newFloor.floor,
+        newFloor.available,
+        newFloor.total,
+        oldFloor.available
+      );
+    }
+  }
 }
+
 
   private notifyParkingUpdate(data: ParkingStats): void {
     for (const callback of this.updateCallbacks) {

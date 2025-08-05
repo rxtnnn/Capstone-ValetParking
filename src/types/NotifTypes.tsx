@@ -50,7 +50,7 @@ export type AppNotification =
   | FeedbackReplyNotification
   | GenericNotification;
 
-// Type guards for safe type checking
+// guards for safe type checking
 export const isSpotAvailableNotification = (notification: AppNotification): notification is SpotAvailableNotification => {
   return notification.type === 'spot_available';
 };
@@ -59,12 +59,11 @@ export const isFeedbackReplyNotification = (notification: AppNotification): noti
   return notification.type === 'feedback_reply';
 };
 
-// Helper function to safely get userId from any notification
 export const getNotificationUserId = (notification: AppNotification): number | undefined => {
   return notification.data?.userId;
 };
 
-// Helper function to set userId on notification data
+//set userId on notification data
 export const setNotificationUserId = (data: any, userId: number | null): any => {
   return {
     ...data,
@@ -72,7 +71,6 @@ export const setNotificationUserId = (data: any, userId: number | null): any => 
   };
 };
 
-// Factory functions for creating typed notifications
 export const createSpotAvailableNotification = (
   title: string,
   message: string,

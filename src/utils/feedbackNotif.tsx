@@ -2,14 +2,9 @@
 import { NotificationManager } from '../services/NotifManager';
 import { FeedbackData } from '../types/feedback';
 
-/**
- * Helper class to integrate feedback replies with notification system
- */
+
 export class FeedbackNotificationHelper {
   
-  /**
-   * Check a single feedback item and create notification if it has a new admin reply
-   */
   static async checkSingleFeedback(feedback: FeedbackData): Promise<boolean> {
     if (!feedback.admin_response || !feedback.responded_at) {
       return false;
@@ -30,9 +25,6 @@ export class FeedbackNotificationHelper {
     }
   }
 
-  /**
-   * Process an array of feedback and create notifications for items with replies
-   */
   static async processFeedbackArray(feedbackArray: FeedbackData[]): Promise<number> {
     let notificationsCreated = 0;
 
@@ -47,9 +39,6 @@ export class FeedbackNotificationHelper {
   }
 
 
-  /**
-   * Simple method to add a feedback reply notification manually
-   */
   static async addFeedbackReply(
     feedbackId: number | undefined,
     originalMessage: string,
@@ -64,18 +53,12 @@ export class FeedbackNotificationHelper {
     );
   }
 
-  /**
-   * Check if a feedback item should trigger a notification
-   */
   static shouldNotify(feedback: FeedbackData): boolean {
     return !!(feedback.admin_response && 
               feedback.admin_response.trim().length > 0 && 
               feedback.responded_at);
   }
 
-  /**
-   * Get notification-worthy feedback items from an array
-   */
   static getNotifiableFeedback(feedbackArray: FeedbackData[]): FeedbackData[] {
     return feedbackArray.filter(feedback => this.shouldNotify(feedback));
   }
