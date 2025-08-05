@@ -602,11 +602,6 @@ const HomeScreen: React.FC = () => {
 
           <View style={styles.occupancyRow}>
             <Text style={styles.occupancyText}>Overall Occupancy</Text>
-            <View style={[styles.liveBadge, { backgroundColor: connectionStatus === 'connected' ? '#48D666' : '#FF9801' }]}>
-              <Text style={styles.liveText}>
-                {connectionStatus === 'connected' ? 'LIVE' : 'OFFLINE'}
-              </Text>
-            </View>
           </View>
         </View>
       </LinearGradient>
@@ -619,11 +614,6 @@ const HomeScreen: React.FC = () => {
         <View style={styles.floorSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Select Floor</Text>
-            <View style={[styles.liveBadge, { backgroundColor: connectionStatus === 'connected' ? '#48D666' : '#FF9801' }]}>
-              <Text style={styles.liveText}>
-                {connectionStatus === 'connected' ? 'LIVE' : 'OFFLINE'}
-              </Text>
-            </View>
           </View>
 
           {floorsToDisplay.map((floor) => {

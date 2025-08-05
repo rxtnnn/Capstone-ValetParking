@@ -5,8 +5,6 @@ export const API_CONFIG = {
   BASE_URL: 'https://valet.up.railway.app/api',
   TIMEOUT: 15000,
 };
-
-// Types matching your API response
 interface LoginResponse {
   success: boolean;
   message: string;
@@ -19,8 +17,6 @@ interface LoginResponse {
     employee_id: string;
   };
 }
-
-// Token and User management with AsyncStorage
 class TokenManager {
   private static token: string | null = null;
   private static user: LoginResponse['user'] | null = null;
@@ -28,7 +24,6 @@ class TokenManager {
   private static initializationPromise: Promise<void> | null = null;
 
   static async initialize(): Promise<void> {
-    // Prevent multiple simultaneous initialization calls
     if (this.isInitialized) return;
     if (this.initializationPromise) return this.initializationPromise;
 
@@ -42,7 +37,7 @@ class TokenManager {
       this.isInitialized = true;
     } catch (error) {
       console.error('Error initializing TokenManager:', error);
-      this.isInitialized = true; // Mark as initialized even on error to prevent loops
+      this.isInitialized = true; 
     } finally {
       this.initializationPromise = null;
     }
@@ -69,7 +64,6 @@ class TokenManager {
     this.user = null;
   }
 
-  // Store both token and user data in AsyncStorage
   static async saveToStorage(token: string, user: LoginResponse['user']): Promise<void> {
     try {
       await Promise.all([
@@ -127,22 +121,18 @@ class TokenManager {
       this.clearToken();
     } catch (error) {
       console.error('Error removing from AsyncStorage:', error);
-      // Even if AsyncStorage fails, clear the in-memory data
       this.clearToken();
     }
   }
 
-  // Check if TokenManager is initialized
   static getInitializationStatus(): boolean {
     return this.isInitialized;
   }
 
-  // Check if user is authenticated
   static isAuthenticated(): boolean {
     return !!(this.token && this.user);
   }
 
-  // Get user info safely
   static getUserInfo(): { id: number | null; name?: string; email?: string; role?: string; employee_id?: string } {
     if (this.user) {
       return {
@@ -156,7 +146,6 @@ class TokenManager {
     return { id: null };
   }
 
-  // Safe initialization check with fallback
   static async ensureInitialized(): Promise<void> {
     if (!this.isInitialized) {
       try {
@@ -167,7 +156,6 @@ class TokenManager {
     }
   }
 
-  // Debug method to get current state
   static getDebugInfo(): any {
     return {
       isInitialized: this.isInitialized,
@@ -179,7 +167,6 @@ class TokenManager {
   }
 }
 
-// Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: API_CONFIG.TIMEOUT,
@@ -189,20 +176,16 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor to add dynamic token
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      // Ensure TokenManager is initialized
       await TokenManager.ensureInitialized();
-      
       const token = TokenManager.getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
       console.warn('Failed to initialize TokenManager in request interceptor:', error);
-      // Continue with request even if token initialization fails
     }
     
     return config;
@@ -213,13 +196,11 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
   },
   async (error) => {
-    // Handle 401 Unauthorized - token might be expired
     if (error.response?.status === 401) {
       console.log('Token expired or invalid, clearing token...');
       try {
@@ -238,7 +219,6 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Login function
 export const login = async (credentials: { email: string; password: string }): Promise<LoginResponse> => {
   try {
     const response = await apiClient.post<LoginResponse>('/login', credentials);
@@ -261,17 +241,14 @@ export const login = async (credentials: { email: string; password: string }): P
   }
 };
 
-// Logout function
 export const logout = async (): Promise<void> => {
   try {
-    // Optional: Call logout endpoint if your API has one
     try {
       await apiClient.post('/logout');
     } catch (apiError) {
       console.warn('Logout API call failed:', apiError);
     }
   } finally {
-    // Always clear token on logout
     try {
       await TokenManager.removeFromStorage();
     } catch (clearError) {
@@ -280,7 +257,6 @@ export const logout = async (): Promise<void> => {
   }
 };
 
-// Safe initialization when module loads
 const initializeTokenManager = async () => {
   try {
     await TokenManager.initialize();
@@ -288,10 +264,7 @@ const initializeTokenManager = async () => {
     console.warn('Initial TokenManager initialization failed, will retry on first use:', error);
   }
 };
-
-// Initialize without blocking module loading
 initializeTokenManager();
 
-// Export token manager for manual token management if needed
 export { TokenManager };
 export default apiClient;

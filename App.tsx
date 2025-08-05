@@ -9,8 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-
-// Import Authentication Provider
 import { AuthProvider } from './src/context/AuthContext';
 
 import SplashScreen from './src/screens/SplashScreen';
@@ -20,7 +18,7 @@ import FeedbackScreen from './src/screens/FeedbackScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
-import { NotificationService } from './src/services/NotificationService';
+import NotificationService from './src/services/NotificationService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
 
@@ -34,7 +32,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Types
 export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
@@ -50,7 +47,6 @@ export type RootStackParamList = {
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-// Custom Gradient Header Component
 const GradientHeader: React.FC<{
   title: string;
   navigation: any;
@@ -59,7 +55,7 @@ const GradientHeader: React.FC<{
   return (
     <LinearGradient colors={['#B22020', '#4C0E0E']} style={{
       height: 100,
-      paddingTop: 50,
+      paddingTop: 30,
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'flex-start',
@@ -68,15 +64,8 @@ const GradientHeader: React.FC<{
       {canGoBack && (
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={{
-            position: 'absolute',
-            left: 5,
-            top: 52,
-            padding: 8,
-            zIndex: 1,
-          }}
-          activeOpacity={0.7}
-        >
+          style={{ position: 'absolute', left: 5, top: 32,
+            padding: 8, zIndex: 1,}} activeOpacity={0.7} >
           <Ionicons name="chevron-back" size={24} color="white" />
         </TouchableOpacity>
       )}
@@ -97,41 +86,47 @@ const GradientHeader: React.FC<{
 
 const AppNavigator: React.FC = () => {
   useEffect(() => {
-    registerForPushNotificationsAsync();
-    
-    // Initialize notification service
-    NotificationService.initialize();
+    const initializeApp = async () => {
+      try {
+        await registerForPushNotificationsAsync();
+        await NotificationService.initialize();
+      } catch (error) {
+        console.error('Error during app initialization:', error);
+      }
+    };
 
-    // Listen for notification interactions
+    initializeApp();
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received:', notification);
     });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification response:', response);
-      Alert.alert('Parking Update', 'Notification tapped!');
-    });
-
-    // 🔥 FIXED: Welcome notification using the simple method
-    const welcomeTimer = setTimeout(async () => {
-      try {
-        await NotificationService.showSimpleNotification(
-          'VALET Connected! ',
-          'Your parking assistant is ready to help you find spots.',
-          { 
-            type: 'welcome',
-            timestamp: Date.now()
-          }
+      const notificationData = response.notification.request.content.data;
+      if (notificationData?.type === 'spot-available') {
+        Alert.alert(
+          'Parking Spot Available!', 
+          'Tap OK to view the parking map.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'View Map', onPress: () => ('Navigate to parking map') }
+          ]
         );
-      } catch (error) {
-        console.error('Error showing welcome notification:', error);
+      } else if (notificationData?.type === 'feedback-reply') {
+        Alert.alert(
+          'Admin Reply Received',
+          'You have a new reply to your feedback.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'View Reply', onPress: () => ('Navigate to feedback replies') }
+          ]
+        );
+      } else {
+        Alert.alert('VALET Notification', 'Notification received!');
       }
-    }, 5000); // Increased delay
+    });
 
     return () => {
       Notifications.removeNotificationSubscription(notificationListener);
       Notifications.removeNotificationSubscription(responseListener);
-      clearTimeout(welcomeTimer);
     };
   }, []);
 
@@ -141,7 +136,7 @@ const AppNavigator: React.FC = () => {
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
-          headerShown: false, // We'll use custom headers
+          headerShown: false,
         }}
       >
         <Stack.Screen 
@@ -246,7 +241,7 @@ const App: React.FC = () => {
   );
 };
 
-async function registerForPushNotificationsAsync() {
+async function registerForPushNotificationsAsync(): Promise<string | undefined> {
   let token;
 
   if (Platform.OS === 'android') {
@@ -268,22 +263,21 @@ async function registerForPushNotificationsAsync() {
     }
     
     if (finalStatus !== 'granted') {
-      alert('Failed to get push token for push notification!');
+      console.warn('Push notification permissions not granted');
       return;
     }
     
     try {
-      token = await Notifications.getExpoPushTokenAsync({
+      const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig?.extra?.eas?.projectId,
       });
+      token = tokenData.data;
     } catch (error) {
-      console.log('Error getting push token:', error);
+      console.error('Error getting push token:', error);
     }
   } else {
-    alert('Must use physical device for Push Notifications');
+    console.warn('Must use physical device for Push Notifications');
   }
-
-  return token?.data;
+  return token;
 }
-
 export default App;

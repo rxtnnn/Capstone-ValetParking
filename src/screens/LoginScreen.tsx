@@ -7,11 +7,11 @@ import {
   StatusBar,
   SafeAreaView,
   Image,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -25,12 +25,44 @@ const ALERT_MESSAGES = {
   INVALID_EMAIL: 'Please enter a valid email address',
   PASSWORD_REQUIRED: 'Please enter your password',
   LOGIN_FAILED: 'Login Failed',
+  LOGIN_FAILED_MSG: 'Invalid email or password. Please try again.',
   LOGIN_ERROR: 'Login Error',
   UNEXPECTED_ERROR: 'An unexpected error occurred. Please try again.',
   FORGOT_PASSWORD: 'Forgot Password',
   FORGOT_PASSWORD_MSG: 'Please contact your administrator to reset your password.',
   CREATE_ACCOUNT: 'Create Account',
   CREATE_ACCOUNT_MSG: 'New accounts are created by administrators only. Please contact your administrator for access.',
+};
+interface CustomAlertProps {
+  visible: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+  buttonText?: string;
+}
+
+const CustomAlert: React.FC<CustomAlertProps> = ({ visible, title, message, onClose, buttonText = "Cool!" }) => {
+  return (
+    <Modal
+      transparent={true}
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.overlay}>
+        <View style={styles.alertcontainer}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.message}>{message}</Text>
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={onClose}
+          >
+            <Text style={styles.buttonText}>{buttonText}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 };
 
 const LoginScreen: React.FC = () => {
@@ -40,8 +72,24 @@ const LoginScreen: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtonText, setAlertButtonText] = useState('Cool!');
+  
   const navigation = useNavigation();
   const { login, isAuthenticated, loading, error, clearError } = useAuth();
+
+  const showCustomAlert = useCallback((title: React.SetStateAction<string>, message: React.SetStateAction<string>, buttonText = 'Cool!')  => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertButtonText(buttonText);
+    setAlertVisible(true);
+  }, []);
+
+  const hideCustomAlert = useCallback(() => {
+    setAlertVisible(false);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && !loading) {
@@ -59,19 +107,19 @@ const LoginScreen: React.FC = () => {
 
   const validateForm = useCallback((): boolean => {
     if (!email.trim()) {
-      Alert.alert('Error', ALERT_MESSAGES.EMAIL_REQUIRED);
+      showCustomAlert('Error', ALERT_MESSAGES.EMAIL_REQUIRED, 'OK');
       return false;
     }
     if (!EMAIL_REGEX.test(email.trim())) {
-      Alert.alert('Error', ALERT_MESSAGES.INVALID_EMAIL);
+      showCustomAlert('Error', ALERT_MESSAGES.INVALID_EMAIL, 'OK');
       return false;
     }
     if (!password.trim()) {
-      Alert.alert('Error', ALERT_MESSAGES.PASSWORD_REQUIRED);
+      showCustomAlert('Error', ALERT_MESSAGES.PASSWORD_REQUIRED, 'OK');
       return false;
     }
     return true;
-  }, [email, password]);
+  }, [email, password, showCustomAlert]);
 
   const handleLogin = useCallback(async () => {
     if (!validateForm()) return;
@@ -89,38 +137,37 @@ const LoginScreen: React.FC = () => {
         setEmail('');
         setPassword('');
       } else {
-        Alert.alert(
-          ALERT_MESSAGES.LOGIN_FAILED,
-          result.message || 'Invalid email or password. Please try again.',
-          [{ text: 'OK' }]
+        showCustomAlert(
+          ALERT_MESSAGES.LOGIN_FAILED, ALERT_MESSAGES.LOGIN_FAILED_MSG,
+          'Try Again'
         );
       }
     } catch (error) {
-      Alert.alert(
+      showCustomAlert(
         ALERT_MESSAGES.LOGIN_ERROR,
         ALERT_MESSAGES.UNEXPECTED_ERROR,
-        [{ text: 'OK' }]
+        'OK'
       );
     } finally {
       setIsSubmitting(false);
     }
-  }, [validateForm, clearError, login, email, password]);
+  }, [validateForm, clearError, login, email, password, showCustomAlert]);
 
   const handleForgotPassword = useCallback(() => {
-    Alert.alert(
+    showCustomAlert(
       ALERT_MESSAGES.FORGOT_PASSWORD,
       ALERT_MESSAGES.FORGOT_PASSWORD_MSG,
-      [{ text: 'OK' }]
+      'Got it!'
     );
-  }, []);
+  }, [showCustomAlert]);
 
   const handleCreateAccount = useCallback(() => {
-    Alert.alert(
+    showCustomAlert(
       ALERT_MESSAGES.CREATE_ACCOUNT,
       ALERT_MESSAGES.CREATE_ACCOUNT_MSG,
-      [{ text: 'OK' }]
+      'Understood'
     );
-  }, []);
+  }, [showCustomAlert]);
 
   const toggleShowPassword = useCallback(() => {
     setShowPassword(prev => !prev);
@@ -225,7 +272,7 @@ const LoginScreen: React.FC = () => {
                 </TouchableOpacity>
                 
                 <TouchableOpacity onPress={handleForgotPassword} disabled={isSubmitting}>
-                  <Text style={styles.forgotPasswordText}>Forgot Password ?</Text>
+                  <Text style={styles.forgotPasswordText}>Forgot Password</Text>
                 </TouchableOpacity>
               </View>
 
@@ -260,6 +307,15 @@ const LoginScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttonText={alertButtonText}
+        onClose={hideCustomAlert}
+      />
     </SafeAreaView>
   );
 };

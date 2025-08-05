@@ -1,4 +1,3 @@
-// src/services/RealTimeParkingService.ts
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
 export interface ParkingSpace {
@@ -10,7 +9,6 @@ export interface ParkingSpace {
   updated_at: string;
   floor_level: string; 
 }
-
 export interface ParkingStats {
   totalSpots: number;
   availableSpots: number;
@@ -60,10 +58,8 @@ class RealTimeParkingServiceClass {
     this.shouldStop = false;
     this.consecErrors = 0;
     this.retryCount = 0;
-    
     this.fetchAndUpdate();
-    
-    // Set up interval
+
     this.updateInterval = setInterval(() => {
       if (!this.shouldStop && this.isRunning && !this.isFetching) {
         this.fetchAndUpdate();
@@ -77,7 +73,7 @@ class RealTimeParkingServiceClass {
     this.shouldStop = true;
     this.isRunning = false;
     
-    if (this.fetchController) {  // Cancel any ongoing request
+    if (this.fetchController) { 
       this.fetchController.abort();
       this.fetchController = null;
     }
@@ -92,12 +88,9 @@ class RealTimeParkingServiceClass {
   }
 
   setRefreshRate(intervalMs: number): void {
-    // Clamp to safe range
     intervalMs = Math.max(2000, Math.min(60000, intervalMs));
     
     this.updateIntervalMs = intervalMs;
-
-    // Restart with new interval if currently running
     if (this.isRunning && this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = setInterval(() => {
@@ -345,14 +338,12 @@ class RealTimeParkingServiceClass {
       const floor = parseInt(floorStr, 10);
       const spotIds = floorGrouped[floor];
 
-      // 1️⃣ OS push notification
       NotificationService.showSpotAvailableNotification(
         spotIds.length,
         floor,
         spotIds
       );
 
-      // 2️⃣ In-app overlay entry
       NotificationService.getNotificationSettings()
         .then(settings => {
           if (settings.spotAvailable) {
