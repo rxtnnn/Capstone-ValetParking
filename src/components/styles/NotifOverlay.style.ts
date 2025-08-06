@@ -11,8 +11,8 @@ export const styles = StyleSheet.create({
   container: {
     backgroundColor: 'white',
     borderRadius: 16,
-    maxHeight: '90%',
-    minHeight: 450,
+    maxHeight: '100%',
+    minHeight: 600,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -75,7 +75,7 @@ export const styles = StyleSheet.create({
   },
   notificationsList: {
     flex: 1,
-    maxHeight: 300,
+    maxHeight: 410,
   },
   swipeContainer: {
     position: 'relative',
@@ -247,11 +247,13 @@ export const styles = StyleSheet.create({
   },
   markAllReadButton: {
     backgroundColor: '#f8f9fa',
-    paddingVertical: 12,
+    paddingVertical: 20,
     paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
     alignItems: 'center',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   markAllReadText: {
     fontSize: 14,

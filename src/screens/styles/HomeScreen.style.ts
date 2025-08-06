@@ -277,10 +277,10 @@ export const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     backgroundColor: '#333',
-    paddingVertical: 12,
+    paddingVertical: 15,
     paddingHorizontal: 40,
     marginHorizontal: 40,
-    marginBottom: 20,
+    marginBottom: 40,
     borderRadius: 25,
     justifyContent: 'space-around',
   },

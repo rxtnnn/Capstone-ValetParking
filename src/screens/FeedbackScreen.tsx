@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,10 +27,10 @@ import ApiService from '../services/ApiService';
 import { useFeedback } from '../hooks/useFeedback';
 import { FeedbackData, FEEDBACK_CATEGORIES } from '../types/feedback';
 import { getBasicDeviceInfo } from '../utils/deviceInfo';
-import { styles } from './styles/FeedbackScreen.style';
 import { NotificationManager } from '../services/NotifManager';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { createResponsiveStyles, createCustomAlertStyles } from './styles/FeedbackScreen.style';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -70,6 +71,9 @@ interface CustomAlertProps {
 }
 
 const CustomAlert: React.FC<CustomAlertProps> = React.memo(({ visible, title, message, buttons, onClose }) => {
+  const { width, height } = useWindowDimensions();
+  const alertStyles = createCustomAlertStyles(width, height);
+
   if (!visible) return null;
 
   return (
@@ -79,23 +83,20 @@ const CustomAlert: React.FC<CustomAlertProps> = React.memo(({ visible, title, me
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.alertOverlay}>
-        <View style={styles.alertContainer}>
-          <View style={styles.alertIconContainer}>
-          </View>
+      <View style={alertStyles.overlay}>
+        <View style={alertStyles.container}>
+          <Text style={alertStyles.title}>{title}</Text>
+          <Text style={alertStyles.message}>{message}</Text>
           
-          <Text style={styles.alertTitle}>{title}</Text>
-          <Text style={styles.alertMessage}>{message}</Text>
-          
-          <View style={styles.alertButtonContainer}>
+          <View style={alertStyles.buttonContainer}>
             {buttons.map((button, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
-                  styles.alertButton,
-                  button.style === 'cancel' && styles.alertCancelButton,
-                  buttons.length === 1 && styles.alertSingleButton,
-                  index === 0 && buttons.length > 1 && styles.alertPrimaryButton,
+                  alertStyles.button,
+                  button.style === 'cancel' && alertStyles.cancelButton,
+                  buttons.length === 1 && alertStyles.singleButton,
+                  index === 0 && buttons.length > 1 && alertStyles.primaryButton,
                 ]}
                 onPress={() => {
                   button.onPress?.();
@@ -104,9 +105,9 @@ const CustomAlert: React.FC<CustomAlertProps> = React.memo(({ visible, title, me
                 activeOpacity={0.8}
               >
                 <Text style={[
-                  styles.alertButtonText,
-                  button.style === 'cancel' && styles.alertCancelButtonText,
-                  index === 0 && buttons.length > 1 && styles.alertPrimaryButtonText,
+                  alertStyles.buttonText,
+                  button.style === 'cancel' && alertStyles.cancelButtonText,
+                  index === 0 && buttons.length > 1 && alertStyles.primaryButtonText,
                 ]}>
                   {button.text}
                 </Text>
@@ -185,8 +186,6 @@ const DEFAULT_DEVICE_INFO = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Pre-cache device info globally to avoid repeated calls
 let globalDeviceInfo: any = null;
 let deviceInfoPromise: Promise<any> | null = null;
 
@@ -212,6 +211,19 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const route = useRoute<FeedbackRouteProp>();
   const { showReplies: initialShowReplies } = route.params || {};
   const { logout, isAuthenticated } = useAuth();
+  const { width, height } = useWindowDimensions();
+  const responsiveStyles = useMemo(() => createResponsiveStyles(width, height), [width, height]);
+  const isSmallScreen = width < 360;
+  const isLargeScreen = width >= 410;
+  const isTablet = width >= 768;
+
+  const getResponsiveSize = useCallback((small: number, medium: number, large: number, tablet: number) => {
+    if (isTablet) return tablet;
+    if (isLargeScreen) return large;
+    if (isSmallScreen) return small;
+    return medium; 
+  }, [isSmallScreen, isLargeScreen, isTablet]);
+
   const mountedRef = useRef(true);
   const lastRefreshTime = useRef(0);
   const [showReplies, setShowReplies] = useState(false);
@@ -223,7 +235,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Submission cache to prevent double submissions and cache device info
   const submissionCache = useRef<{
     isSubmitting: boolean;
     lastSubmissionTime: number;
@@ -234,7 +245,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     deviceInfo: null
   });
 
-  // Custom alert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState<{
     title: string;
@@ -271,7 +281,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [initialShowReplies, setShowReplies]);
 
-  // Pre-load device info immediately when component mounts
   useEffect(() => {
     getDeviceInfoOnce().then(info => {
       if (mountedRef.current) {
@@ -280,7 +289,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     });
   }, []);
 
-  // Memoize filtered feedback with better caching
   const feedbackWithReplies = useMemo(() => {
     if (!feedback || feedback.length === 0) return [];
     
@@ -290,7 +298,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     );
   }, [feedback, currentUserId]);
 
-  // Memoize common issues to prevent recalculation
   const currentTypeIssues = useMemo(() => 
     getCommonIssuesForType(feedbackType), [feedbackType]);
 
@@ -429,13 +436,10 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     setFeedbackType('general');
   }, []);
 
-  // Optimized submission with minimal blocking operations
   const handleSubmit = useCallback(async () => {
     if (!validateForm() || submissionCache.current.isSubmitting || !mountedRef.current) {
       return;
     }
-
-    // Prevent double submissions
     const now = Date.now();
     if (now - submissionCache.current.lastSubmissionTime < 2000) {
       return;
@@ -446,41 +450,24 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Use cached device info or fallback immediately
       const deviceInfo = submissionCache.current.deviceInfo || DEFAULT_DEVICE_INFO;
-
-      // Build minimal payload to reduce bridge overhead
       const feedbackData: Omit<FeedbackData, 'id' | 'status' | 'created_at' | 'user_id'> = {
-        type: feedbackType,                 // now one of the four allowed literals
+        type: feedbackType,
         message: message.trim(),
-
-        // only include optional fields when present
         ...(feedbackType === 'general' && rating > 0 && { rating }),
         ...(email.trim() && { email: email.trim() }),
         ...(selectedIssues.length > 0 && { issues: selectedIssues }),
-
-        // minimal device info
         device_info: {
           platform: deviceInfo.platform,
           model:    deviceInfo.model,
           version:  deviceInfo.appVersion,
         },
-
-        // only add parking_location for parking_experience
         ...(feedbackType === 'parking' && { parking_location: 'Mobile App Feedback' }),
       };
 
-
-      // Submit with timeout to prevent hanging
-      const submitPromise = ApiService.submitFeedback(feedbackData);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Submission timeout')), 15000)
-      );
-      
-       const feedbackId = await ApiService.submitFeedback(feedbackData);
+      const feedbackId = await ApiService.submitFeedback(feedbackData);
       
       if (feedbackId && mountedRef.current) {
-        // Immediate UI feedback - don't wait for refresh
         resetForm();
         
         showCustomAlert(
@@ -491,8 +478,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             { text: 'Done', style: 'cancel', onPress: () => navigation.goBack() }
           ]
         );
-
-        // Refresh in background - don't block UI
         setTimeout(async () => {
           if (mountedRef.current) {
             try {
@@ -510,8 +495,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       console.error('Error submitting feedback:', error);
       
       if (!mountedRef.current) return;
-      
-      // Fast error handling
       let errorMessage = 'We couldn\'t submit your feedback. Please try again.';
       let retryAction = () => handleSubmit();
       
@@ -559,18 +542,16 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     currentUserId
   ]);
 
-  // Optimized refresh that doesn't block other operations
   const onRefresh = useCallback(async () => {
     if (refreshing || !mountedRef.current) return;
     
     const now = Date.now();
-    if (now - lastRefreshTime.current < 1000) return; // Reduced debounce
+    if (now - lastRefreshTime.current < 1000) return; 
     
     lastRefreshTime.current = now;
     setRefreshing(true);
     
     try {
-      // Parallel execution with shorter timeout
       const refreshPromise = Promise.race([
         Promise.allSettled([
           refreshFeedback(),
@@ -582,7 +563,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
       await refreshPromise;
     } catch (error: any) {
-      // Don't show errors for refresh operations - fail silently
       console.error('Refresh error:', error);
     } finally {
       if (mountedRef.current) {
@@ -591,138 +571,135 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [refreshing, refreshFeedback, currentUserId, checkForNewReplies]);
 
-  // Memoized star rating component
   const renderStarRating = useMemo(() => (
-    <View style={styles.ratingContainer}>
-      <Text style={styles.ratingLabel}>Rate your experience</Text>
-      <View style={styles.starsContainer}>
+    <View style={responsiveStyles.ratingContainer}>
+      <Text style={responsiveStyles.ratingLabel}>Rate your experience</Text>
+      <View style={responsiveStyles.starsContainer}>
         {[1, 2, 3, 4, 5].map((star) => (
           <TouchableOpacity
             key={star}
             onPress={() => setRating(star)}
-            style={styles.starButton}
+            style={responsiveStyles.starButton}
             activeOpacity={0.7}
           >
             <Ionicons
               name={star <= rating ? 'star' : 'star-outline'}
-              size={28}
+              size={getResponsiveSize(24, 28, 30, 32)}
               color={star <= rating ? '#FFD700' : '#E5E7EB'}
             />
           </TouchableOpacity>
         ))}
       </View>
       {rating > 0 && (
-        <Text style={styles.ratingFeedback}>
+        <Text style={responsiveStyles.ratingFeedback}>
           {RATING_LABELS[rating - 1]}
         </Text>
       )}
     </View>
-  ), [rating]);
+  ), [rating, responsiveStyles, getResponsiveSize]);
 
-  // Memoized reply item component
   const ReplyItem = React.memo(({ item, index }: { item: FeedbackData; index: number }) => (
-    <View key={`${item.id}-${index}`} style={styles.replyCard}>
-      <View style={styles.replyHeader}>
-        <View style={styles.replyTypeContainer}>
+    <View key={`${item.id}-${index}`} style={responsiveStyles.replyCard}>
+      <View style={responsiveStyles.replyHeader}>
+        <View style={responsiveStyles.replyTypeContainer}>
           <Ionicons 
             name={getTypeIcon(item.type) as any} 
-            size={16} 
+            size={getResponsiveSize(14, 16, 17, 18)} 
             color="#B22020" 
           />
-          <Text style={styles.replyTypeText}>
+          <Text style={responsiveStyles.replyTypeText}>
             {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
           </Text>
         </View>
         <View style={[
-          styles.replyStatus,
+          responsiveStyles.replyStatus,
           { backgroundColor: getStatusColor(item.status || 'pending') }
         ]}>
-          <Text style={styles.replyStatusText}>
+          <Text style={responsiveStyles.replyStatusText}>
             {(item.status || 'pending').charAt(0).toUpperCase() + (item.status || 'pending').slice(1)}
           </Text>
         </View>
       </View>
 
-      <View style={styles.originalFeedback}>
-        <Text style={styles.originalLabel}>Your feedback:</Text>
-        <Text style={styles.originalText} numberOfLines={2}>
+      <View style={responsiveStyles.originalFeedback}>
+        <Text style={responsiveStyles.originalLabel}>Your feedback:</Text>
+        <Text style={responsiveStyles.originalText} numberOfLines={2}>
           {item.message}
         </Text>
       </View>
 
-      <View style={styles.adminResponse}>
-        <View style={styles.adminHeader}>
-          <Ionicons name="shield-checkmark" size={16} color="#059669" />
-          <Text style={styles.adminLabel}>Admin Response</Text>
+      <View style={responsiveStyles.adminResponse}>
+        <View style={responsiveStyles.adminHeader}>
+          <Ionicons name="shield-checkmark" size={getResponsiveSize(14, 16, 17, 18)} color="#059669" />
+          <Text style={responsiveStyles.adminLabel}>Admin Response</Text>
           {item.responded_at && (
-            <Text style={styles.responseTime}>
+            <Text style={responsiveStyles.responseTime}>
               {formatTimeAgo(item.responded_at)}
             </Text>
           )}
         </View>
-        <Text style={styles.adminText}>
+        <Text style={responsiveStyles.adminText}>
           {item.admin_response}
         </Text>
       </View>
 
       {item.rating && item.type === 'general' && (
-        <View style={styles.ratingDisplay}>
-          <Text style={styles.ratingDisplayLabel}>Your rating: </Text>
+        <View style={responsiveStyles.ratingDisplay}>
+          <Text style={responsiveStyles.ratingDisplayLabel}>Your rating: </Text>
           {[1, 2, 3, 4, 5].map((star) => (
             <Ionicons
               key={star}
               name={star <= item.rating! ? 'star' : 'star-outline'}
-              size={12}
+              size={getResponsiveSize(10, 12, 13, 14)}
               color={star <= item.rating! ? '#FFD700' : '#E5E7EB'}
             />
           ))}
-          <Text style={styles.ratingDisplayValue}>({item.rating}/5)</Text>
+          <Text style={responsiveStyles.ratingDisplayValue}>({item.rating}/5)</Text>
         </View>
       )}
     </View>
   ));
 
-  // Memoized submit button to prevent re-renders
   const SubmitButton = useMemo(() => (
     <TouchableOpacity
       onPress={handleSubmit}
       disabled={loading || submissionCache.current.isSubmitting}
-      style={[styles.submitButton, loading && styles.disabledButton]}
+      style={[responsiveStyles.submitButton, loading && responsiveStyles.disabledButton]}
       activeOpacity={0.8}
     >
       <LinearGradient
         colors={loading ? ['#9CA3AF', '#6B7280'] : ['#B22020', '#8B1917']}
-        style={styles.submitGradient}
+        style={responsiveStyles.submitGradient}
       >
         {loading ? (
           <ActivityIndicator size="small" color="white" />
         ) : (
-          <Ionicons name="send" size={18} color="white" />
+          <Ionicons name="send" size={getResponsiveSize(16, 18, 19, 20)} color="white" />
         )}
-        <Text style={styles.submitText}>
+        <Text style={responsiveStyles.submitText}>
           {loading ? 'Submitting...' : 'Submit Feedback'}
         </Text>
       </LinearGradient>
     </TouchableOpacity>
-  ), [loading, handleSubmit]);
+  ), [loading, handleSubmit, responsiveStyles, getResponsiveSize]);
 
   const renderAdminReplies = useMemo(() => {
     if (feedbackWithReplies.length === 0) {
       return (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#B22020" />
+        <View style={responsiveStyles.emptyContainer}>
+          <View style={responsiveStyles.emptyIconContainer}>
+            <Ionicons name="chatbubbles-outline" size={getResponsiveSize(40, 48, 50, 56)} color="#B22020" />
           </View>
-          <Text style={styles.emptyTitle}>No replies yet</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={responsiveStyles.emptyTitle}>No replies yet</Text>
+          <Text style={responsiveStyles.emptySubtitle}>
             Admin responses to your feedback will appear here.{'\n'}
             You'll receive notifications when we reply!
           </Text>
           <TouchableOpacity 
-            style={styles.emptyAction}
+            style={responsiveStyles.emptyAction}
             onPress={() => setShowReplies(false)}
           >
-            <Text style={styles.emptyActionText}>Submit New Feedback</Text>
+            <Text style={responsiveStyles.emptyActionText}>Submit New Feedback</Text>
           </TouchableOpacity>
         </View>
       );
@@ -730,7 +707,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
     return (
       <ScrollView 
-        style={styles.repliesContainer}
+        style={responsiveStyles.repliesContainer}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -740,7 +717,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           />
         }
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.repliesContent}
+        contentContainerStyle={responsiveStyles.repliesContent}
         removeClippedSubviews={true}
       >
         {feedbackWithReplies.map((item, index) => (
@@ -748,19 +725,18 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         ))}
       </ScrollView>
     );
-  }, [feedbackWithReplies, refreshing, onRefresh]);
+  }, [feedbackWithReplies, refreshing, onRefresh, responsiveStyles, getResponsiveSize]);
 
-  // Show loading if fonts are not loaded
   if (!fontsLoaded) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[responsiveStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#B22020" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={responsiveStyles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B22020" />
       
       <CustomAlert
@@ -771,55 +747,55 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         onClose={() => setAlertVisible(false)}
       />
       
-      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
-        <View style={styles.headerTop}>
+      <LinearGradient colors={['#B22020', '#4C0E0E']} style={responsiveStyles.header}>
+        <View style={responsiveStyles.headerTop}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()} 
-            style={styles.backButton}
+            style={responsiveStyles.backButton}
           >
-            <Ionicons name="chevron-back" size={24} color="white" />
+            <Ionicons name="chevron-back" size={getResponsiveSize(20, 24, 25, 28)} color="white" />
           </TouchableOpacity>
           
-          <Text style={styles.headerTitle}>Feedback</Text>
+          <Text style={responsiveStyles.headerTitle}>Feedback</Text>
           
           <TouchableOpacity 
             onPress={() => setShowReplies(!showReplies)}
-            style={styles.toggleButton}
+            style={responsiveStyles.toggleButton}
           >
             <Ionicons 
               name={showReplies ? "create-outline" : "chatbubbles-outline"} 
-              size={20} 
+              size={getResponsiveSize(18, 20, 21, 24)} 
               color="white" 
             />
             {feedbackWithReplies.length > 0 && !showReplies && (
-              <View style={styles.badgeContainer}>
-                <Text style={styles.badgeText}>{feedbackWithReplies.length}</Text>
+              <View style={responsiveStyles.badgeContainer}>
+                <Text style={responsiveStyles.badgeText}>{feedbackWithReplies.length}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
         
-        <Text style={styles.headerSubtitle}>
+        <Text style={responsiveStyles.headerSubtitle}>
           {showReplies 
             ? 'View admin responses to your feedback'
             : 'Help us improve VALET with your insights'
           }
         </Text>
 
-        <View style={styles.tabContainer}>
+        <View style={responsiveStyles.tabContainer}>
           <TouchableOpacity 
-            style={[styles.tab, !showReplies && styles.activeTab]}
+            style={[responsiveStyles.tab, !showReplies && responsiveStyles.activeTab]}
             onPress={() => setShowReplies(false)}
           >
-            <Text style={[styles.tabText, !showReplies && styles.activeTabText]}>
+            <Text style={[responsiveStyles.tabText, !showReplies && responsiveStyles.activeTabText]}>
               New Feedback
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.tab, showReplies && styles.activeTab]}
+            style={[responsiveStyles.tab, showReplies && responsiveStyles.activeTab]}
             onPress={() => setShowReplies(true)}
           >
-            <Text style={[styles.tabText, showReplies && styles.activeTabText]}>
+            <Text style={[responsiveStyles.tabText, showReplies && responsiveStyles.activeTabText]}>
               Replies {feedbackWithReplies.length > 0 && `(${feedbackWithReplies.length})`}
             </Text>
           </TouchableOpacity>
@@ -830,49 +806,49 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         renderAdminReplies
       ) : (
         <KeyboardAvoidingView
-          style={styles.contentContainer}
+          style={responsiveStyles.contentContainer}
           behavior={Platform.OS === 'android' ? 'padding' : 'height'}
         >
           <ScrollView 
-            style={styles.scrollContainer} 
+            style={responsiveStyles.scrollContainer} 
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={responsiveStyles.scrollContent}
             removeClippedSubviews={true}
             keyboardShouldPersistTaps="handled"
           >
             
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What would you like to share?</Text>
-              <View style={styles.typeGrid}>
+            <View style={responsiveStyles.section}>
+              <Text style={responsiveStyles.sectionTitle}>What would you like to share?</Text>
+              <View style={responsiveStyles.typeGrid}>
                 {FEEDBACK_TYPES.map((type) => (
                   <TouchableOpacity
                     key={type.value}
                     style={[
-                      styles.typeCard,
-                      feedbackType === type.value && styles.selectedTypeCard
+                      responsiveStyles.typeCard,
+                      feedbackType === type.value && responsiveStyles.selectedTypeCard
                     ]}
                     onPress={() => setFeedbackType(type.value)}
                     activeOpacity={0.8}
                   >
                     <View style={[
-                      styles.typeIcon,
-                      feedbackType === type.value && styles.selectedTypeIcon
+                      responsiveStyles.typeIcon,
+                      feedbackType === type.value && responsiveStyles.selectedTypeIcon
                     ]}>
                       <Ionicons 
                         name={type.icon as any} 
-                        size={20} 
+                        size={getResponsiveSize(18, 20, 21, 24)} 
                         color={feedbackType === type.value ? 'white' : '#B22020'} 
                       />
                     </View>
                     <Text style={[
-                      styles.typeLabel,
-                      feedbackType === type.value && styles.selectedTypeLabel
+                      responsiveStyles.typeLabel,
+                      feedbackType === type.value && responsiveStyles.selectedTypeLabel
                     ]}>
                       {type.label}
                     </Text>
                     <Text style={[
-                      styles.typeDescription,
-                      feedbackType === type.value && styles.selectedTypeDescription
+                      responsiveStyles.typeDescription,
+                      feedbackType === type.value && responsiveStyles.selectedTypeDescription
                     ]}>
                       {type.description}
                     </Text>
@@ -882,33 +858,33 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             {feedbackType === 'general' && (
-              <View style={styles.section}>
-                <View style={styles.card}>
+              <View style={responsiveStyles.section}>
+                <View style={responsiveStyles.card}>
                   {renderStarRating}
                 </View>
               </View>
             )}
             
             {currentTypeIssues.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Related Issues</Text>
-                <Text style={styles.sectionSubtitle}>
+              <View style={responsiveStyles.section}>
+                <Text style={responsiveStyles.sectionTitle}>Related Issues</Text>
+                <Text style={responsiveStyles.sectionSubtitle}>
                   Select any that apply (optional)
                 </Text>
-                <View style={styles.card}>
-                  <View style={styles.chipsContainer}>
+                <View style={responsiveStyles.card}>
+                  <View style={responsiveStyles.chipsContainer}>
                     {currentTypeIssues.map((issue) => (
                       <TouchableOpacity
                         key={issue}
                         style={[
-                          styles.chip,
-                          selectedIssues.includes(issue) && styles.selectedChip
+                          responsiveStyles.chip,
+                          selectedIssues.includes(issue) && responsiveStyles.selectedChip
                         ]}
                         onPress={() => handleIssueToggle(issue)}
                       >
                         <Text style={[
-                          styles.chipText,
-                          selectedIssues.includes(issue) && styles.selectedChipText
+                          responsiveStyles.chipText,
+                          selectedIssues.includes(issue) && responsiveStyles.selectedChipText
                         ]}>
                           {issue}
                         </Text>
@@ -919,40 +895,40 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Your Message</Text>
-              <Text style={styles.sectionSubtitle}>
+            <View style={responsiveStyles.section}>
+              <Text style={responsiveStyles.sectionTitle}>Your Message</Text>
+              <Text style={responsiveStyles.sectionSubtitle}>
                 Share your detailed feedback
               </Text>
-              <View style={styles.card}>
+              <View style={responsiveStyles.card}>
                 <TextInput
                   placeholder={getPlaceholderText()}
                   value={message}
                   onChangeText={setMessage}
                   multiline
                   numberOfLines={4}
-                  style={styles.textInput}
+                  style={responsiveStyles.textInput}
                   placeholderTextColor="#9CA3AF"
                   textAlignVertical="top"
                   maxLength={1000}
                 />
-                <View style={styles.inputFooter}>
-                  <Text style={styles.characterCount}>
+                <View style={responsiveStyles.inputFooter}>
+                  <Text style={responsiveStyles.characterCount}>
                     {message.length}/1000
                   </Text>
-                  <Text style={styles.requiredIndicator}>Required</Text>
+                  <Text style={responsiveStyles.requiredIndicator}>Required</Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Email (Optional)</Text>
-              <Text style={styles.sectionSubtitle}>
+            <View style={responsiveStyles.section}>
+              <Text style={responsiveStyles.sectionTitle}>Email (Optional)</Text>
+              <Text style={responsiveStyles.sectionSubtitle}>
                 For follow-up responses
               </Text>
-              <View style={styles.emailInputCard}>
-                <View style={styles.emailInputContainer}>
-                  <Ionicons name="mail-outline" size={18} color="#6B7280" />
+              <View style={responsiveStyles.emailInputCard}>
+                <View style={responsiveStyles.emailInputContainer}>
+                  <Ionicons name="mail-outline" size={getResponsiveSize(16, 18, 19, 20)} color="#6B7280" />
                   <TextInput
                     placeholder="your.email@example.com"
                     value={email}
@@ -960,7 +936,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
-                    style={styles.emailInput}
+                    style={responsiveStyles.emailInput}
                     placeholderTextColor="#9CA3AF"
                     maxLength={100}
                   />
@@ -968,27 +944,27 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             </View>
 
-            <View style={styles.submitContainer}>
+            <View style={responsiveStyles.submitContainer}>
               {SubmitButton}
             </View>
 
-            <View style={styles.section}>
-              <View style={styles.contactCard}>
-                <View style={styles.contactHeader}>
-                  <Ionicons name="headset" size={20} color="#B22020" />
-                  <Text style={styles.contactTitle}>Need immediate help?</Text>
+            <View style={responsiveStyles.section}>
+              <View style={responsiveStyles.contactCard}>
+                <View style={responsiveStyles.contactHeader}>
+                  <Ionicons name="headset" size={getResponsiveSize(18, 20, 21, 24)} color="#B22020" />
+                  <Text style={responsiveStyles.contactTitle}>Need immediate help?</Text>
                 </View>
-                <Text style={styles.contactSubtitle}>
+                <Text style={responsiveStyles.contactSubtitle}>
                   Contact support for urgent issues
                 </Text>
-                <View style={styles.contactOptions}>
-                  <TouchableOpacity style={styles.contactOption}>
-                    <Ionicons name="mail" size={14} color="#6B7280" />
-                    <Text style={styles.contactText}>support@valet-parking.com</Text>
+                <View style={responsiveStyles.contactOptions}>
+                  <TouchableOpacity style={responsiveStyles.contactOption}>
+                    <Ionicons name="mail" size={getResponsiveSize(12, 14, 15, 16)} color="#6B7280" />
+                    <Text style={responsiveStyles.contactText}>support@valet-parking.com</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.contactOption}>
-                    <Ionicons name="call" size={14} color="#6B7280" />
-                    <Text style={styles.contactText}>+63 919 123 456</Text>
+                  <TouchableOpacity style={responsiveStyles.contactOption}>
+                    <Ionicons name="call" size={getResponsiveSize(12, 14, 15, 16)} color="#6B7280" />
+                    <Text style={responsiveStyles.contactText}>+63 919 123 456</Text>
                   </TouchableOpacity>
                 </View>
               </View>

@@ -1,624 +1,626 @@
 import { StyleSheet, Dimensions } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
-export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  
-  // Header Styles
-  header: {
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins_600SemiBold',
-    color: 'white',
-    flex: 1,
-    textAlign: 'left',
-    marginHorizontal: 5,
-  },
-  toggleButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    position: 'relative',
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FFD700',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    minWidth: 16,
-    alignItems: 'center',
-  },
-  badgeText: {
-    fontSize: 10,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#B22020',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 9,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  activeTab: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  tabText: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  activeTabText: {
-    color: 'white',
-    fontFamily: 'Poppins_600SemiBold',
-  },
+export const createResponsiveStyles = (width: number, height: number) => {
+  const isSmallScreen = width < 360;
+  const isLargeScreen = width >= 410;
+  const isTablet = width >= 768;
+  const isLandscape = width > height;
 
-  // Content Container
-  contentContainer: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingVertical: 20,
-  },
+  const getResponsiveSize = (small: number, medium: number, large: number, tablet: number) => {
+    if (isTablet) return tablet;
+    if (isLargeScreen) return large;
+    if (isSmallScreen) return small;
+    return medium; 
+  };
 
-  // Section Styles
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#6B7280',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#F8FAFC',
+    },
+    
+    header: {
+      paddingTop: isLandscape ? height * 0.025 : height * 0.0625, 
+      paddingHorizontal: width * 0.056,
+      paddingBottom: height * 0.025,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: height * 0.01,
+    },
+    backButton: {
+      padding: width * 0.022, 
+      marginLeft: -width * 0.022,
+    },
+    headerTitle: {
+      fontSize: getResponsiveSize(18, 20, 21, 24),
+      fontFamily: 'Poppins_600SemiBold',
+      color: 'white',
+      flex: 1,
+      textAlign: 'left',
+      marginHorizontal: width * 0.014, 
+    },
+    toggleButton: {
+      padding: width * 0.022, 
+      borderRadius: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      position: 'relative',
+    },
+    badgeContainer: {
+      position: 'absolute',
+      top: -4,
+      right: -4,
+      backgroundColor: '#FFD700',
+      borderRadius: 8,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+      minWidth: 16,
+      alignItems: 'center',
+    },
+    badgeText: {
+      fontSize: getResponsiveSize(9, 10, 10, 11),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#B22020',
+    },
+    headerSubtitle: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: 'rgba(255, 255, 255, 0.9)',
+      textAlign: 'center',
+      marginBottom: height * 0.02,
+      lineHeight: getResponsiveSize(16, 20, 21, 22),
+    },
+    tabContainer: {
+      flexDirection: 'row',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderRadius: 12,
+      padding: 4,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: height * 0.01,
+      paddingHorizontal: width * 0.025,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    activeTab: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    tabText: {
+      fontSize: getResponsiveSize(11, 12, 13, 14),
+      fontFamily: 'Poppins_500Medium',
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    activeTabText: {
+      color: 'white',
+      fontFamily: 'Poppins_600SemiBold',
+    },
+    contentContainer: {
+      flex: 1,
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingVertical: height * 0.025,
+    },
+    section: {
+      paddingHorizontal: width * 0.056,
+      marginBottom: height * 0.03,
+    },
+    sectionTitle: {
+      fontSize: getResponsiveSize(16, 18, 19, 22),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#1F2937',
+      marginBottom: height * 0.005,
+    },
+    sectionSubtitle: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: '#6B7280',
+      marginBottom: height * 0.015,
+      lineHeight: getResponsiveSize(16, 20, 21, 22),
+    },
+    card: {
+      backgroundColor: 'white',
+      borderRadius: 16,
+      padding: width * 0.056,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    typeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginHorizontal: -width * 0.017, 
+    },
+    typeCard: {
+      width: (width - (width * 0.112 + width * 0.034)) / 2,
+      backgroundColor: 'white',
+      borderRadius: 16,
+      padding: width * 0.044, 
+      margin: width * 0.017,
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#F1F5F9',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    selectedTypeCard: {
+      borderColor: '#B22020',
+      backgroundColor: '#FEF7F7',
+      transform: [{ scale: 0.98 }],
+    },
+    typeIcon: {
+      width: getResponsiveSize(35, 40, 42, 48),
+      height: getResponsiveSize(35, 40, 42, 48),
+      borderRadius: getResponsiveSize(17.5, 20, 21, 24),
+      backgroundColor: '#FEF7F7',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: height * 0.01,
+    },
+    selectedTypeIcon: {
+      backgroundColor: '#B22020',
+    },
+    typeLabel: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#374151',
+      textAlign: 'center',
+      marginBottom: height * 0.005,
+    },
+    selectedTypeLabel: {
+      color: '#B22020',
+    },
+    typeDescription: {
+      fontSize: getResponsiveSize(10, 12, 13, 14),
+      fontFamily: 'Poppins_400Regular',
+      color: '#6B7280',
+      textAlign: 'center',
+      lineHeight: getResponsiveSize(14, 16, 17, 18),
+    },
+    selectedTypeDescription: {
+      color: '#7C2D12',
+    },
+    ratingContainer: {
+      alignItems: 'center',
+      paddingVertical: height * 0.01,
+    },
+    ratingLabel: {
+      fontSize: getResponsiveSize(14, 16, 17, 18),
+      fontFamily: 'Poppins_500Medium',
+      color: '#374151',
+      marginBottom: height * 0.02,
+      textAlign: 'center',
+    },
+    starsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginBottom: height * 0.015,
+    },
+    starButton: {
+      padding: width * 0.022, 
+      marginHorizontal: width * 0.006, 
+    },
+    ratingFeedback: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#B22020',
+      textAlign: 'center',
+    },
 
-  // Card Styles
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
+    chipsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginHorizontal: -width * 0.011, 
+    },
+    chip: {
+      paddingHorizontal: width * 0.033, 
+      paddingVertical: height * 0.01,
+      borderRadius: 20,
+      backgroundColor: '#F8FAFC',
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      margin: width * 0.011, 
+    },
+    selectedChip: {
+      backgroundColor: '#B22020',
+      borderColor: '#B22020',
+    },
+    chipText: {
+      fontSize: getResponsiveSize(10, 12, 13, 14),
+      fontFamily: 'Poppins_500Medium',
+      color: '#64748B',
+    },
+    selectedChipText: {
+      color: 'white',
+    },
 
-  // Feedback Type Grid
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
-  },
-  typeCard: {
-    width: (width - 52) / 2,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    margin: 6,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  selectedTypeCard: {
-    borderColor: '#B22020',
-    backgroundColor: '#FEF7F7',
-    transform: [{ scale: 0.98 }],
-  },
-  typeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FEF7F7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  selectedTypeIcon: {
-    backgroundColor: '#B22020',
-  },
-  typeLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#374151',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  selectedTypeLabel: {
-    color: '#B22020',
-  },
-  typeDescription: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  selectedTypeDescription: {
-    color: '#7C2D12',
-  },
+    textInput: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: '#374151',
+      textAlignVertical: 'top',
+      minHeight: height * 0.125,
+      lineHeight: getResponsiveSize(16, 20, 21, 22),
+      borderWidth: 0,
+      padding: 0,
+    },
+    inputFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: height * 0.015,
+      paddingTop: height * 0.015,
+      borderTopWidth: 1,
+      borderTopColor: '#F1F5F9',
+    },
+    characterCount: {
+      fontSize: getResponsiveSize(10, 12, 13, 14),
+      fontFamily: 'Poppins_400Regular',
+      color: '#9CA3AF',
+    },
+    requiredIndicator: {
+      fontSize: getResponsiveSize(10, 12, 13, 14),
+      fontFamily: 'Poppins_500Medium',
+      color: '#EF4444',
+    },
+    emailInputCard: {
+      backgroundColor: 'white',
+      borderRadius: 16,
+      paddingHorizontal: width * 0.044,
+      paddingVertical: height * 0.005,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    emailInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: height * 0.01,
+    },
+    emailInput: {
+      flex: 1,
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: '#374151',
+      marginLeft: width * 0.033, 
+      paddingVertical: height * 0.01,
+    },
+    submitContainer: {
+      paddingHorizontal: width * 0.056, 
+      marginBottom: height * 0.02,
+    },
+    submitButton: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      shadowColor: '#B22020',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
+    submitGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: height * 0.02,
+      paddingHorizontal: width * 0.067, 
+    },
+    submitText: {
+      fontSize: getResponsiveSize(14, 16, 17, 18),
+      fontFamily: 'Poppins_600SemiBold',
+      color: 'white',
+      marginLeft: width * 0.022,
+    },
+    contactCard: {
+      backgroundColor: 'white',
+      borderRadius: 16,
+      padding: width * 0.056, 
+      borderWidth: 1,
+      borderColor: '#E0F2FE',
+    },
+    contactHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: height * 0.01,
+    },
+    contactTitle: {
+      fontSize: getResponsiveSize(14, 16, 17, 18),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#1F2937',
+      marginLeft: width * 0.022, 
+    },
+    contactSubtitle: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: '#6B7280',
+      marginBottom: height * 0.015,
+    },
+    contactOptions: {
+      gap: height * 0.01,
+    },
+    contactOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    contactText: {
+      fontSize: getResponsiveSize(11, 13, 14, 15),
+      fontFamily: 'Poppins_500Medium',
+      color: '#374151',
+      marginLeft: width * 0.022,
+    },
+    repliesContainer: {
+      flex: 1,
+      paddingHorizontal: width * 0.056, 
+    },
+    repliesContent: {
+      paddingVertical: height * 0.025,
+    },
+    emptyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: width * 0.111, 
+    },
+    emptyIconContainer: {
+      width: getResponsiveSize(70, 80, 85, 90),
+      height: getResponsiveSize(70, 80, 85, 90),
+      borderRadius: getResponsiveSize(35, 40, 42.5, 45),
+      backgroundColor: '#FEF7F7',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: height * 0.025,
+    },
+    emptyTitle: {
+      fontSize: getResponsiveSize(18, 20, 21, 24),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#374151',
+      marginBottom: height * 0.01,
+    },
+    emptySubtitle: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: '#6B7280',
+      textAlign: 'center',
+      lineHeight: getResponsiveSize(16, 20, 21, 22),
+      marginBottom: height * 0.03,
+    },
+    emptyAction: {
+      backgroundColor: 'white',
+      paddingHorizontal: width * 0.056,
+      paddingVertical: height * 0.015,
+      borderRadius: 24,
+      borderWidth: 2,
+      borderColor: '#B22020',
+    },
+    emptyActionText: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#B22020',
+    },
+    replyCard: {
+      backgroundColor: 'white',
+      borderRadius: 16,
+      padding: width * 0.044,
+      marginBottom: height * 0.02,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    replyHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: height * 0.015,
+    },
+    replyTypeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    replyTypeText: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_500Medium',
+      color: '#6B7280',
+      marginLeft: width * 0.017,
+    },
+    replyStatus: {
+      paddingHorizontal: width * 0.022,
+      paddingVertical: height * 0.005,
+      borderRadius: 12,
+    },
+    replyStatusText: {
+      fontSize: getResponsiveSize(10, 11, 12, 13),
+      fontFamily: 'Poppins_600SemiBold',
+      color: 'white',
+    },
+    originalFeedback: {
+      backgroundColor: '#F8FAFC',
+      borderRadius: 12,
+      padding: width * 0.033, 
+      marginBottom: height * 0.015,
+      borderLeftWidth: 3,
+      borderLeftColor: '#E2E8F0',
+    },
+    originalLabel: {
+      fontSize: getResponsiveSize(10, 12, 13, 14),
+      fontFamily: 'Poppins_500Medium',
+      color: '#6B7280',
+      marginBottom: height * 0.005,
+    },
+    originalText: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: '#374151',
+      lineHeight: getResponsiveSize(16, 18, 19, 20),
+    },
+    adminResponse: {
+      backgroundColor: '#F0FDF4',
+      borderRadius: 12,
+      padding: width * 0.033,
+      borderLeftWidth: 3,
+      borderLeftColor: '#22C55E',
+    },
+    adminHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: height * 0.0075,
+    },
+    adminLabel: {
+      fontSize: getResponsiveSize(11, 13, 14, 15),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#059669',
+      marginLeft: width * 0.017, 
+      flex: 1,
+    },
+    responseTime: {
+      fontSize: getResponsiveSize(10, 11, 12, 13),
+      fontFamily: 'Poppins_400Regular',
+      color: '#6B7280',
+    },
+    adminText: {
+      fontSize: getResponsiveSize(12, 14, 15, 16),
+      fontFamily: 'Poppins_400Regular',
+      color: '#374151',
+      lineHeight: getResponsiveSize(16, 18, 19, 20),
+    },
+    ratingDisplay: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: height * 0.015,
+      paddingTop: height * 0.015,
+      borderTopWidth: 1,
+      borderTopColor: '#F1F5F9',
+    },
+    ratingDisplayLabel: {
+      fontSize: getResponsiveSize(10, 12, 13, 14),
+      fontFamily: 'Poppins_500Medium',
+      color: '#6B7280',
+      marginRight: width * 0.011, 
+    },
+    ratingDisplayValue: {
+      fontSize: getResponsiveSize(10, 12, 13, 14),
+      fontFamily: 'Poppins_500Medium',
+      color: '#6B7280',
+      marginLeft: width * 0.011, 
+    },
+  });
+};
+export const createCustomAlertStyles = (width: number, height: number) => {
+ 
+  const isSmallScreen = width < 360;
+  const isLargeScreen = width >= 410;
+  const isTablet = width >= 768;
 
-  // Rating Styles
-  ratingContainer: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  ratingLabel: {
-    fontSize: 16,
-    fontFamily: 'Poppins_500Medium',
-    color: '#374151',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  starButton: {
-    padding: 8,
-    marginHorizontal: 2,
-  },
-  ratingFeedback: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#B22020',
-    textAlign: 'center',
-  },
+  const getResponsiveSize = (small: number, medium: number, large: number, tablet: number) => {
+    if (isTablet) return tablet;
+    if (isLargeScreen) return large;
+    if (isSmallScreen) return small;
+    return medium;
+  };
 
-  // Chips for Issues
-  chipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -4,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    margin: 4,
-  },
-  selectedChip: {
-    backgroundColor: '#B22020',
-    borderColor: '#B22020',
-  },
-  chipText: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium',
-    color: '#64748B',
-  },
-  selectedChipText: {
-    color: 'white',
-  },
-
-  // Text Input Styles
-  textInput: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#374151',
-    textAlignVertical: 'top',
-    minHeight: 100,
-    lineHeight: 20,
-    borderWidth: 0,
-    padding: 0,
-  },
-  inputFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  characterCount: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    color: '#9CA3AF',
-  },
-  requiredIndicator: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium',
-    color: '#EF4444',
-  },
-
-  // Email Input
-  emailInputCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  emailInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  emailInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#374151',
-    marginLeft: 12,
-    paddingVertical: 8,
-  },
-
-  // Submit Button
-  submitContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  submitButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#B22020',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  submitGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-  },
-  submitText: {
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
-    color: 'white',
-    marginLeft: 8,
-  },
-
-  // Contact Card
-  contactCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E0F2FE',
-  },
-  contactHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  contactTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#1F2937',
-    marginLeft: 8,
-  },
-  contactSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#6B7280',
-    marginBottom: 12,
-  },
-  contactOptions: {
-    gap: 8,
-  },
-  contactOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  contactText: {
-    fontSize: 13,
-    fontFamily: 'Poppins_500Medium',
-    color: '#374151',
-    marginLeft: 8,
-  },
-
-  // Admin Replies Styles
-  repliesContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  repliesContent: {
-    paddingVertical: 20,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FEF7F7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  emptyAction: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: '#B22020',
-  },
-  emptyActionText: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#B22020',
-  },
-
-  // Reply Card Styles
-  replyCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  replyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  replyTypeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  replyTypeText: {
-    fontSize: 14,
-    fontFamily: 'Poppins_500Medium',
-    color: '#6B7280',
-    marginLeft: 6,
-  },
-  replyStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  replyStatusText: {
-    fontSize: 11,
-    fontFamily: 'Poppins_600SemiBold',
-    color: 'white',
-  },
-  originalFeedback: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#E2E8F0',
-  },
-  originalLabel: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium',
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  originalText: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#374151',
-    lineHeight: 18,
-  },
-  adminResponse: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: 12,
-    padding: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#22C55E',
-  },
-  adminHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  adminLabel: {
-    fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#059669',
-    marginLeft: 6,
-    flex: 1,
-  },
-  responseTime: {
-    fontSize: 11,
-    fontFamily: 'Poppins_400Regular',
-    color: '#6B7280',
-  },
-  adminText: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#374151',
-    lineHeight: 18,
-  },
-  ratingDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  ratingDisplayLabel: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium',
-    color: '#6B7280',
-    marginRight: 4,
-  },
-  ratingDisplayValue: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium',
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-
-  // Custom Alert Styles - Designed to match your app's theme
-  alertOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  alertContainer: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    paddingVertical: 32,
-    paddingHorizontal: 28,
-    minWidth: 300,
-    maxWidth: 360,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 15,
-  },
-  alertIconContainer: {
-    marginBottom: 20,
-  },
-  alertTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#1F2937',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 26,
-  },
-  alertMessage: {
-    fontSize: 15,
-    fontFamily: 'Poppins_400Regular',
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-  alertButtonContainer: {
-    width: '100%',
-    gap: 12,
-  },
-  alertButton: {
-    backgroundColor: '#F3F4F6',
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  alertPrimaryButton: {
-    backgroundColor: '#007AFF',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  alertCancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  alertSingleButton: {
-    backgroundColor: '#007AFF',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  alertButtonText: {
-    fontSize: 16,
-    fontFamily: 'Poppins_500Medium',
-    color: 'white',
-    textAlign: 'center',
-  },
-  alertPrimaryButtonText: {
-    color: 'white',
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  alertCancelButtonText: {
-    color: '#9CA3AF',
-    fontFamily: 'Poppins_400Regular',
-  },
-});
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: width * 0.067, 
+    },
+    container: {
+      backgroundColor: 'white',
+      borderRadius: 20,
+      paddingVertical: height * 0.04, 
+      paddingHorizontal: width * 0.078, 
+      minWidth: Math.min(width * 0.83, 300), 
+      maxWidth: Math.min(width * 0.9, 360),
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.25,
+      shadowRadius: 24,
+      elevation: 15,
+    },
+    title: {
+      fontSize: getResponsiveSize(18, 20, 21, 24),
+      fontFamily: 'Poppins_600SemiBold',
+      color: '#1F2937',
+      textAlign: 'center',
+      marginBottom: height * 0.015,
+      lineHeight: getResponsiveSize(24, 26, 27, 30),
+    },
+    message: {
+      fontSize: getResponsiveSize(13, 15, 16, 17),
+      fontFamily: 'Poppins_400Regular',
+      color: '#6B7280',
+      textAlign: 'center',
+      lineHeight: getResponsiveSize(20, 22, 23, 24),
+      marginBottom: height * 0.035,
+    },
+    buttonContainer: {
+      width: '100%',
+      gap: 12,
+    },
+    button: {
+      backgroundColor: '#F3F4F6',
+      paddingVertical: height * 0.0175, 
+      paddingHorizontal: width * 0.078, 
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: getResponsiveSize(44, 48, 50, 52),
+    },
+    primaryButton: {
+      backgroundColor: '#007AFF',
+      shadowColor: '#007AFF',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    cancelButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: '#E5E7EB',
+    },
+    singleButton: {
+      backgroundColor: '#007AFF',
+      shadowColor: '#007AFF',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    buttonText: {
+      fontSize: getResponsiveSize(14, 16, 17, 18),
+      fontFamily: 'Poppins_500Medium',
+      color: 'white',
+      textAlign: 'center',
+    },
+    primaryButtonText: {
+      color: 'white',
+      fontFamily: 'Poppins_600SemiBold',
+    },
+    cancelButtonText: {
+      color: '#9CA3AF',
+      fontFamily: 'Poppins_400Regular',
+    },
+  });
+};
