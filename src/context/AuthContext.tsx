@@ -80,7 +80,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storedUser = TokenManager.getUser();
       const token = TokenManager.getToken();
       
-      if (token && storedUser) {
+     if (token && storedUser) {
+      const role = storedUser.role.toLowerCase();
+      if (['admin', 'sdd', 'security'].includes(role)) {
+        await TokenManager.removeFromStorage();
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return;
+      }
         setUser(storedUser);
         setIsAuthenticated(true);
         await syncNotificationServices(storedUser);
@@ -106,13 +114,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       const response = await apiLogin(credentials);
-      
-      if (response.success && response.user) {
+
+        if (response.success && response.user) {
+        const role = response.user.role.toLowerCase();
+        if (['admin', 'ssd', 'security'].includes(role)) {
+          await TokenManager.removeFromStorage();
+          const accessDenied = 'Access denied. Only users can login.';
+          setError(accessDenied);
+          return { success: false, message: accessDenied };
+        }
         setUser(response.user);
         setIsAuthenticated(true);
         await syncNotificationServices(response.user);
         
-        try { //for offline access
+        try {
           await AsyncStorage.setItem('valet_user_data', JSON.stringify(response.user));
         } catch (error) {
           console.error('Error storing user data:', error);

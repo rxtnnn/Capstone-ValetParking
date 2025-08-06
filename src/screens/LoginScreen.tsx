@@ -397,10 +397,12 @@ const LoginScreen: React.FC = () => {
         setEmail('');
         setPassword('');
       } else {
+        const msg = result.message || ALERT_MESSAGES.LOGIN_FAILED_MSG;
+        const isDenied = msg.toLowerCase().includes('access denied');
         showCustomAlert(
-          ALERT_MESSAGES.LOGIN_FAILED, 
-          ALERT_MESSAGES.LOGIN_FAILED_MSG,
-          'Try Again'
+          isDenied ? 'Access Denied' : ALERT_MESSAGES.LOGIN_FAILED,
+          msg,
+          isDenied ? 'OK' : 'Try Again'
         );
       }
     } catch (error) {
@@ -475,7 +477,7 @@ const LoginScreen: React.FC = () => {
             </View>
 
             <View style={responsiveStyles.welcomeSection}>
-              <Text style={responsiveStyles.welcomeTitle}>Welcome back</Text>
+              <Text style={responsiveStyles.welcomeTitle}>Welcome</Text>
               <Text style={responsiveStyles.welcomeSubtitle}>Login to your VALET account</Text>
             </View>
 
