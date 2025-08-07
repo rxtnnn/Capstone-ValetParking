@@ -130,7 +130,7 @@ class TokenManager {
   }
 
   static isAuthenticated(): boolean {
-    return !!(this.token && this.user);
+     return !!this.token;
   }
 
   static getUserInfo(): { id: number | null; name?: string; email?: string; role?: string; employee_id?: string } {
@@ -201,20 +201,6 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
-    if (error.response?.status === 401) {
-      console.log('Token expired or invalid, clearing token...');
-      try {
-        await TokenManager.removeFromStorage();
-      } catch (clearError) {
-        console.log('Failed to clear expired token:', clearError);
-      }
-    }
-    
-    console.log('Response Error:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message,
-    });
     return Promise.reject(error);
   }
 );
