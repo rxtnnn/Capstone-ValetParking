@@ -39,7 +39,7 @@ interface CircularProgressProps {
 const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
 const FLOOR_SUFFIXES = ['th', 'st', 'nd', 'rd'];
 const FLOOR_PATTERN = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
-const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000;
 const DEFAULT_FLOORS = Array.from({ length: 4 }, (_, i) => ({
   floor: i + 1,
   total: 0,
@@ -116,8 +116,6 @@ const HomeScreen: React.FC = () => {
   const [lastParkingData, setLastParkingData] = useState<ParkingStats | null>(null);
 
   const isMountedRef = useRef(true);
-  const servicesInitializedRef = useRef(false);
-  const userIdFetchedRef = useRef(false);
   const unsubscribeFunctionsRef = useRef<{
     parkingUpdates?: () => void;
     connectionStatus?: () => void;
@@ -188,8 +186,8 @@ const HomeScreen: React.FC = () => {
     }
   }, [lastParkingData, currentUserId]);
 
-  const getCurrentUserId = useCallback(async () => {
-    if (!isMountedRef.current) return;
+  const initializeUser = useCallback(async () => {
+    if (!isMountedRef.current || !isAuthenticated) return;
     
     try {
       const userData = await AsyncStorage.getItem('valet_user_data');
@@ -201,88 +199,49 @@ const HomeScreen: React.FC = () => {
         await NotificationManager.setCurrentUserId(userId);
         await checkForNewReplies();
         await NotificationManager.checkForFeedbackReplies(userId);
+        
+        const unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
+          if (!isMountedRef.current) return;
+          setUnreadNotificationCount(NotificationManager.getUnreadCount());
+        });
+        
+        unsubscribeFunctionsRef.current.notifications = unsubscribeNotifications;
       }
     } catch (error) {
-      console.error('Error getting current user ID:', error);
+      console.error('Error initializing user:', error);
     }
-  }, [checkForNewReplies]);
+  }, [checkForNewReplies, isAuthenticated]);
 
-  const transformParkingData = useCallback((rawData: any[]): ParkingStats => {
-    const totalSpots = rawData.length;
-    const availableSpots = rawData.filter((space: any) => !space.is_occupied).length;
-    const occupiedSpots = totalSpots - availableSpots;
+  const subscribeToParkingData = useCallback(() => {
+    if (!isAuthenticated || unsubscribeFunctionsRef.current.parkingUpdates) return;
 
-    const floorGroups: { [key: number]: any[] } = {};
-  
-    rawData.forEach((space: any) => {
-      const floor = extractFloorFromLocation(space.floor_level || '');
-      if (!floorGroups[floor]) floorGroups[floor] = [];
-      floorGroups[floor].push(space);
+    console.log('Setting up parking data subscription');
+
+    const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
+      if (!isMountedRef.current) return;
+      
+      console.log('Received parking update:', data.lastUpdated);
+      checkParkingChanges(data);
+      setParkingData(data);
+      setLoading(false);
     });
 
-    const floors = Object.entries(floorGroups).map(([floorNum, spaces]) => {
-      const total = spaces.length;
-      const available = spaces.filter((s: any) => !s.is_occupied).length;
-      const occupancyRate = total > 0 ? ((total - available) / total) * 100 : 0;
-      
-      let status: 'available' | 'limited' | 'full';
-      if (available === 0) status = 'full';
-      else if (available / total < 0.2) status = 'limited';
-      else status = 'available';
+    const unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
+      if (!isMountedRef.current) return;
+      console.log('Connection status:', status);
+      setConnectionStatus(status);
+    });
 
-      return {
-        floor: parseInt(floorNum),
-        total,
-        available,
-        occupancyRate,
-        status,
-      };
-    }).sort((a, b) => a.floor - b.floor);
+    unsubscribeFunctionsRef.current.parkingUpdates = unsubscribeParkingUpdates;
+    unsubscribeFunctionsRef.current.connectionStatus = unsubscribeConnectionStatus;
 
-    return {
-      totalSpots,
-      availableSpots,
-      occupiedSpots,
-      floors,
-      lastUpdated: new Date().toLocaleTimeString(),
-      isLive: true,
-      sensorData: rawData,
-    };
-  }, [extractFloorFromLocation]);
-
-  const fetchParkingDataDirect = useCallback(async () => {
-    if (!isMountedRef.current) return;
-    
-    try {
-      const response = await fetch('https://valet.up.railway.app/api/parking', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const rawData = await response.json();
-      
-      if (isMountedRef.current) {
-        const transformedData = transformParkingData(rawData);
-        setParkingData(transformedData);
-        setConnectionStatus('connected');
-      }
-    } catch (error) {
-      if (isMountedRef.current) {
-        setConnectionStatus('error');
-      }
-    } finally {
-      if (isMountedRef.current) {
+    setTimeout(() => {
+      if (isMountedRef.current && loading) {
+        console.log('Removing loading state after timeout');
         setLoading(false);
       }
-    }
-  }, [transformParkingData]);
+    }, 5000);
+  }, [isAuthenticated, checkParkingChanges, loading]);
 
   const onRefresh = useCallback(async () => {
     if (!isAuthenticated || !isMountedRef.current) return;
@@ -297,15 +256,12 @@ const HomeScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error during refresh:', error);
-      if (isAuthenticated && isMountedRef.current) {
-        await fetchParkingDataDirect();
-      }
     } finally {
       if (isMountedRef.current) {
         setRefreshing(false);
       }
     }
-  }, [isAuthenticated, currentUserId, checkForNewReplies, fetchParkingDataDirect]);
+  }, [isAuthenticated, currentUserId, checkForNewReplies]);
 
   const handleFloorPress = useCallback((floor: any) => {
     const status = getFloorStatus(floor.available, floor.total);
@@ -317,169 +273,36 @@ const HomeScreen: React.FC = () => {
     }
   }, [getFloorStatus, navigation]);
 
-   const setupPersistentServices = useCallback(async () => {
-    if (!isAuthenticated || servicesInitializedRef.current) return;
-    servicesInitializedRef.current = true;
-
-    try {
-      const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
-        if (!isMountedRef.current) return;
-        
-        setParkingData(prevData => {
-          if (JSON.stringify(prevData.floors) !== JSON.stringify(data.floors)) {
-            checkParkingChanges(data);
-            return data;
-          }
-          return { ...prevData, lastUpdated: data.lastUpdated, isLive: data.isLive };
-        });
-        setLoading(false);
-      });
-
-      const unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status: 'connected' | 'disconnected' | 'error') => {
-        if (!isMountedRef.current) return;
-        setConnectionStatus(status);
-      });
-
-      // Store unsubscribe functions
-      unsubscribeFunctionsRef.current = {
-        parkingUpdates: unsubscribeParkingUpdates,
-        connectionStatus: unsubscribeConnectionStatus,
-      };
-      RealTimeParkingService.start();
-      
-      setTimeout(() => {
-        if (isMountedRef.current && loading && connectionStatus !== 'connected') {
-          fetchParkingDataDirect();
-        }
-      }, 3000);
-
-    } catch (error) {
-      console.error('Error setting up persistent services:', error);
-      if (isMountedRef.current && isAuthenticated) {
-        fetchParkingDataDirect();
-      }
-    }
-  }, [isAuthenticated, checkParkingChanges, fetchParkingDataDirect, loading, connectionStatus]);
-
-  const setupNotifications = useCallback(() => {
-    if (!currentUserId || unsubscribeFunctionsRef.current.notifications) return;
-
-    const unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
-      if (!isMountedRef.current) return;
-      setUnreadNotificationCount(NotificationManager.getUnreadCount());
-    });
-
-    unsubscribeFunctionsRef.current.notifications = unsubscribeNotifications;
-  }, [currentUserId]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      
-      if (!isAuthenticated) {
-        navigation.navigate('Login');
-        return;
-      }
-      if (!userIdFetchedRef.current) {
-        getCurrentUserId().then(() => {
-          userIdFetchedRef.current = true;
-        });
-      }
-      setupPersistentServices();
-      setupNotifications();
-    }, [isAuthenticated, getCurrentUserId, setupPersistentServices, setupNotifications, navigation])
-  );
-
   useEffect(() => {
-    isMountedRef.current = true;
+    if (!isAuthenticated) {
+      navigation.navigate('Login');
+      return;
+    }
+
+    initializeUser();
+    subscribeToParkingData();
 
     return () => {
-      isMountedRef.current = false;
       Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
         if (typeof unsubscribe === 'function') {
           unsubscribe();
         }
       });
       unsubscribeFunctionsRef.current = {};
-      servicesInitializedRef.current = false;
-      userIdFetchedRef.current = false;
     };
-  }, []);
+  }, [isAuthenticated, navigation, initializeUser, subscribeToParkingData]);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setLoading(false);
-      return;
-    }
-
-    if (servicesInitializedRef.current) return;
-
-    let unsubscribeParkingUpdates: (() => void) | undefined;
-    let unsubscribeConnectionStatus: (() => void) | undefined;
-    let fallbackTimer: NodeJS.Timeout | undefined;
-
-    const setupParkingService = async () => {
-      servicesInitializedRef.current = true;
-
-      try {
-        let updateTimeout: NodeJS.Timeout;
-        unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
-          if (!isMountedRef.current) return;
-          
-          if (updateTimeout) clearTimeout(updateTimeout);
-          
-          updateTimeout = setTimeout(() => {
-            if (isMountedRef.current) {
-              setParkingData(prevData => {
-                if (JSON.stringify(prevData.floors) !== JSON.stringify(data.floors)) {
-                  checkParkingChanges(data);
-                  return data;
-                }
-                return { ...prevData, lastUpdated: data.lastUpdated, isLive: data.isLive };
-              });
-              setLoading(false);
-            }
-          }, 300);
-        });
-
-        unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status: 'connected' | 'disconnected' | 'error') => {
-          if (!isMountedRef.current) return;
-          setConnectionStatus(status);
-        });
-
-        if (isMountedRef.current && isAuthenticated) {
-          RealTimeParkingService.start();
-          
-          fallbackTimer = setTimeout(() => {
-            if (isMountedRef.current && loading && isAuthenticated) {
-              fetchParkingDataDirect();
-            }
-          }, 3000);
-        }
-      } catch (error) {
-        console.error('Error setting up services:', error);
-        if (isMountedRef.current && isAuthenticated) {
-          fetchParkingDataDirect();
-        }
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isAuthenticated) return;
+      
+      if (!unsubscribeFunctionsRef.current.parkingUpdates) {
+        subscribeToParkingData();
       }
-    };
-
-    setupParkingService();
-
-    return () => {
-      servicesInitializedRef.current = false;
-      if (fallbackTimer) clearTimeout(fallbackTimer);
-      if (unsubscribeParkingUpdates) unsubscribeParkingUpdates();
-      if (unsubscribeConnectionStatus) unsubscribeConnectionStatus();
-
-      try {
-        RealTimeParkingService.stop();
-      } catch (error) {
-        console.error('Error stopping RealTimeParkingService:', error);
-      }
-    };
-  }, [isAuthenticated, checkParkingChanges, fetchParkingDataDirect, loading]);
-
-  
+      
+      setUnreadNotificationCount(NotificationManager.getUnreadCount());
+    }, [isAuthenticated, subscribeToParkingData])
+  );
 
   useEffect(() => {
     if (!currentUserId || !isAuthenticated) return;
@@ -496,6 +319,14 @@ const HomeScreen: React.FC = () => {
       clearInterval(checkFeedbackInterval);
     };
   }, [currentUserId, isAuthenticated, checkForNewReplies]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   if (!isAuthenticated) return null;
 
@@ -602,6 +433,9 @@ const HomeScreen: React.FC = () => {
 
           <View style={styles.occupancyRow}>
             <Text style={styles.occupancyText}>Overall Occupancy</Text>
+            <Text style={styles.occupancyText}>
+              {connectionStatus === 'connected' ? '● Live' : connectionStatus === 'error' ? '● Error' : '● Offline'}
+            </Text>
           </View>
         </View>
       </LinearGradient>

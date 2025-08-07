@@ -8,7 +8,7 @@ import {
   ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { PanGestureHandler, PinchGestureHandler } from 'react-native-gesture-handler';
 import Animated, {
@@ -125,11 +125,12 @@ const ParkingMapScreen: React.FC = () => {
   const [navigationPath, setNavigationPath] = useState<{x: number, y: number}[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [parkingStats, setParkingStats] = useState<ParkingStats | null>(null);
-  const [isServiceRunning, setIsServiceRunning] = useState(false);
 
   const isMountedRef = useRef(true);
-  const servicesInitializedRef = useRef(false);
-  const connectionTestedRef = useRef(false);
+  const unsubscribeFunctionsRef = useRef<{
+    parkingUpdates?: () => void;
+    connectionStatus?: () => void;
+  }>({});
 
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -161,6 +162,7 @@ const ParkingMapScreen: React.FC = () => {
   const updateParkingSpotsFromService = useCallback((stats: ParkingStats) => {
     if (!isMountedRef.current) return;
     
+    console.log('Updating parking map with new data:', stats.lastUpdated);
     setParkingStats(stats);
     
     const spotOccupancyMap: { [key: string]: boolean } = {};
@@ -207,46 +209,60 @@ const ParkingMapScreen: React.FC = () => {
     });
   }, []);
 
+  // Subscribe to parking service updates
+  const subscribeToParkingData = useCallback(() => {
+    if (unsubscribeFunctionsRef.current.parkingUpdates) return;
+
+    console.log('Setting up parking map subscription');
+
+    const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
+      if (!isMountedRef.current) return;
+      updateParkingSpotsFromService(data);
+    });
+
+    const unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
+      if (!isMountedRef.current) return;
+      console.log('Map connection status:', status);
+      setConnectionStatus(status);
+    });
+
+    unsubscribeFunctionsRef.current.parkingUpdates = unsubscribeParkingUpdates;
+    unsubscribeFunctionsRef.current.connectionStatus = unsubscribeConnectionStatus;
+  }, [updateParkingSpotsFromService]);
+
+  // Initialize subscriptions
+  useEffect(() => {
+    subscribeToParkingData();
+
+    return () => {
+      // Clean up subscriptions
+      Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
+      unsubscribeFunctionsRef.current = {};
+    };
+  }, [subscribeToParkingData]);
+
+  // Re-subscribe when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // Re-subscribe if not already subscribed
+      if (!unsubscribeFunctionsRef.current.parkingUpdates) {
+        subscribeToParkingData();
+      }
+    }, [subscribeToParkingData])
+  );
+
+  // Component mount/unmount lifecycle
   useEffect(() => {
     isMountedRef.current = true;
-    
-    let unsubscribeParkingUpdates: (() => void) | undefined;
-    let unsubscribeConnectionStatus: (() => void) | undefined;
-
-    const initializeServices = async () => {
-      if (servicesInitializedRef.current || !isMountedRef.current) return;
-
-      servicesInitializedRef.current = true;
-
-      unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
-        if (!isMountedRef.current) return;
-        updateParkingSpotsFromService(data);
-      });
-
-      unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
-        if (!isMountedRef.current) return;
-        setConnectionStatus(status);
-      });
-    };
-
-    initializeServices();
 
     return () => {
       isMountedRef.current = false;
-      servicesInitializedRef.current = false;
-      connectionTestedRef.current = false;
-      
-      if (unsubscribeParkingUpdates) unsubscribeParkingUpdates();
-      if (unsubscribeConnectionStatus) unsubscribeConnectionStatus();
-      
-      try {
-        RealTimeParkingService.stop();
-        setIsServiceRunning(false);
-      } catch (error) {
-        console.error('Error stopping service:', error);
-      }
     };
-  }, [updateParkingSpotsFromService]);
+  }, []);
 
   const panGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
@@ -330,6 +346,7 @@ const ParkingMapScreen: React.FC = () => {
     if (!isMountedRef.current) return;
     
     try {
+      console.log('Manual refresh triggered from parking map');
       await RealTimeParkingService.forceUpdate();
     } catch (error) {
       console.error('Manual refresh failed:', error);
@@ -634,6 +651,10 @@ const ParkingMapScreen: React.FC = () => {
               <View style={styles.lastUpdated}>
                 <Text style={styles.lastUpdatedText}>
                   Last updated: {parkingStats?.lastUpdated || 'Loading...'}
+                </Text>
+                <Text style={styles.lastUpdatedText}>
+                  Status: {connectionStatus === 'connected' ? 'Live' : 
+                           connectionStatus === 'error' ? 'Error' : 'Offline'}
                 </Text>
               </View>
             </View>
