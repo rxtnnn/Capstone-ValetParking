@@ -94,28 +94,7 @@ class RealTimeParkingServiceClass {
     }, this.updateIntervalMs);
   }
 
-  pause(): void {
-    console.log('Manually pausing RealTimeParkingService data fetching');
-    
-    if (this.fetchController) { 
-      this.fetchController.abort();
-      this.fetchController = null;
-    }
-    
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval);
-      this.updateInterval = null;
-    }
-    
-    this.isFetching = false;
-  }
 
-  resume(): void {
-    console.log('Resuming RealTimeParkingService data fetching');
-    if (!this.updateInterval && this.isInitialized && !this.shouldStop) {
-      this.start();
-    }
-  }
 
   stop(): void {
     console.log('Stopping RealTimeParkingService completely');
