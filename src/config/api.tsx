@@ -36,7 +36,7 @@ class TokenManager {
       await this.loadFromStorage();
       this.isInitialized = true;
     } catch (error) {
-      console.error('Error initializing TokenManager:', error);
+      console.log('Error initializing TokenManager:', error);
       this.isInitialized = true; 
     } finally {
       this.initializationPromise = null;
@@ -74,7 +74,7 @@ class TokenManager {
       this.setToken(token);
       this.setUser(user);
     } catch (error) {
-      console.error('Error saving to AsyncStorage:', error);
+      console.log('Error saving to AsyncStorage:', error);
       throw error;
     }
   }
@@ -92,11 +92,11 @@ class TokenManager {
         try {
           parsedUser = JSON.parse(userData);
         } catch (parseError) {
-          console.error('Error parsing user data from AsyncStorage:', parseError);
+          console.log('Error parsing user data from AsyncStorage:', parseError);
           try {
             await AsyncStorage.removeItem('user_data');
           } catch (removeError) {
-            console.error('Failed to remove corrupted user data:', removeError);
+            console.log('Failed to remove corrupted user data:', removeError);
           }
         }
       }
@@ -106,7 +106,7 @@ class TokenManager {
       
       return { token, user: parsedUser };
     } catch (error) {
-      console.error('Error loading from AsyncStorage:', error);
+      console.log('Error loading from AsyncStorage:', error);
       return { token: null, user: null };
     }
   }
@@ -120,7 +120,7 @@ class TokenManager {
       
       this.clearToken();
     } catch (error) {
-      console.error('Error removing from AsyncStorage:', error);
+      console.log('Error removing from AsyncStorage:', error);
       this.clearToken();
     }
   }
@@ -191,7 +191,7 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('Request Error:', error);
+    console.log('Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -206,11 +206,11 @@ apiClient.interceptors.response.use(
       try {
         await TokenManager.removeFromStorage();
       } catch (clearError) {
-        console.error('Failed to clear expired token:', clearError);
+        console.log('Failed to clear expired token:', clearError);
       }
     }
     
-    console.error('Response Error:', {
+    console.log('Response Error:', {
       status: error.response?.status,
       data: error.response?.data,
       message: error.message,
@@ -236,7 +236,7 @@ export const login = async (credentials: { email: string; password: string }): P
       throw new Error(message || 'Login failed');
     }
   } catch (error) {
-    console.error('Login failed:', error);
+    console.log('Login failed:', error);
     throw error;
   }
 };
@@ -252,7 +252,7 @@ export const logout = async (): Promise<void> => {
     try {
       await TokenManager.removeFromStorage();
     } catch (clearError) {
-      console.error('Failed to clear data on logout:', clearError);
+      console.log('Failed to clear data on logout:', clearError);
     }
   }
 };

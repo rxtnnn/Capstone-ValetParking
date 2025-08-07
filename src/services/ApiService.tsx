@@ -20,7 +20,7 @@ class ApiService {
       const user = TokenManager.getUser();
       return user?.id || null;
     } catch (error) {
-      console.error('Error getting current user ID:', error);
+      console.log('Error getting current user ID:', error);
       return null;
     }
   }
@@ -88,7 +88,7 @@ class ApiService {
       
       throw new Error(response.data.message || ERROR_MESSAGES.SUBMISSION_FAILED);
     } catch (error) {
-      console.error('Submission error:', error);
+      console.log('Submission error:', error);
       throw this.handleAxiosError(error);
     }
   }
@@ -115,7 +115,7 @@ class ApiService {
       
       return feedbackList.filter(feedback => feedback.user_id === targetUserId);
     } catch (error) {
-      console.error('Error getting user feedback:', error);
+      console.log('Error getting user feedback:', error);
       throw new Error(ERROR_MESSAGES.LOAD_FAILED);
     }
   }
@@ -140,7 +140,7 @@ class ApiService {
         feedback.id
       );
     } catch (error) {
-      console.error('Error getting feedback with replies:', error);
+      console.log('Error getting feedback with replies:', error);
       return [];
     }
   }
@@ -176,7 +176,7 @@ class ApiService {
         return true;
       });
     } catch (error) {
-      console.error('Error getting new feedback replies:', error);
+      console.log('Error getting new feedback replies:', error);
       return [];
     }
   }
@@ -202,7 +202,7 @@ class ApiService {
       console.warn(`Feedback ID ${feedbackId} not found or doesn't belong to user ${targetUserId}`);
       return null;
     } catch (error) {
-      console.error(`Error getting feedback by ID ${feedbackId}:`, error);
+      console.log(`Error getting feedback by ID ${feedbackId}:`, error);
       return null;
     }
   }
@@ -216,17 +216,17 @@ class ApiService {
       
       return response.data.success !== false;
     } catch (error) {
-      console.error('Connection test failed:', error);
+      console.log('Connection test failed:', error);
       
       if (axios.isAxiosError(error) && error.response) {
         const status = error.response.status;
         if (status === 401) {
-          console.error('Authentication issue - check token');
+          console.log('Authentication issue - check token');
           TokenManager.clearToken(); // Clear invalid token
         } else if (status === 404) {
-          console.error('Endpoint not found - check backend deployment');
+          console.log('Endpoint not found - check backend deployment');
         } else if (error.code === 'ECONNABORTED') {
-          console.error('Connection timeout');
+          console.log('Connection timeout');
         }
       }
       
@@ -253,7 +253,7 @@ class ApiService {
       }
       return { id: null };
     } catch (error) {
-      console.error('Error getting current user info:', error);
+      console.log('Error getting current user info:', error);
       return { id: null };
     }
   }
@@ -281,7 +281,7 @@ class ApiService {
         }).length
       };
     } catch (error) {
-      console.error('Error getting feedback stats:', error);
+      console.log('Error getting feedback stats:', error);
       return DEFAULT_STATS;
     }
   }

@@ -20,7 +20,7 @@ export class FeedbackNotificationHelper {
       
       return true;
     } catch (error) {
-      console.error('Error creating feedback notification:', error);
+      console.log('Error creating feedback notification:', error);
       return false;
     }
   }

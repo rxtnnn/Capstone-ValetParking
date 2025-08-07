@@ -34,7 +34,7 @@ export const getBasicDeviceInfo = async (): Promise<DeviceInformation> => {
       buildNumber: '1',
     };
   } catch (error) {
-    console.error('Device info error:', error);
+    console.log('Device info error:', error);
     
     return {
       platform: 'unknown',

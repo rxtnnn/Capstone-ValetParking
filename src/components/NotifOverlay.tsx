@@ -209,7 +209,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
         const info = await ApiService.getCurrentUserInfo();
         setUserInfo(info);
       } catch (error) {
-        console.error('Error getting user info:', error);
+        console.log('Error getting user info:', error);
       }
     };
 

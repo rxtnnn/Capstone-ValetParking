@@ -326,7 +326,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
               await logout();
               navigation.navigate('Login' as never);
             } catch (error) {
-              console.error('Logout error:', error);
+              console.log('Logout error:', error);
             }
           },
           style: 'default'
@@ -486,13 +486,13 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 currentUserId ? checkForNewReplies() : Promise.resolve()
               ]);
             } catch (error) {
-              console.error('Background refresh failed:', error);
+              console.log('Background refresh failed:', error);
             }
           }
         }, 500);
       }
     } catch (error) {
-      console.error('Error submitting feedback:', error);
+      console.log('Error submitting feedback:', error);
       
       if (!mountedRef.current) return;
       let errorMessage = 'We couldn\'t submit your feedback. Please try again.';
@@ -563,7 +563,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
 
       await refreshPromise;
     } catch (error: any) {
-      console.error('Refresh error:', error);
+      console.log('Refresh error:', error);
     } finally {
       if (mountedRef.current) {
         setRefreshing(false);

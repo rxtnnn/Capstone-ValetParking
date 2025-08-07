@@ -73,7 +73,7 @@ class NotificationServiceClass {
         this.registerPushNotif()
       ]);
     } catch (error) {
-      console.error('Error initializing NotificationService:', error);
+      console.log('Error initializing NotificationService:', error);
     }
   }
 
@@ -167,7 +167,7 @@ class NotificationServiceClass {
       this.expoPushToken = tokenData.data;
       return tokenData.data;
     } catch (error) {
-      console.error('Error getting push token:', error);
+      console.log('Error getting push token:', error);
       return null;
     }
   }
@@ -190,7 +190,7 @@ class NotificationServiceClass {
         return { ...DEFAULT_SETTINGS, ...(JSON.parse(stored) as NotificationSettings) };
       }
     } catch (e) {
-      console.error('Load settings error:', e);
+      console.log('Load settings error:', e);
     }
     return DEFAULT_SETTINGS;
   }
@@ -223,7 +223,7 @@ class NotificationServiceClass {
     try {
       await this.saveSettingsLocally(settings);
     } catch (error) {
-      console.error('Error saving notification settings locally:', error);
+      console.log('Error saving notification settings locally:', error);
       throw error;
     }
   }
@@ -234,7 +234,7 @@ class NotificationServiceClass {
       const storageKey = this.getUserStorageKey();
       await AsyncStorage.removeItem(storageKey);
     } catch (error) {
-      console.error('Error clearing notification settings:', error);
+      console.log('Error clearing notification settings:', error);
     }
   }
 
@@ -298,7 +298,7 @@ class NotificationServiceClass {
         settings
       );
     } catch (error) {
-      console.error('Error showing spot notification:', error);
+      console.log('Error showing spot notification:', error);
     }
   }
 
@@ -347,7 +347,7 @@ class NotificationServiceClass {
         settings
       );
     } catch (error) {
-      console.error('Error showing floor update:', error);
+      console.log('Error showing floor update:', error);
     }
   }
 
@@ -378,7 +378,7 @@ class NotificationServiceClass {
         settings
       );
     } catch (error) {
-      console.error('Error showing feedback reply notification:', error);
+      console.log('Error showing feedback reply notification:', error);
     }
   }
 
@@ -418,7 +418,7 @@ class NotificationServiceClass {
       });
       
     } catch (error) {
-      console.error('Error scheduling notification:', error);
+      console.log('Error scheduling notification:', error);
     }
   }
 
@@ -433,7 +433,7 @@ class NotificationServiceClass {
         settings
       );
     } catch (error) {
-      console.error('Error showing simple notification:', error);
+      console.log('Error showing simple notification:', error);
     }
   }
 
@@ -451,7 +451,7 @@ class NotificationServiceClass {
       
       return finalStatus === 'granted';
     } catch (error) {
-      console.error('Error requesting permissions:', error);
+      console.log('Error requesting permissions:', error);
       return false;
     }
   }
@@ -566,7 +566,7 @@ class NotificationServiceClass {
           Notifications.deleteNotificationChannelAsync(CHANNELS.FEEDBACK_REPLIES)
         ]);
       } catch (error) {
-        console.error('Error clearing notification channels:', error);
+        console.log('Error clearing notification channels:', error);
       }
     }
   }
@@ -595,7 +595,7 @@ class NotificationServiceClass {
       const localSettings = await this.getNotificationSettings();
       await this.saveSettings(localSettings);
     } catch (error) {
-      console.error('Failed to sync settings with server:', error);
+      console.log('Failed to sync settings with server:', error);
     }
   }
 }

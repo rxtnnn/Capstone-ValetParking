@@ -1,6 +1,4 @@
-import { StyleSheet, Dimensions } from 'react-native';
-
-const { width: screenWidth } = Dimensions.get('window');
+import { StyleSheet } from 'react-native';
 
 export const createResponsiveStyles = (width: number, height: number) => {
   const isSmallScreen = width < 360;

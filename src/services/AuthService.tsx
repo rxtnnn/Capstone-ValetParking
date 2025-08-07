@@ -118,7 +118,7 @@ class AuthService {
       return { success: false, message: ERROR_MESSAGES.SERVER_ERROR };
 
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.log('Login error:', error);
       
       if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
         return { success: false, message: ERROR_MESSAGES.CONNECTION_ERROR };
@@ -154,7 +154,7 @@ class AuthService {
 
       return { success: true, user };
     } catch (error: any) {
-      console.error('Error finding user:', error);
+      console.log('Error finding user:', error);
       
       if (error.response?.status === 401) {
         return { success: false, message: ERROR_MESSAGES.API_ACCESS_DENIED };
@@ -188,7 +188,7 @@ class AuthService {
         message: ERROR_MESSAGES.NO_USERS,
       };
     } catch (error: any) {
-      console.error('Error fetching users:', error);
+      console.log('Error fetching users:', error);
       
       return {
         success: false,
@@ -203,7 +203,7 @@ class AuthService {
       const { token, user } = await TokenManager.loadFromStorage();
       return { token, user };
     } catch (error) {
-      console.error('Error getting stored auth data:', error);
+      console.log('Error getting stored auth data:', error);
       return { token: null, user: null };
     }
   }
@@ -214,7 +214,7 @@ class AuthService {
       const user = TokenManager.getUser();
       return !!(token && user);
     } catch (error) {
-      console.error('Error checking authentication:', error);
+      console.log('Error checking authentication:', error);
       return false;
     }
   }
@@ -225,7 +225,7 @@ class AuthService {
       const user = TokenManager.getUser();
       return !!(token && user);
     } catch (error) {
-      console.error('Error checking authentication:', error);
+      console.log('Error checking authentication:', error);
       return false;
     }
   }
@@ -239,7 +239,7 @@ class AuthService {
       }
       await TokenManager.removeFromStorage();
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.log('Error during logout:', error);
     }
   }
 

@@ -76,7 +76,7 @@ class NotificationManagerClass {
       this.notifyUserChangeListeners();
       
     } catch (error) {
-      console.error('Error during user change:', error);
+      console.log('Error during user change:', error);
     } finally {
       this.isInitializing = false;
     }
@@ -114,7 +114,7 @@ class NotificationManagerClass {
       const stored = await AsyncStorage.getItem(key);
       this.processedReplies = stored ? new Set(JSON.parse(stored)) : new Set();
     } catch (error) {
-      console.error('Error loading processed replies:', error);
+      console.log('Error loading processed replies:', error);
       this.processedReplies = new Set();
     }
   }
@@ -126,7 +126,7 @@ class NotificationManagerClass {
       
       await AsyncStorage.setItem(key, JSON.stringify(Array.from(this.processedReplies)));
     } catch (error) {
-      console.error('Error saving processed replies:', error);
+      console.log('Error saving processed replies:', error);
     }
   }
 
@@ -138,7 +138,7 @@ class NotificationManagerClass {
       }
       this.processedReplies.clear();
     } catch (error) {
-      console.error('Error clearing processed replies:', error);
+      console.log('Error clearing processed replies:', error);
     }
   }
 
@@ -179,7 +179,7 @@ class NotificationManagerClass {
         : [];
       this.notifyListeners();      
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      console.log('Error loading notifications:', error);
       this.notifications = [];
       this.notifyListeners();
     }
@@ -198,7 +198,7 @@ class NotificationManagerClass {
       
       await AsyncStorage.setItem(key, JSON.stringify(this.notifications));
     } catch (error) {
-      console.error('Error saving notifications:', error);
+      console.log('Error saving notifications:', error);
     }
   }
 
@@ -343,7 +343,7 @@ class NotificationManagerClass {
         }
       }
     } catch (error) {
-      console.error('Error processing feedback replies:', error);
+      console.log('Error processing feedback replies:', error);
     }
   }
 
@@ -359,7 +359,7 @@ class NotificationManagerClass {
         await this.processFeedbackReplies(feedbackArray);
       }
     } catch (error) {
-      console.error('Error checking for feedback replies:', error);
+      console.log('Error checking for feedback replies:', error);
     }
   }
 
@@ -466,7 +466,7 @@ class NotificationManagerClass {
       try {
         listener(notifications);
       } catch (error) {
-        console.error('Error in notification listener:', error);
+        console.log('Error in notification listener:', error);
       }
     }
   }
@@ -476,7 +476,7 @@ class NotificationManagerClass {
       try {
         listener();
       } catch (error) {
-        console.error('Error in user change listener:', error);
+        console.log('Error in user change listener:', error);
       }
     }
   }

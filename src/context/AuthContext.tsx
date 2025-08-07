@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await NotificationService.clearUserSettings();
       }
     } catch (error) {
-      console.error('Error syncing notification services:', error);
+      console.log('Error syncing notification services:', error);
     }
   };
 
@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthenticated(false);
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      console.log('Error checking auth status:', error);
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           await AsyncStorage.setItem('valet_user_data', JSON.stringify(response.user));
         } catch (error) {
-          console.error('Error storing user data:', error);
+          console.log('Error storing user data:', error);
         }
         
         return {
@@ -174,11 +174,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await AsyncStorage.removeItem('valet_user_data');
       } catch (error) {
-        console.error('Error clearing stored user data:', error);
+        console.log('Error clearing stored user data:', error);
       }
       
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.log('Error during logout:', error);
       
       setUser(null); // if logout fails, clear local state
       setIsAuthenticated(false);

@@ -262,13 +262,13 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         try {
           await AsyncStorage.setItem('valet_user_data', JSON.stringify(currentUser));
         } catch (error) {
-          console.error('Error updating stored user data:', error);
+          console.log('Error updating stored user data:', error);
         }
       }
       
       return currentUser;
     } catch (error: any) {
-      console.error('Error fetching user from API:', error);
+      console.log('Error fetching user from API:', error);
       return null;
     }
   }, [authUser, showAlert, navigation]);
@@ -278,7 +278,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       await logout();
       navigation.navigate('Home');
     } catch (error) {
-      console.error('Error during force logout:', error);
+      console.log('Error during force logout:', error);
       navigation.navigate('Home');
     }
   }, [logout, navigation]);
@@ -298,7 +298,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         setUserStats(mockStats);
       }
     } catch (error) {
-      console.error('Error loading user stats:', error);
+      console.log('Error loading user stats:', error);
     }
   }, []);
 
@@ -333,7 +333,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
       await loadUserStats(targetUserId);
     } catch (error) {
-      console.error('Error loading current user:', error);
+      console.log('Error loading current user:', error);
       
       if (isMountedRef.current) {
         showAlert({

@@ -56,7 +56,7 @@ export const useFeedback = (userId?: number): UseFeedbackReturn => {
       
       return id;
     } catch (error) {
-      console.error('Error getting current user:', error);
+      console.log('Error getting current user:', error);
       return null;
     }
   }, [currentUserId]);
@@ -133,7 +133,7 @@ export const useFeedback = (userId?: number): UseFeedbackReturn => {
       }
       
     } catch (err) {
-      console.error('Error checking for new replies:', err);
+      console.log('Error checking for new replies:', err);
     }
   }, [userId, getCurrentUser]);
 
@@ -232,7 +232,7 @@ export const useFeedback = (userId?: number): UseFeedbackReturn => {
         try {
           await checkForNewReplies();
         } catch (error) {
-          console.error('Error in periodic feedback check:', error);
+          console.log('Error in periodic feedback check:', error);
         }
       }
     }, PERIODIC_CHECK_INTERVAL);

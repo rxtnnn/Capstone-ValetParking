@@ -1,88 +1,123 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet } from 'react-native';
+interface ResponsiveStylesParams {
+  width: number;
+  height: number;
+}
 
-const { width } = Dimensions.get('window');
+export const createResponsiveStyles = ({ width, height }: ResponsiveStylesParams) => {
+  const isSmallScreen = width < 360;
+  const isLargeScreen = width >= 410;
+  const isTablet = width >= 768;
+  const isLandscape = width > height;
 
-export const styles = StyleSheet.create({
-  
-  container: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  image:{
-    width: 400,
-    height: 400,
-    alignItems: 'flex-start',
-  },
-  logo:{
-    width:100,
-    height: 100,
-    borderRadius: 20,
-  },
-  logoSection: {
-    marginBottom: 48,
-    alignItems: 'center',
-  },
-  logoHere: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  appName: {
-    fontSize: 36,
-    color: '#111827',
-    marginBottom: 8,
-    fontFamily: 'Montserrat_700Bold'
-  },
-  tagline: {
-    fontSize: 18,
-    color: 'black',
-    textAlign: 'center',
-    lineHeight: 24,
-    fontFamily: 'Poppins_400Regular'
-  },
-  indicatorContainer: {
-    flexDirection: 'row',
-    marginBottom: 32,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 10,
-    marginHorizontal: 4,
-  },
-  firstDot: {
-    backgroundColor: '#DC2626',
-    width: 15,
-  },
-  secDot: {
-    backgroundColor: '#DC2626',
-    width: 50
-  },
-  exploreButton: {
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 25,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  exploreButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  exploreButtonArrow: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-});
+  const getResponsiveSize = (small: number, medium: number, large: number, tablet: number) => {
+    if (isTablet) return tablet;
+    if (isLargeScreen) return large;
+    if (isSmallScreen) return small;
+    return medium;
+  };
+
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#F3F4F6',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: width * 0.08,
+      paddingVertical: height * 0.05,
+      flexDirection: isLandscape && height < 500 ? 'row' : 'column',
+    },
+    imageContainer: {
+      flex: isLandscape ? 1 : 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    image: {
+      width: isTablet 
+        ? Math.min(width * 0.4, 400) 
+        : isLandscape 
+          ? Math.min(width * 0.35, 300)
+          : Math.min(width * 0.85, 400),
+      height: isTablet 
+        ? Math.min(width * 0.4, 400) 
+        : isLandscape 
+          ? Math.min(width * 0.35, 300)
+          : Math.min(width * 0.85, 400),
+      marginBottom: isLandscape ? 0 : height * 0.03,
+    },
+    contentContainer: {
+      flex: isLandscape ? 1 : 0,
+      alignItems: 'center',
+      paddingLeft: isLandscape ? width * 0.05 : 0,
+    },
+    logoSection: {
+      marginBottom: height * 0.06,
+      alignItems: 'center',
+    },
+    logo: {
+      width: getResponsiveSize(70, 80, 90, 120),
+      height: getResponsiveSize(70, 80, 90, 120),
+      borderRadius: getResponsiveSize(15, 20, 20, 25),
+      marginBottom: height * 0.02,
+    },
+    appName: {
+      fontSize: getResponsiveSize(28, 34, 36, 42),
+      color: '#111827',
+      marginBottom: height * 0.01,
+      fontFamily: 'Montserrat_700Bold',
+      textAlign: 'center',
+    },
+    tagline: {
+      fontSize: getResponsiveSize(16, 18, 20, 24),
+      color: 'black',
+      textAlign: 'center',
+      lineHeight: getResponsiveSize(22, 24, 26, 30),
+      fontFamily: 'Poppins_400Regular',
+      maxWidth: width * 0.8,
+    },
+    indicatorContainer: {
+      flexDirection: 'row',
+      marginBottom: height * 0.04,
+      alignItems: 'center',
+    },
+    dot: {
+      height: getResponsiveSize(6, 8, 8, 10),
+      borderRadius: 5,
+      marginHorizontal: width * 0.01,
+    },
+    firstDot: {
+      backgroundColor: '#DC2626',
+      width: getResponsiveSize(12, 15, 15, 18),
+    },
+    secDot: {
+      backgroundColor: '#DC2626',
+      width: getResponsiveSize(35, 45, 50, 60),
+    },
+    exploreButton: {
+      backgroundColor: '#DC2626',
+      paddingHorizontal: getResponsiveSize(24, 28, 32, 40),
+      paddingVertical: getResponsiveSize(12, 14, 16, 18),
+      borderRadius: 25,
+      flexDirection: 'row',
+      alignItems: 'center',
+      elevation: 3,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      minWidth: width * 0.4,
+      maxWidth: width * 0.8,
+    },
+    exploreButtonText: {
+      color: 'white',
+      fontSize: getResponsiveSize(16, 18, 20, 22),
+      fontWeight: '600',
+      marginRight: 8,
+    },
+    exploreButtonArrow: {
+      color: 'white',
+      fontSize: getResponsiveSize(18, 20, 22, 24),
+      fontWeight: 'bold',
+    },
+  });
+};

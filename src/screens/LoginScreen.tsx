@@ -13,11 +13,11 @@ import {
   ScrollView,
   Modal,
   useWindowDimensions,
-  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { createResponsiveStyles, createCustomAlertStyles } from './styles/LoginScreen.style';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -49,57 +49,7 @@ interface CustomAlertProps {
 
 const CustomAlert: React.FC<CustomAlertProps> = ({ visible, title, message, onClose, buttonText = "Cool!" }) => {
   const { width } = useWindowDimensions();
-  
-  const alertStyles = StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: width * 0.1, // 10% padding
-    },
-    alertcontainer: {
-      backgroundColor: 'white',
-      borderRadius: 12,
-      paddingVertical: width * 0.06, // 6% of screen width
-      paddingHorizontal: width * 0.06,
-      width: '100%',
-      maxWidth: Math.min(width * 0.8, 300),
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
-    },
-    title: {
-      fontSize: Math.min(width * 0.045, 18), // Responsive font size
-      fontWeight: '600',
-      color: '#1F2937',
-      textAlign: 'center',
-      marginBottom: width * 0.03,
-    },
-    message: {
-      fontSize: Math.min(width * 0.035, 14),
-      color: '#6B7280',
-      textAlign: 'center',
-      lineHeight: Math.min(width * 0.05, 20),
-      marginBottom: width * 0.05,
-    },
-    button: {
-      backgroundColor: '#3B82F6',
-      paddingVertical: width * 0.03,
-      paddingHorizontal: width * 0.08,
-      borderRadius: 8,
-      minWidth: width * 0.2,
-    },
-    buttonText: {
-      color: 'white',
-      fontSize: Math.min(width * 0.04, 16),
-      fontWeight: '500',
-      textAlign: 'center',
-    },
-  });
+  const alertStyles = createCustomAlertStyles({ width });
 
   return (
     <Modal
@@ -137,205 +87,19 @@ const LoginScreen: React.FC = () => {
   const { login, isAuthenticated, loading, error, clearError } = useAuth();
   const { width, height } = useWindowDimensions();
 
-  // Responsive breakpoints
   const isSmallScreen = width < 360;
   const isLargeScreen = width >= 410;
   const isTablet = width >= 768;
   const isLandscape = width > height;
 
-  // Responsive values based on screen size
   const getResponsiveSize = (small: number, medium: number, large: number, tablet: number) => {
     if (isTablet) return tablet;
     if (isLargeScreen) return large;
     if (isSmallScreen) return small;
-    return medium; // Default for Realme C25S size (360px)
+    return medium;
   };
 
-  // Dynamic styles based on screen dimensions
-  const responsiveStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#ffffff',
-    },
-    content: {
-      flex: 1,
-      paddingHorizontal: width * 0.055, // ~5.5% of screen width (20px on 360px)
-      justifyContent: isLandscape ? 'flex-start' : 'center',
-      paddingTop: isLandscape ? height * 0.02 : 0,
-    },
-    image: {
-      width: isTablet 
-        ? Math.min(width * 0.4, 300)
-        : isLandscape 
-          ? Math.min(width * 0.25, 200)
-          : Math.min(width * 0.75, 280),
-      height: isTablet 
-        ? Math.min(width * 0.4, 300)
-        : isLandscape 
-          ? Math.min(width * 0.25, 200)
-          : Math.min(width * 0.75, 280),
-      alignSelf: 'center',
-      marginBottom: isLandscape ? height * 0.02 : height * 0.03,
-      marginTop: isLandscape ? height * 0.01 : height * 0.06,
-    },
-    welcomeSection: {
-      marginBottom: isLandscape ? height * 0.03 : height * 0.05,
-      alignItems: 'center',
-    },
-    welcomeTitle: {
-      fontSize: getResponsiveSize(24, 28, 30, 34),
-      fontWeight: 'bold',
-      color: '#000000',
-      marginBottom: height * 0.01,
-      textAlign: 'center',
-    },
-    welcomeSubtitle: {
-      fontSize: getResponsiveSize(14, 16, 17, 20),
-      color: '#6B7280',
-      fontWeight: '400',
-      textAlign: 'center',
-    },
-    form: {
-      flex: 1,
-    },
-    inputContainer: {
-      position: 'relative',
-      marginBottom: isLandscape ? height * 0.025 : height * 0.025,
-    },
-    textInput: {
-      height: getResponsiveSize(45, 50, 52, 56),
-      borderWidth: 1,
-      borderColor: '#D1D5DB',
-      borderRadius: 8,
-      paddingHorizontal: width * 0.044, // ~16px on 360px
-      fontSize: getResponsiveSize(14, 16, 17, 18),
-      color: '#000000',
-      backgroundColor: '#ffffff',
-    },
-    textInputWithIcon: {
-      paddingLeft: width * 0.133, // ~48px on 360px
-    },
-    passwordInputWithIcon: {
-      paddingLeft: width * 0.133, // ~48px on 360px
-      paddingRight: width * 0.139, // ~50px on 360px
-    },
-    inputIcon: {
-      position: 'absolute',
-      left: width * 0.044, // ~16px on 360px
-      top: (getResponsiveSize(45, 50, 52, 56) - 20) / 2, // Center vertically
-      zIndex: 1,
-    },
-    eyeIcon: {
-      position: 'absolute',
-      right: width * 0.042, // ~15px on 360px
-      top: (getResponsiveSize(45, 50, 52, 56) - 20) / 2, // Center vertically
-      padding: 5,
-    },
-    errorContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#FEF2F2',
-      borderColor: '#FECACA',
-      borderWidth: 1,
-      borderRadius: 8,
-      padding: width * 0.033, // ~12px on 360px
-      marginBottom: width * 0.044, // ~16px on 360px
-    },
-    errorText: {
-      color: '#C53030',
-      fontSize: getResponsiveSize(12, 14, 15, 16),
-      marginLeft: width * 0.022, // ~8px on 360px
-      flex: 1,
-      lineHeight: getResponsiveSize(16, 20, 21, 22),
-    },
-    optionsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: isLandscape ? height * 0.035 : height * 0.035,
-    },
-    rememberMeContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    checkbox: {
-      width: getResponsiveSize(16, 18, 19, 20),
-      height: getResponsiveSize(16, 18, 19, 20),
-      borderWidth: 2,
-      borderColor: '#D1D5DB',
-      borderRadius: 3,
-      marginRight: width * 0.022, // ~8px on 360px
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: '#ffffff',
-    },
-    checkboxChecked: {
-      backgroundColor: '#C53030',
-      borderColor: '#C53030',
-    },
-    rememberMeText: {
-      fontSize: getResponsiveSize(12, 14, 15, 16),
-      color: '#374151',
-    },
-    forgotPasswordText: {
-      fontSize: getResponsiveSize(12, 14, 15, 16),
-      color: '#C53030',
-      fontWeight: '500',
-    },
-    loginButton: {
-      height: getResponsiveSize(45, 50, 52, 56),
-      backgroundColor: '#C53030',
-      borderRadius: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: isLandscape ? height * 0.035 : height * 0.035,
-    },
-    loginButtonDisabled: {
-      opacity: 0.7,
-      backgroundColor: '#9CA3AF',
-    },
-    loginButtonText: {
-      color: '#ffffff',
-      fontSize: getResponsiveSize(14, 16, 17, 18),
-      fontWeight: '600',
-    },
-    loginButtonContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dividerContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: isLandscape ? height * 0.035 : height * 0.035,
-    },
-    dividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: '#D1D5DB',
-    },
-    dividerText: {
-      marginHorizontal: width * 0.044, // ~16px on 360px
-      fontSize: getResponsiveSize(12, 14, 15, 16),
-      color: '#6B7280',
-      fontWeight: '500',
-    },
-    createAccountContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingBottom: height * 0.025,
-    },
-    createAccountText: {
-      fontSize: getResponsiveSize(12, 14, 15, 16),
-      color: '#6B7280',
-    },
-    createAccountLink: {
-      fontSize: getResponsiveSize(12, 14, 15, 16),
-      color: '#C53030',
-      fontWeight: '600',
-    },
-  });
+  const responsiveStyles = createResponsiveStyles({ width, height });
 
   const showCustomAlert = useCallback((title: string, message: string, buttonText = 'Cool!') => {
     setAlertTitle(title);

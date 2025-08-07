@@ -112,7 +112,7 @@ class RealTimeParkingServiceClass {
       try {
         callback(this.lastData);
       } catch (error) {
-        console.error('Error in initial callback:', error);
+        console.log('Error in initial callback:', error);
       }
     }
     
@@ -130,7 +130,7 @@ class RealTimeParkingServiceClass {
     try {
       callback(this.connectionStatus);
     } catch (error) {
-      console.error('Error in connection status callback:', error);
+      console.log('Error in connection status callback:', error);
     }
     
     return () => {
@@ -149,7 +149,7 @@ class RealTimeParkingServiceClass {
     if (now - this.lastFetchTime < 5000) return; //every 5 secs to avoid flooding 
 
     if (this.consecErrors >= this.maxConsecutiveErrors) { // Stop if too many errors
-      console.error(`Too many consecutive errors (${this.consecErrors}), stopping service`);
+      console.log(`Too many consecutive errors (${this.consecErrors}), stopping service`);
       this.stop();
       return;
     }
@@ -181,7 +181,7 @@ class RealTimeParkingServiceClass {
       if (this.fetchController.signal.aborted) return; //if ni abort due to timeout, exit
 
       if (response.status === 401 || response.status === 403) { //invalid token
-        console.error(`API authentication error: ${response.status}`);
+        console.log(`API authentication error: ${response.status}`);
         this.setConnectionStatus('error');
         this.consecErrors++;
         return;
@@ -213,7 +213,7 @@ class RealTimeParkingServiceClass {
 
       this.retryCount++;
       this.consecErrors++;
-      console.error(`Fetch error (attempt ${this.retryCount}/${this.maxRetries}):`, error.message);
+      console.log(`Fetch error (attempt ${this.retryCount}/${this.maxRetries}):`, error.message);
       
       this.setConnectionStatus('error');
       
@@ -235,7 +235,7 @@ class RealTimeParkingServiceClass {
           }
         }, delay);
       } else {
-        console.error('Max retries exceeded, stopping automatic updates');
+        console.log('Max retries exceeded, stopping automatic updates');
         this.stop();
       }
     } finally {
@@ -354,7 +354,7 @@ class RealTimeParkingServiceClass {
             );
           }
         })
-        .catch(err => console.error('Error fetching settings:', err));
+        .catch(err => console.log('Error fetching settings:', err));
     }
   }
 
@@ -378,7 +378,7 @@ class RealTimeParkingServiceClass {
       try {
         callback(data);
       } catch (error) {
-        console.error('Error in parking update callback:', error);
+        console.log('Error in parking update callback:', error);
       }
     }
   }
@@ -391,7 +391,7 @@ class RealTimeParkingServiceClass {
         try {
           callback(status);
         } catch (error) {
-          console.error('Error in connection status callback:', error);
+          console.log('Error in connection status callback:', error);
         }
       }
     }

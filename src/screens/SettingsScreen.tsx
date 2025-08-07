@@ -255,7 +255,7 @@ const SettingsScreen: React.FC = () => {
         setNotificationSettings(DEFAULT_SETTINGS);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.log('Error loading settings:', error);
       showAlert(
         'Settings Error',
         'Could not load preferences, using defaults.',
@@ -280,7 +280,7 @@ const SettingsScreen: React.FC = () => {
       await AsyncStorage.setItem(key, JSON.stringify(newSettings));
       setNotificationSettings(newSettings);
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.log('Error saving settings:', error);
       showAlert(
         'Save Error',
         'Failed to save preferences.',
@@ -317,7 +317,7 @@ const SettingsScreen: React.FC = () => {
       await logout();
       navigation.navigate('Login');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.log('Logout error:', error);
       showAlert(
         'Logout Error',
         'Please try again.',
