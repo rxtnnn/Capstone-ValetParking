@@ -95,7 +95,7 @@ class RealTimeParkingServiceClass {
   }
 
   pause(): void {
-    console.log('Pausing RealTimeParkingService data fetching');
+    console.log('Manually pausing RealTimeParkingService data fetching');
     
     if (this.fetchController) { 
       this.fetchController.abort();
@@ -108,6 +108,13 @@ class RealTimeParkingServiceClass {
     }
     
     this.isFetching = false;
+  }
+
+  resume(): void {
+    console.log('Resuming RealTimeParkingService data fetching');
+    if (!this.updateInterval && this.isInitialized && !this.shouldStop) {
+      this.start();
+    }
   }
 
   stop(): void {
@@ -128,6 +135,11 @@ class RealTimeParkingServiceClass {
     
     this.isFetching = false;
     this.setConnectionStatus('disconnected');
+  }
+
+  manualStop(): void {
+    console.log('Manual stop requested - use for logout/app close only');
+    this.stop();
   }
 
   setRefreshRate(intervalMs: number): void {
@@ -168,10 +180,6 @@ class RealTimeParkingServiceClass {
       if (index > -1) {
         this.updateCallbacks.splice(index, 1);
       }
-      
-      if (this.updateCallbacks.length === 0) {
-        this.pause();
-      }
     };
   }
 
@@ -200,8 +208,14 @@ class RealTimeParkingServiceClass {
     if (now - this.lastFetchTime < 2000) return;
 
     if (this.consecErrors >= this.maxConsecutiveErrors) {
-      console.log(`Too many consecutive errors (${this.consecErrors}), pausing service`);
-      this.pause();
+      console.log(`Too many consecutive errors (${this.consecErrors}), extending retry delay`);
+      const extendedDelay = Math.min(30000, this.updateIntervalMs * 3);
+      setTimeout(() => {
+        if (this.isRunning && !this.shouldStop) {
+          this.consecErrors = Math.floor(this.maxConsecutiveErrors / 2);
+          this.fetchAndUpdate();
+        }
+      }, extendedDelay);
       return;
     }
     
