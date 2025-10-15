@@ -1,4 +1,3 @@
-// src/utils/feedbackNotificationHelper.ts
 import { NotificationManager } from '../services/NotifManager';
 import { FeedbackData } from '../types/feedback';
 

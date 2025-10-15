@@ -27,6 +27,8 @@ const ALERT_MESSAGES = {
   PASSWORD_REQUIRED: 'Please enter your password',
   LOGIN_FAILED: 'Login Failed',
   LOGIN_FAILED_MSG: 'Invalid email or password. Please try again.',
+  ACCNT_INACTIVE: 'Account Inactive',
+  LOGIN_INACTIVE: 'Your account is inactive. Please contact your administrator to reactivate your account.',
   LOGIN_ERROR: 'Login Error',
   UNEXPECTED_ERROR: 'An unexpected error occurred. Please try again.',
   FORGOT_PASSWORD: 'Forgot Password',
@@ -144,7 +146,7 @@ const LoginScreen: React.FC = () => {
     }
     return true;
   }, [email, password, showCustomAlert]);
-
+  
   const handleLogin = useCallback(async () => {
     if (!validateForm()) return;
 
@@ -161,13 +163,12 @@ const LoginScreen: React.FC = () => {
         setEmail('');
         setPassword('');
       } else {
-        const msg = result.message || ALERT_MESSAGES.LOGIN_FAILED_MSG;
-        const isDenied = msg.toLowerCase().includes('access denied');
         showCustomAlert(
-          isDenied ? 'Access Denied' : ALERT_MESSAGES.LOGIN_FAILED,
-          msg,
-          isDenied ? 'OK' : 'Try Again'
-        );
+            ALERT_MESSAGES.ACCNT_INACTIVE,
+            ALERT_MESSAGES.LOGIN_INACTIVE,
+            'OK'
+          );
+          setIsSubmitting(false);
       }
     } catch (error) {
       showCustomAlert(
@@ -179,6 +180,7 @@ const LoginScreen: React.FC = () => {
       setIsSubmitting(false);
     }
   }, [validateForm, clearError, login, email, password, showCustomAlert]);
+
 
   const handleForgotPassword = useCallback(() => {
     showCustomAlert(

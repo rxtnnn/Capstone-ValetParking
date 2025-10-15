@@ -5,7 +5,8 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
-  ScrollView
+  ScrollView,
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -21,6 +22,9 @@ import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-
 import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 
+// Import the car PNG image
+const carImage = require('../../assets/car_top.png');
+
 type RootStackParamList = {
   Home: undefined;
 };
@@ -34,6 +38,7 @@ interface ParkingSpot {
   width?: number;
   height?: number;
   section?: string;
+  rotation?: string;
 }
 
 interface ParkingSection {
@@ -59,58 +64,58 @@ const SENSOR_TO_SPOT_MAPPING: { [key: number]: string } = {
 };
 
 const INITIAL_SPOTS: ParkingSpot[] = [
-  { id: 'A1', isOccupied: false, position: { x: 680, y: 110 }, width: 35, height: 35 },
-  { id: 'B4', isOccupied: false, position: { x: 500, y: 50 }, width: 35, height: 35 },
-  { id: 'B3', isOccupied: false, position: { x: 540, y: 50 }, width: 35, height: 35 },
-  { id: 'B2', isOccupied: false, position: { x: 580, y: 50 }, width: 35, height: 35 },
-  { id: 'B1', isOccupied: false, position: { x: 620, y: 50 }, width: 35, height: 35 },
-  { id: 'C1', isOccupied: false, position: { x: 450, y: 100 }, width: 35, height: 35 },
-  { id: 'C2', isOccupied: false, position: { x: 450, y: 140 }, width: 35, height: 35 },
-  { id: 'D7', isOccupied: false, position: { x: 120, y: 200 }, width: 35, height: 35 },
-  { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 35, height: 35 },
-  { id: 'D5', isOccupied: false, position: { x: 200, y: 200 }, width: 35, height: 35 },
-  { id: 'D4', isOccupied: false, position: { x: 240, y: 200 }, width: 35, height: 35 },
-  { id: 'D3', isOccupied: false, position: { x: 300, y: 200 }, width: 35, height: 35 },
-  { id: 'D2', isOccupied: false, position: { x: 340, y: 200 }, width: 35, height: 35 },
-  { id: 'D1', isOccupied: false, position: { x: 380, y: 200 }, width: 35, height: 35 },
-  { id: 'J5', isOccupied: false, position: { x: 300, y: 370 }, width: 35, height: 35 },
-  { id: 'J4', isOccupied: false, position: { x: 340, y: 370 }, width: 35, height: 35 },
-  { id: 'J3', isOccupied: false, position: { x: 380, y: 370 }, width: 35, height: 35 },
-  { id: 'J2', isOccupied: false, position: { x: 420, y: 370 }, width: 35, height: 35 },
-  { id: 'J1', isOccupied: false, position: { x: 460, y: 370 }, width: 35, height: 35 },
-  { id: 'E3', isOccupied: false, position: { x: 55, y: 315 }, width: 35, height: 60 },
-  { id: 'E2', isOccupied: false, position: { x: 55, y: 380 }, width: 35, height: 60 },
-  { id: 'E1', isOccupied: false, position: { x: 55, y: 445 }, width: 35, height: 60 },
-  { id: 'F1', isOccupied: false, position: { x: 120, y: 520 }, width: 35, height: 35 },
-  { id: 'F2', isOccupied: false, position: { x: 160, y: 520 }, width: 35, height: 35 },
-  { id: 'F3', isOccupied: false, position: { x: 220, y: 520 }, width: 35, height: 35 },
-  { id: 'F4', isOccupied: false, position: { x: 260, y: 520 }, width: 35, height: 35 },
-  { id: 'F5', isOccupied: false, position: { x: 300, y: 520 }, width: 35, height: 35 },
-  { id: 'F6', isOccupied: false, position: { x: 360, y: 520 }, width: 35, height: 35 },
-  { id: 'F7', isOccupied: false, position: { x: 400, y: 520 }, width: 35, height: 35 },
-  { id: 'G1', isOccupied: false, position: { x: 500, y: 590 }, width: 35, height: 35 },
-  { id: 'G2', isOccupied: false, position: { x: 500, y: 630 }, width: 35, height: 35 },
-  { id: 'G3', isOccupied: false, position: { x: 500, y: 670 }, width: 35, height: 35 }, 
-  { id: 'G4', isOccupied: false, position: { x: 500, y: 730 }, width: 35, height: 35 },
-  { id: 'G5', isOccupied: false, position: { x: 500, y: 770 }, width: 35, height: 35 },
-  { id: 'H1', isOccupied: false, position: { x: 550, y: 830 }, width: 35, height: 35 },
-  { id: 'H2', isOccupied: false, position: { x: 590, y: 830 }, width: 35, height: 35 },
-  { id: 'H3', isOccupied: false, position: { x: 630, y: 830 }, width: 35, height: 35 },
-  { id: 'I5', isOccupied: false, position: { x: 680, y: 590 }, width: 35, height: 35 },
-  { id: 'I4', isOccupied: false, position: { x: 680, y: 630 }, width: 35, height: 35 },
-  { id: 'I3', isOccupied: false, position: { x: 680, y: 670 }, width: 35, height: 35 },
-  { id: 'I2', isOccupied: false, position: { x: 680, y: 730 }, width: 35, height: 35 },
-  { id: 'I1', isOccupied: false, position: { x: 680, y: 770 }, width: 35, height: 35 },
+  { id: 'A1', isOccupied: false, position: { x: 690, y: 90 }, width: 40, height: 100, rotation: '90deg' },
+  { id: 'B4', isOccupied: false, position: { x: 500, y: 32 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'B3', isOccupied: false, position: { x: 545, y: 32 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'B2', isOccupied: false, position: { x: 590, y: 32 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'B1', isOccupied: false, position: { x: 635, y: 32 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'C1', isOccupied: false, position: { x: 450, y: 95 }, width: 40, height: 55, rotation: '-90deg' },
+  { id: 'C2', isOccupied: false, position: { x: 450, y: 150 }, width: 40, height: 55, rotation: '90deg' },
+  { id: 'D7', isOccupied: false, position: { x: 100, y: 200 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'D5', isOccupied: false, position: { x: 210, y: 200 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'D4', isOccupied: false, position: { x: 259, y: 200 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'D3', isOccupied: false, position: { x: 310, y: 200 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'D2', isOccupied: false, position: { x: 355, y: 200 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'D1', isOccupied: false, position: { x: 400, y: 200 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'J5', isOccupied: false, position: { x: 270, y: 370 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'J4', isOccupied: false, position: { x: 320, y: 370 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'J3', isOccupied: false, position: { x: 380, y: 370 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'J2', isOccupied: false, position: { x: 440, y: 370 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'J1', isOccupied: false, position: { x: 490, y: 370 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'E3', isOccupied: false, position: { x: 55, y: 315 }, width: 55, height: 60, rotation: '90deg' },
+  { id: 'E2', isOccupied: false, position: { x: 55, y: 380 }, width: 55, height: 60, rotation: '90deg' },
+  { id: 'E1', isOccupied: false, position: { x: 55, y: 445 }, width: 55, height: 60, rotation: '90deg' },
+  { id: 'F1', isOccupied: false, position: { x: 120, y: 520 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'F2', isOccupied: false, position: { x: 165, y: 520 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'F3', isOccupied: false, position: { x: 220, y: 520 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'F4', isOccupied: false, position: { x: 265, y: 520 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'F5', isOccupied: false, position: { x: 310, y: 520 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'F6', isOccupied: false, position: { x: 365, y: 520 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'F7', isOccupied: false, position: { x: 410, y: 520 }, width: 40, height: 55, rotation: '0deg' },
+  { id: 'G1', isOccupied: false, position: { x: 500, y: 590 }, width: 40, height: 55, rotation: '90deg' },
+  { id: 'G2', isOccupied: false, position: { x: 500, y: 650 }, width: 40, height: 55, rotation: '90deg' },
+  { id: 'G3', isOccupied: false, position: { x: 500, y: 710 }, width: 40, height: 55, rotation: '90deg' }, 
+  { id: 'G4', isOccupied: false, position: { x: 500, y: 770 }, width: 40, height: 55, rotation: '90deg' },
+  { id: 'G5', isOccupied: false, position: { x: 500, y: 830 }, width: 40, height: 55, rotation: '90deg' },
+  { id: 'H1', isOccupied: false, position: { x: 560, y: 890 }, width: 40, height: 55, rotation: '180deg' },
+  { id: 'H2', isOccupied: false, position: { x: 605, y: 890 }, width: 40, height: 55, rotation: '180deg' },
+  { id: 'H3', isOccupied: false, position: { x: 650, y: 890 }, width: 40, height: 55, rotation: '180deg' },
+  { id: 'I5', isOccupied: false, position: { x: 680, y: 590 }, width: 40, height: 55, rotation: '270deg' },
+  { id: 'I4', isOccupied: false, position: { x: 680, y: 650 }, width: 40, height: 55, rotation: '270deg' },
+  { id: 'I3', isOccupied: false, position: { x: 680, y: 710 }, width: 40, height: 55, rotation: '270deg' },
+  { id: 'I2', isOccupied: false, position: { x: 680, y: 770 }, width: 40, height: 55, rotation: '270deg' },
+  { id: 'I1', isOccupied: false, position: { x: 680, y: 830 }, width: 40, height: 55, rotation: '270deg' },
 ];
 
 const GESTURE_LIMITS = {
-  maxTranslateX: 200,
-  minTranslateX: -400,
-  maxTranslateY: 100,
-  minTranslateY: -300,
-  minScale: 0.5,
+  maxTranslateX: 300,
+  minTranslateX: -300,
+  maxTranslateY: 200,
+  minTranslateY: -600,
+  minScale: 0.7,
   maxScale: 3,
-  clampMinScale: 0.7,
+  clampMinScale: 0.8,
   clampMaxScale: 2.5
 };
 
@@ -159,10 +164,107 @@ const ParkingMapScreen: React.FC = () => {
 
   const [parkingSections, setParkingSections] = useState<ParkingSection[]>(() => computeInitialSections());
 
+  // Define navigation waypoints for routing
+  const NAVIGATION_WAYPOINTS = useMemo(() => ({
+    entrance: { x:670, y: 280 }, // Bottom entrance point
+    
+    // Main intersection points
+    intersectionAB: { x: 670, y: 130 },
+    intersectionBC: { x: 520, y: 130 },
+    intersectionA: { x: 670, y: 150 },
+    intersectionH: { x: 600, y: 900 },
+    intersectionG: { x: 550, y: 830 },
+    intersectionF: { x: 450, y: 550 },
+    intersectionE: { x: 100, y: 450 },
+    intersectionD: { x: 200, y: 230 },
+    intersectionC: { x: 467, y: 150 },
+    intersectionB: { x: 660, y: 60 },
+    intersectionJ: { x: 400, y: 400 },
+  }), []);
+
+  const generateNavigationPath = useCallback((spotId: string) => {
+    const spot = parkingData.find(s => s.id === spotId);
+    if (!spot) return [];
+
+    const section = spotId.charAt(0);
+    const entrance = NAVIGATION_WAYPOINTS.entrance;
+    const path: {x: number, y: number}[] = [entrance];
+
+    // Route based on section
+    switch(section) {
+      case 'H':
+        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
+        break;
+      
+      case 'I':
+        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+        path.push(NAVIGATION_WAYPOINTS.intersectionG);
+        path.push({ x: 700, y: spot.position.y + 30 });
+        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
+        break;
+      
+      case 'G':
+        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+        path.push(NAVIGATION_WAYPOINTS.intersectionG);
+        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
+        break;
+      
+      case 'F':
+        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+        path.push(NAVIGATION_WAYPOINTS.intersectionG);
+        path.push(NAVIGATION_WAYPOINTS.intersectionF);
+        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
+        break;
+      
+      case 'E':
+        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+        path.push(NAVIGATION_WAYPOINTS.intersectionG);
+        path.push(NAVIGATION_WAYPOINTS.intersectionF);
+        path.push(NAVIGATION_WAYPOINTS.intersectionE);
+        path.push({ x: spot.position.x + 30, y: spot.position.y + 30 });
+        break;
+      
+      case 'J':
+        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+        path.push(NAVIGATION_WAYPOINTS.intersectionG);
+        path.push(NAVIGATION_WAYPOINTS.intersectionF);
+        path.push(NAVIGATION_WAYPOINTS.intersectionJ);
+        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
+        break;
+      
+      case 'D':
+        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+        path.push(NAVIGATION_WAYPOINTS.intersectionG);
+        path.push(NAVIGATION_WAYPOINTS.intersectionF);
+        path.push(NAVIGATION_WAYPOINTS.intersectionJ);
+        path.push(NAVIGATION_WAYPOINTS.intersectionD);
+        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
+        break;
+      
+      case 'C':
+        path.push(NAVIGATION_WAYPOINTS.intersectionAB);
+        path.push(NAVIGATION_WAYPOINTS.intersectionBC);
+        path.push({ x:520, y:180 });
+        path.push({ x: 470, y: 180 });
+        break;
+      
+      case 'B':
+        path.push(NAVIGATION_WAYPOINTS.intersectionB);
+        break;
+      
+      case 'A':
+        path.push(NAVIGATION_WAYPOINTS.intersectionA);
+        path.push({ x: 710, y: 150});
+        break;
+    }
+
+    return path;
+  }, [parkingData, NAVIGATION_WAYPOINTS]);
+
   const updateParkingSpotsFromService = useCallback((stats: ParkingStats) => {
     if (!isMountedRef.current) return;
-    
-    console.log('Updating parking map with new data:', stats.lastUpdated);
+  
     setParkingStats(stats);
     
     const spotOccupancyMap: { [key: string]: boolean } = {};
@@ -209,11 +311,8 @@ const ParkingMapScreen: React.FC = () => {
     });
   }, []);
 
-  // Subscribe to parking service updates
   const subscribeToParkingData = useCallback(() => {
     if (unsubscribeFunctionsRef.current.parkingUpdates) return;
-
-    console.log('Setting up parking map subscription');
 
     const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
       if (!isMountedRef.current) return;
@@ -222,7 +321,6 @@ const ParkingMapScreen: React.FC = () => {
 
     const unsubscribeConnectionStatus = RealTimeParkingService.onConnectionStatus((status) => {
       if (!isMountedRef.current) return;
-      console.log('Map connection status:', status);
       setConnectionStatus(status);
     });
 
@@ -230,12 +328,10 @@ const ParkingMapScreen: React.FC = () => {
     unsubscribeFunctionsRef.current.connectionStatus = unsubscribeConnectionStatus;
   }, [updateParkingSpotsFromService]);
 
-  // Initialize subscriptions
   useEffect(() => {
     subscribeToParkingData();
 
     return () => {
-      // Clean up subscriptions
       Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
         if (typeof unsubscribe === 'function') {
           unsubscribe();
@@ -248,7 +344,6 @@ const ParkingMapScreen: React.FC = () => {
   // Re-subscribe when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      // Re-subscribe if not already subscribed
       if (!unsubscribeFunctionsRef.current.parkingUpdates) {
         subscribeToParkingData();
       }
@@ -346,7 +441,6 @@ const ParkingMapScreen: React.FC = () => {
     if (!isMountedRef.current) return;
     
     try {
-      console.log('Manual refresh triggered from parking map');
       await RealTimeParkingService.forceUpdate();
     } catch (error) {
       console.error('Manual refresh failed:', error);
@@ -380,11 +474,15 @@ const ParkingMapScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Guide Me',
-          onPress: () => setShowNavigation(true),
+          onPress: () => {
+            const path = generateNavigationPath(spot.id);
+            setNavigationPath(path);
+            setShowNavigation(true);
+          },
         },
       ]
     );
-  }, []);
+  }, [generateNavigationPath]);
 
   const navigateHome = useCallback(() => {
     navigation.navigate('Home');
@@ -398,29 +496,74 @@ const ParkingMapScreen: React.FC = () => {
 
   const renderParkingSpot = useCallback((spot: ParkingSpot) => {
     const isSelected = selectedSpot === spot.id;
-    const spotSection = spot.id.charAt(0); 
+    const spotSection = spot.id.charAt(0);
     const isHighlighted = highlightedSection === spotSection;
-    
+    const rotation = spot.rotation || '0deg';
+    const w = spot.width || 30;
+    const h = spot.height || 30;
+
     return (
       <TouchableOpacity
         key={spot.id}
-        style={[
-          styles.parkingSpot,
-          {
-            left: spot.position.x,
-            top: spot.position.y,
-            width: spot.width || 35,
-            height: spot.height || 35,
-            backgroundColor: spot.isOccupied ? '#ff4444' : '#4CAF50',
-            borderColor: isSelected ? '#FFD700' : (isHighlighted ? '#FF6B35' : 'transparent'),
-            borderWidth: isSelected || isHighlighted ? 3 : 0,
-          },
-        ]}
         onPress={() => handleSpotPress(spot)}
+        style={{
+          position: 'absolute',
+          left: spot.position.x,
+          top: spot.position.y,
+          width: w,
+          height: h,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        activeOpacity={2}
       >
-        <Text style={[styles.spotText, { fontSize: spot.width && spot.width > 35 ? 10 : 8 }]}>
-          {spot.id}
-        </Text>
+        {spot.isOccupied ? (
+          <Image 
+            source={carImage}
+            style={{
+              width: w,
+              height: h,
+              transform: [{rotate: rotation }],
+            }}
+            resizeMode="contain"
+          />
+        ) : (
+          <View
+            style={{
+              width: w,
+              height: h,
+              borderRadius: 4,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [{ rotate: rotation }],
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFF',
+                fontWeight: '700',
+                fontSize: 18,
+                fontFamily: 'Poppins_600SemiBold',
+              }}
+            >
+              {spot.id}
+            </Text>
+          </View>
+        )}
+
+        {/* highlight ring when selected/section-highlighted */}
+        {(isSelected || isHighlighted) && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              width: w + 6,
+              height: h + 6,
+              borderWidth: 4,
+              borderColor: isSelected ? '#00e73aff' : '#FF6B35',
+            }}
+          />
+        )}
       </TouchableOpacity>
     );
   }, [selectedSpot, highlightedSection, handleSpotPress]);
@@ -449,7 +592,8 @@ const ParkingMapScreen: React.FC = () => {
     if (!showNavigation || navigationPath.length < 2) return null;
 
     return (
-      <>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+        {/* Draw the path lines */}
         {navigationPath.map((point, index) => {
           if (index === navigationPath.length - 1) return null;
           
@@ -467,16 +611,18 @@ const ParkingMapScreen: React.FC = () => {
                 left: point.x,
                 top: point.y,
                 width: distance,
-                height: 4,
-                backgroundColor: '#FF0000',
+                height: 6,
+                backgroundColor: '#00E676',
                 transform: [{ rotate: `${angle}deg` }],
                 transformOrigin: '0 50%',
                 zIndex: 100,
+                borderRadius: 3,
               }}
             />
           );
         })}
         
+        {/* Draw directional arrow at each waypoint */}
         {navigationPath.map((point, index) => {
           if (index === 0 || index === navigationPath.length - 1) return null;
           
@@ -485,12 +631,12 @@ const ParkingMapScreen: React.FC = () => {
               key={`arrow-${index}`}
               style={{
                 position: 'absolute',
-                left: point.x - 15,
-                top: point.y - 15,
-                width: 30,
-                height: 30,
-                backgroundColor: '#FF0000',
-                borderRadius: 15,
+                left: point.x - 8,
+                top: point.y - 8,
+                width: 16,
+                height: 16,
+                backgroundColor: '#00E676',
+                borderRadius: 8,
                 justifyContent: 'center',
                 alignItems: 'center',
                 zIndex: 101,
@@ -498,7 +644,46 @@ const ParkingMapScreen: React.FC = () => {
             />
           );
         })}
-      </>
+
+        {/* Starting point indicator */}
+        <View
+          style={{
+            position: 'absolute',
+            left: navigationPath[0].x - 15,
+            top: navigationPath[0].y - 15,
+            width: 30,
+            height: 30,
+            backgroundColor: '#00E676',
+            borderRadius: 15,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 102,
+            borderWidth: 3,
+            borderColor: 'white',
+          }}
+        >
+        </View>
+
+        {/* Destination point indicator */}
+        <View
+          style={{
+            position: 'absolute',
+            left: navigationPath[navigationPath.length - 1].x - 20,
+            top: navigationPath[navigationPath.length - 1].y - 20,
+            width: 40,
+            height: 40,
+            backgroundColor: '#00E676',
+            borderRadius: 20,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 102,
+            borderWidth: 3,
+            borderColor: 'white',
+          }}
+        >
+          <Ionicons name="flag" size={20} color="white" />
+        </View>
+      </View>
     );
   }, [showNavigation, navigationPath]);
 
@@ -538,6 +723,89 @@ const ParkingMapScreen: React.FC = () => {
                 maxPointers={1}
               >
                 <Animated.View style={[styles.parkingLayout, animatedStyle]}>
+                  {/* Section A - Box */}
+                  <View style={{ position: 'absolute', left: 690, top: 110, width: 44, height: 2,  backgroundColor: '#fff',}} />
+                  <View style={{ position: 'absolute', left: 690, top: 170, width: 44, height: 2,  backgroundColor: '#fff',}} />
+                  {/* Section B - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 498, top: 30, width: 180, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 498, top: 90, width: 180, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section B - Vertical dividers */}
+                  <View style={{ position: 'absolute', left: 540, top: 30, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 585, top: 30, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 630, top: 30, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  
+                  {/* Section C - Vertical dividers */}
+                  <View style={{ position: 'absolute', left: 437, top: 100, width: 2, height: 100, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 497, top: 98, width: 2, height: 100, backgroundColor: '#fff' }} />
+                    {/* Section C - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 440, top: 150, width: 58, height: 2, backgroundColor: '#fff',}} />
+                
+                  {/* Section D - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 100, top: 198, width: 335, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 100, top: 257, width: 335, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section D - Vertical dividers */}
+                  <View style={{ position: 'absolute', left: 150, top: 198, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 205, top: 198, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 250, top: 198, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 305, top: 198, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 350, top: 198, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 395, top: 198, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  
+                  {/* Section J - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 270, top: 368, width: 250, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 270, top: 427, width: 250, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section J - Vertical dividers */}
+                  <View style={{ position: 'absolute', left: 310, top: 368, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 370, top: 368, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 430, top: 368, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 485, top: 368, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  
+                  {/* Section E - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 53, top: 313, width: 2, height: 205, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 112, top: 313, width: 2, height: 205, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 53, top: 375, width: 59, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 53, top: 440, width: 59, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section F - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 115, top: 518, width: 330, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 115, top: 577, width: 330, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section F - Vertical dividers */}
+                  <View style={{ position: 'absolute', left: 160, top: 518, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 215, top: 518, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 260, top: 518, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 305, top: 518, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 360, top: 518, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 405, top: 518, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  
+                  {/* Section G - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 498, top: 588, width: 2, height: 305, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 542, top: 588, width: 2, height: 305, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 498, top: 645, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 498, top: 705, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 498, top: 765, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 498, top: 825, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section I - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 678, top: 588, width: 2, height: 305, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 722, top: 588, width: 2, height: 305, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 678, top: 645, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 678, top: 705, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 678, top: 765, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 678, top: 825, width: 44, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section H - Horizontal dividers */}
+                  <View style={{ position: 'absolute', left: 545, top: 890, width: 135, height: 2, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 550, top: 947, width: 135, height: 2, backgroundColor: '#fff' }} />
+                  
+                  {/* Section H - Vertical dividers */}
+                  <View style={{ position: 'absolute', left: 600, top: 890, width: 2, height: 59, backgroundColor: '#fff' }} />
+                  <View style={{ position: 'absolute', left: 645, top: 890, width: 2, height: 59, backgroundColor: '#fff' }} />
+
+                  {/* Render parking spots */}
                   {parkingData.map(renderParkingSpot)}
                   {renderNavigationPath()}
                   
@@ -555,8 +823,8 @@ const ParkingMapScreen: React.FC = () => {
                     <Text style={styles.stairsText}>STAIRS</Text>
                   </View>
                   
-                  <View style={styles.youAreHere}>
-                    <Text style={styles.youAreHereText}>You are here</Text>
+                  <View style={styles.entrance}>
+                    <Text style={styles.entranceText}>Entrance</Text>
                   </View>
                   
                   <View style={styles.exitSign}>
