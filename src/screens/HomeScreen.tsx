@@ -12,6 +12,7 @@ import { styles } from './styles/HomeScreen.style';
 import { NotificationManager } from '../services/NotifManager';
 import NotificationOverlay from '../components/NotifOverlay';
 import { useFeedback } from '../hooks/useFeedback';
+import {COLORS} from '../constants/AppConst';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -24,9 +25,7 @@ type RootStackParamList = {
   ApiTest: undefined;
   Login: undefined;
 };
-
 type HomeScreenNavigationProp = NavigationProp<RootStackParamList>;
-
 interface CircularProgressProps {
   size: number;
   strokeWidth: number;
@@ -35,18 +34,24 @@ interface CircularProgressProps {
   backgroundColor?: string;
   children?: React.ReactNode;
 }
-
-const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
-const FLOOR_SUFFIXES = ['th', 'st', 'nd', 'rd'];
-const FLOOR_PATTERN = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
 const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000;
-const DEFAULT_FLOORS = Array.from({ length: 4 }, (_, i) => ({
-  floor: i + 1,
-  total: 0,
-  available: 0,
-  occupancyRate: 0,
-  status: 'available' as const
-}));
+const DEFAULT_FLOORS: {
+  floor: number;
+  total: number;
+  available: number;
+  occupancyRate: number;
+  status:'available';
+}[] = [];
+
+  for(let i = 0; i<4; i++){
+    DEFAULT_FLOORS.push({
+      floor: i + 1,
+      total: 0,
+      available: 0,
+      occupancyRate: 0,
+      status: 'available' as const
+    });
+  }
 
 const CircularProgress: React.FC<CircularProgressProps> = ({
   size,
@@ -95,8 +100,6 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user, isAuthenticated } = useAuth();
   const { checkForNewReplies } = useFeedback();
-  const [fontsLoaded] = useFonts(FONTS);
-
   const [parkingData, setParkingData] = useState<ParkingStats>({
     totalSpots: 0,
     availableSpots: 0,
@@ -105,7 +108,6 @@ const HomeScreen: React.FC = () => {
     lastUpdated: '',
     isLive: false,
   });
-
   const [refreshing, setRefreshing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [loading, setLoading] = useState(true);
@@ -114,45 +116,46 @@ const HomeScreen: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [lastParkingData, setLastParkingData] = useState<ParkingStats | null>(null);
-
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
     parkingUpdates?: () => void;
     connectionStatus?: () => void;
     notifications?: () => void;
   }>({});
-
-  const extractFloorFromLocation = useCallback((floor_level: string): number => {
-    if (!floor_level) return 1;
-    const match = floor_level.match(FLOOR_PATTERN);
-    if (match) {
-      const floorNumber = parseInt(match[1]);
-      if (floorNumber >= 1 && floorNumber <= 4) return floorNumber;
+  
+  const getFloorName = (floorNum: number) => {
+    const checkLastTwo = floorNum % 100;
+    if(checkLastTwo >= 11 && checkLastTwo <= 13){
+      return `${floorNum}th Floor`;
     }
-    return 1;
-  }, []);
-
-  const getFloorName = useCallback((floorNumber: number): string => {
-    const remainder = floorNumber % 100;
-    const suffix = (remainder >= 11 && remainder <= 13) 
-      ? 'th' 
-      : FLOOR_SUFFIXES[floorNumber % 10] || 'th';
-    return `${floorNumber}${suffix} Floor`;
-  }, []);
+    const lastDigit = floorNum % 10;
+    let suffix = 'th';
+    if(lastDigit === 1){ suffix = 'st'; }
+    else if(lastDigit === 2){ suffix = 'nd'; }
+    else if(lastDigit === 3){ suffix = 'rd'; };
+  }
 
   const getFloorStatus = useCallback((available: number, total: number) => {
-    if (total === 0) return { text: 'NO DATA', color: '#999' };
-    const percentage = (available / total) * 100;
-    if (percentage === 0) return { text: 'FULL', color: '#B22020' };
-    if (percentage < 25) return { text: 'LIMITED', color: '#FF9801' };
-    return { text: 'AVAILABLE', color: '#48D666' };
+    if (total === 0) {
+      return { text: 'NO DATA', color: '#999'};
+    }
+    const percent = (available / total) * 100;
+    switch (true) {
+      case percent === 0:
+        return { text: 'FULL', color: COLORS.primary };
+      case percent < 25: 
+        return { text: 'LIMITED', color: COLORS.limited };
+      default:
+        return { text: 'AVAILABLE', color: COLORS.secondary };
+    }
   }, []);
 
   const getProgressPercentage = useCallback((available: number, total: number) => {
     return total === 0 ? 0 : ((total - available) / total) * 100;
   }, []);
 
-  const floorsToDisplay = useMemo(() => {
+  //display floor cards
+  const displayFloors = useMemo(() => {
     const fixedFloors = [...DEFAULT_FLOORS];
     
     fixedFloors.forEach(fixedFloor => {
@@ -161,8 +164,8 @@ const HomeScreen: React.FC = () => {
         Object.assign(fixedFloor, realFloor);
       }
     });
-    
-    return fixedFloors;
+    //sort descending order
+    return fixedFloors.sort((a, b) => b.available - a.available);
   }, [parkingData.floors]);
 
   const checkParkingChanges = useCallback((newData: ParkingStats) => {
@@ -212,6 +215,7 @@ const HomeScreen: React.FC = () => {
     }
   }, [checkForNewReplies, isAuthenticated]);
 
+  //parking data subscription
   const subscribeToParkingData = useCallback(() => {
     if (!isAuthenticated || unsubscribeFunctionsRef.current.parkingUpdates) return;
 
@@ -334,7 +338,7 @@ const HomeScreen: React.FC = () => {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <View style={styles.loadingContent}>
-          <Ionicons name="car" size={48} color="#B22020" />
+          <Ionicons name="car" size={48} color={COLORS.primary}/>
           <Text style={styles.loadingText}>Loading VALET...</Text>
           <Text style={styles.loadingSubtext}>
             Welcome {user?.name || user?.email}! Fetching real-time parking data...
@@ -346,9 +350,9 @@ const HomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#B22020" />
+      <StatusBar barStyle="light-content" backgroundColor= {COLORS.primary} />
       
-      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
+      <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }} style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoSection}>
             <View style={styles.logoContainer}>
@@ -395,7 +399,7 @@ const HomeScreen: React.FC = () => {
                 progress={(parkingData.totalSpots > 0) ? (parkingData.availableSpots / parkingData.totalSpots) * 100 : 0}
                 color="#48D666"
               >
-                <Text style={[styles.progressNumber, { color: '#48D666' }]}>
+                <Text style={[styles.progressNumber, { color: COLORS.green }]}>
                   {parkingData.availableSpots}
                 </Text>
               </CircularProgress>
@@ -407,9 +411,9 @@ const HomeScreen: React.FC = () => {
                 size={80}
                 strokeWidth={6}
                 progress={(parkingData.totalSpots > 0) ? (parkingData.occupiedSpots / parkingData.totalSpots) * 100 : 0}
-                color="#B22020"
+                color = {COLORS.primary}
               >
-                <Text style={[styles.progressNumber, { color: '#B22020' }]}>
+                <Text style={[styles.progressNumber, { color: COLORS.primary }]}>
                   {parkingData.occupiedSpots}
                 </Text>
               </CircularProgress>
@@ -421,9 +425,9 @@ const HomeScreen: React.FC = () => {
                 size={80}
                 strokeWidth={6}
                 progress={100}
-                color="#2196F3"
+                color={COLORS.blue}
               >
-                <Text style={[styles.progressNumber, { color: '#2196F3' }]}>
+                <Text style={[styles.progressNumber, { color: COLORS.blue }]}>
                   {parkingData.totalSpots}
                 </Text>
               </CircularProgress>
@@ -433,7 +437,7 @@ const HomeScreen: React.FC = () => {
 
           <View style={styles.occupancyRow}>
             <Text style={styles.occupancyText}>Overall Occupancy</Text>
-            <Text style={styles.occupancyText}>
+            <Text style={[styles.occupancyText, { color: connectionStatus === 'connected' ? COLORS.green : connectionStatus === 'error' ? COLORS.primary : '#999', fontWeight: 'bold' }]}>
               {connectionStatus === 'connected' ? '● Live' : connectionStatus === 'error' ? '● Error' : '● Offline'}
             </Text>
           </View>
@@ -450,22 +454,18 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Select Floor</Text>
           </View>
 
-          {floorsToDisplay.map((floor) => {
+          {displayFloors.map((floor) => {
             const status = getFloorStatus(floor.available, floor.total);
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
             const isFull = status.text === 'FULL';
-            const hasNoData = status.text === 'NO DATA' || floor.total === 0;
-            const isDisabled = hasNoData;
+            const noData = status.text === 'NO DATA' || floor.total === 0;
+            const isDisabled = noData;
             
             return (
               <TouchableOpacity
                 key={`floor-${floor.floor}`}
-                style={[
-                  styles.floorCard,
-                  isFull && styles.fullFloorCard,
-                  hasNoData && styles.noDataFloorCard,
-                  isDisabled && styles.disabledFloorCard
-                ]}
+                style={[styles.floorCard, isFull && styles.fullFloorCard, noData && styles.noDataFloorCard,
+                  isDisabled && styles.disabledFloorCard]}
                 onPress={() => isDisabled ? null : handleFloorPress(floor)}
                 activeOpacity={isDisabled ? 1 : 0.8}
                 disabled={isDisabled}
@@ -473,7 +473,7 @@ const HomeScreen: React.FC = () => {
                 <View style={styles.floorHeader}>
                   <Text style={[
                     styles.floorTitle,
-                    (isFull || hasNoData) && styles.fullFloorText,
+                    (isFull || noData) && styles.fullFloorText,
                     isDisabled && styles.disabledText
                   ]}>
                     {getFloorName(floor.floor)}
@@ -485,7 +485,7 @@ const HomeScreen: React.FC = () => {
                     <Ionicons 
                       name="chevron-forward" 
                       size={24} 
-                      color={isDisabled ? "#ccc" : (isFull || hasNoData) ? "#666" : "#999"} 
+                      color={isDisabled ? "#ccc" : (isFull || noData) ? "#666" : "#999"} 
                     />
                   </View>
                 </View>
@@ -494,15 +494,15 @@ const HomeScreen: React.FC = () => {
                   <View style={styles.statItem}>
                     <Text style={[
                       styles.statNumber, 
-                      { color: '#48D666' },
-                      (isFull || hasNoData) && styles.fullFloorText,
+                      { color: COLORS.green },
+                      (isFull || noData) && styles.fullFloorText,
                       isDisabled && styles.disabledText
                     ]}>
                       {floor.available}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || hasNoData) && styles.fullFloorText,
+                      (isFull || noData) && styles.fullFloorText,
                       isDisabled && styles.disabledText
                     ]}>Available</Text>
                   </View>
@@ -510,15 +510,15 @@ const HomeScreen: React.FC = () => {
                   <View style={styles.statItem}>
                     <Text style={[
                       styles.statNumber, 
-                      { color: '#B22020' },
-                      (isFull || hasNoData) && styles.fullFloorText,
+                      { color: COLORS.primary },
+                      (isFull || noData) && styles.fullFloorText,
                       isDisabled && styles.disabledText
                     ]}>
                       {floor.total - floor.available}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || hasNoData) && styles.fullFloorText,
+                      (isFull || noData) && styles.fullFloorText,
                       isDisabled && styles.disabledText
                     ]}>Occupied</Text>
                   </View>
@@ -526,15 +526,15 @@ const HomeScreen: React.FC = () => {
                   <View style={styles.statItem}>
                     <Text style={[
                       styles.statNumber, 
-                      { color: '#2196F3' },
-                      (isFull || hasNoData) && styles.fullFloorText,
+                      { color: COLORS.blue },
+                      (isFull || noData) && styles.fullFloorText,
                       isDisabled && styles.disabledText
                     ]}>
                       {floor.total}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || hasNoData) && styles.fullFloorText,
+                      (isFull || noData) && styles.fullFloorText,
                       isDisabled && styles.disabledText
                     ]}>Total Spots</Text>
                   </View>
@@ -554,10 +554,10 @@ const HomeScreen: React.FC = () => {
                   </View>
                   <Text style={[
                     styles.progressBarText,
-                    (isFull || hasNoData) && styles.fullFloorText,
+                    (isFull || noData) && styles.fullFloorText,
                     isDisabled && styles.disabledText
                   ]}>
-                    {hasNoData ? 'No sensors' : `${Math.round(progressPercentage)}% Full`}
+                    {noData ? 'No sensors' : `${Math.round(progressPercentage)}% Full`}
                   </Text>
                 </View>
               </TouchableOpacity>

@@ -64,7 +64,7 @@ export const createResponsiveStyles = ({ width, height }: ResponsiveStylesParams
     form: {
       flex: 1,
     },
-    inputContainer: {
+    inputCon: {
       position: 'relative',
       marginBottom: isLandscape ? height * 0.025 : height * 0.025,
     },

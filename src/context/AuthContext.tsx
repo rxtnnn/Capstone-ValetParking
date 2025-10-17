@@ -1,5 +1,3 @@
-// Update your AuthContext.tsx file to include notification sync
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { login as apiLogin, logout as apiLogout, TokenManager } from '../config/api';
@@ -13,7 +11,6 @@ interface User {
   role: string;
   employee_id: string;
 }
-
 interface LoginCredentials {
   email: string;
   password: string;
@@ -23,8 +20,8 @@ interface LoginResult {
   success: boolean;
   message?: string;
   user?: User;
+  reason?: 'inactive' | 'invalid_credentials' | 'unknown';
 }
-
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -35,7 +32,6 @@ interface AuthContextType {
   clearError: () => void;
   checkAuthStatus: () => Promise<void>;
 }
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
@@ -82,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
      if (token && storedUser) {
       const role = storedUser.role.toLowerCase();
-      if (['admin', 'sdd', 'security'].includes(role)) {
+      if (['admin', 'sdd'].includes(role)) {
         await TokenManager.removeFromStorage();
         setUser(null);
         setIsAuthenticated(false);
@@ -117,9 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (response.success && response.user) {
         const role = response.user.role.toLowerCase();
-        if (['admin', 'ssd', 'security'].includes(role)) {
+        if (['admin', 'ssd'].includes(role)) {
           await TokenManager.removeFromStorage();
-          const accessDenied = 'Access denied. Only users can login.';
+          const accessDenied = 'Access denied. Only users and security personnel can login.';
           setError(accessDenied);
           return { success: false, message: accessDenied };
         }

@@ -1,4 +1,5 @@
 import { StyleSheet, Dimensions } from 'react-native';
+import { COLORS, FONTS, useAppFonts} from '../../constants/AppConst';
 const { height } = Dimensions.get('window');
 
 export const styles = StyleSheet.create({
@@ -39,13 +40,13 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   sectionSlots: {
     color: 'white',
     fontSize: 10,
     marginTop: 2,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   connectionStatus: {
     flexDirection: 'row',
@@ -62,7 +63,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   refreshButton: {
     position: 'absolute',
@@ -81,7 +82,7 @@ export const styles = StyleSheet.create({
   refreshText: {
     color: 'white',
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   mapContainer: {
     flex: 1,
@@ -165,7 +166,7 @@ export const styles = StyleSheet.create({
     color: 'black',
     fontSize: 9,
     textAlign: 'center',
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   stairs: {
     position: 'absolute',
@@ -184,7 +185,7 @@ export const styles = StyleSheet.create({
     color: 'black',
     fontSize: 9,
     textAlign: 'center',
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   entrance: {
     position: 'absolute',
@@ -201,7 +202,7 @@ export const styles = StyleSheet.create({
   entranceText: {
     color: 'black',
     fontSize: 15,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
     textAlign: 'center',
   },
   exitSign: {
@@ -220,7 +221,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 24,
     textAlign: 'center',
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   bottomPanel: {
     borderTopLeftRadius: 20,
@@ -237,7 +238,7 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
     marginBottom: 15,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   floorInfo: {
     marginBottom: 20,
@@ -251,25 +252,25 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     textAlign: 'center',
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   floorNumber: {
     color: 'white',
     fontSize: 32,
     textAlign: 'center',
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   availableLabel: {
     color: 'white',
     fontSize: 14,
     textAlign: 'center',
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   availableNumber: {
     color: 'white',
     fontSize: 32,
     textAlign: 'center',
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   lastUpdated: {
     marginTop: 10,
@@ -278,7 +279,7 @@ export const styles = StyleSheet.create({
   lastUpdatedText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   bottomButtons: {
     flexDirection: 'row',
@@ -299,10 +300,10 @@ export const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
   primaryButton: {
-    backgroundColor: '#FF4444',
+    backgroundColor: '#B22020',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
@@ -313,7 +314,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   closeButton: {
     position: 'absolute',
@@ -338,7 +339,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
   },
   dragHandle: {
     width: 40,
@@ -364,7 +365,7 @@ export const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 11,
     marginTop: 2,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
   },
 
 });

@@ -18,10 +18,9 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
-
+import { COLORS, FONTS, useAppFonts} from '../constants/AppConst';
 // Import the car PNG image
 const carImage = require('../../assets/car_top.png');
 
@@ -40,7 +39,6 @@ interface ParkingSpot {
   section?: string;
   rotation?: string;
 }
-
 interface ParkingSection {
   id: string;
   label: string;
@@ -48,8 +46,6 @@ interface ParkingSection {
   availableSlots: number;
   isFull: boolean;
 }
-
-const FONTS = { Poppins_400Regular, Poppins_600SemiBold };
 
 const SENSOR_TO_SPOT_MAPPING: { [key: number]: string } = {
   7: 'A1',   4: 'B1',   3: 'B2',   2: 'B3',   1: 'B4',
@@ -121,8 +117,7 @@ const GESTURE_LIMITS = {
 
 const ParkingMapScreen: React.FC = () => {
   const navigation = useNavigation<ParkingMapScreenNavigationProp>();
-  const [fontsLoaded] = useFonts(FONTS);
-
+  const fontsLoaded = useAppFonts();
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [parkingData, setParkingData] = useState<ParkingSpot[]>(INITIAL_SPOTS);
@@ -543,7 +538,7 @@ const ParkingMapScreen: React.FC = () => {
                 color: '#FFF',
                 fontWeight: '700',
                 fontSize: 18,
-                fontFamily: 'Poppins_600SemiBold',
+                fontFamily: FONTS.semiBold,
               }}
             >
               {spot.id}
@@ -691,7 +686,7 @@ const ParkingMapScreen: React.FC = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.header}>
+      <View style={[styles.header, {backgroundColor: '#4C0E0E'}]}>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -700,7 +695,7 @@ const ParkingMapScreen: React.FC = () => {
         >
           {parkingSections.map(renderSectionIndicator)}
         </ScrollView>
-      </LinearGradient>
+      </View>
 
       <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
         <Ionicons name="refresh" size={20} color="white" />
@@ -900,7 +895,7 @@ const ParkingMapScreen: React.FC = () => {
 
       <PanGestureHandler ref={bottomPanelPanRef} onGestureEvent={bottomPanelGestureHandler}>
         <Animated.View style={[bottomPanelAnimatedStyle]}>
-          <LinearGradient colors={['#B22020', '#4C0E0E']} style={styles.bottomPanel}>
+          <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.bottomPanel}>
             <View style={styles.dragHandle} />
             
             <View style={styles.floorInfo}>

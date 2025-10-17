@@ -1,8 +1,9 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_ENDPOINTS } from '../constants/AppConst';
 
 export const API_CONFIG = {
-  BASE_URL: 'https://valet.up.railway.app/api',
+  BASE_URL: API_ENDPOINTS.baseUrl,
   TIMEOUT: 15000,
 };
 interface LoginResponse {
@@ -36,7 +37,7 @@ class TokenManager {
       await this.loadFromStorage();
       this.isInitialized = true;
     } catch (error) {
-      console.log('Error initializing TokenManager:', error);
+      console.log('Error initializing Token Manager:', error);
       this.isInitialized = true; 
     } finally {
       this.initializationPromise = null;
@@ -247,7 +248,7 @@ const initializeTokenManager = async () => {
   try {
     await TokenManager.initialize();
   } catch (error) {
-    console.warn('Initial TokenManager initialization failed, will retry on first use:', error);
+    console.warn('Initial TokenManager initialization failed: ', error);
   }
 };
 initializeTokenManager();

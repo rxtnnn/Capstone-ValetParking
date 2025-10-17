@@ -1,5 +1,5 @@
 import { StyleSheet,Dimensions } from 'react-native';
-
+import {COLORS, FONTS, } from '../../constants/AppConst';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -17,13 +17,13 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginTop: 16,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   loadingSubtext: {
     fontSize: 14,
     color: '#666',
     marginTop: 8,
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: FONTS.regular
   },
   header: {
     paddingTop: 50,
@@ -59,14 +59,14 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
     letterSpacing: 1,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   subtitle: {
     fontSize: 12,
     color: 'white',
     opacity: 0.9,
     marginTop: 2,
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: FONTS.regular
   },
   headerIcons: {
     flexDirection: 'row',
@@ -90,13 +90,13 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#B22020',
+    borderColor: '#FFD700',
   },
   notificationBadgeText: {
     color: '#333',
     fontSize: 10,
     fontWeight: 'bold',
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
     textAlign: 'center',
   },
   campusCard: {
@@ -111,7 +111,7 @@ export const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
     marginBottom: 20,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   circularProgressRow: {
     flexDirection: 'row',
@@ -124,14 +124,14 @@ export const styles = StyleSheet.create({
   progressNumber: {
     fontSize: 20,
     fontWeight: 'bold',
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   progressLabel: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 10,
+    color: 'black',
     marginTop: 8,
     textAlign: 'center',
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: FONTS.regular
   },
   occupancyRow: {
     flexDirection: 'row',
@@ -142,7 +142,7 @@ export const styles = StyleSheet.create({
   occupancyText: {
     fontSize: 12,
     color: '#666',
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
     fontStyle: 'italic',
   },
   liveBadge: {
@@ -154,7 +154,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   scrollContainer: {
     flex: 1,
@@ -172,7 +172,7 @@ export const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   floorCard: {
     backgroundColor: 'white',
@@ -199,11 +199,11 @@ export const styles = StyleSheet.create({
   },
   fullFloorText: {
     color: '#666',
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: FONTS.regular
   },
   disabledText: {
     color: '#aaa',
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: FONTS.regular
   },
   floorHeader: {
     flexDirection: 'row',
@@ -215,7 +215,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   floorHeaderRight: {
     flexDirection: 'row',
@@ -231,7 +231,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   floorStats: {
     flexDirection: 'row',
@@ -244,13 +244,13 @@ export const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: FONTS.semiBold
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#666',
     marginTop: 4,
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: FONTS.regular
   },
   progressBarContainer: {
     alignItems: 'center',
@@ -272,7 +272,7 @@ export const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     fontWeight: '500',
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: FONTS.regular
   },
   tabBar: {
     flexDirection: 'row',
@@ -289,7 +289,7 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
   },
   activeTab: {
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
   },
   modalOverlay: {
     flex: 1,
@@ -311,14 +311,14 @@ export const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
     marginBottom: 12,
     textAlign: 'center',
     color: '#333',
   },
   modalText: {
     color: '#666',
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: FONTS.regular,
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 20,
@@ -337,7 +337,7 @@ export const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: 'white',
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: FONTS.semiBold,
     fontSize: 14,
   },
 });

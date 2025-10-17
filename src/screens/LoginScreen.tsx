@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { createResponsiveStyles, createCustomAlertStyles } from './styles/LoginScreen.style';
+import { COLORS } from '../constants/AppConst';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -74,21 +75,22 @@ const CustomAlert: React.FC<CustomAlertProps> = ({ visible, title, message, onCl
 };
 
 const LoginScreen: React.FC = () => {
+  //credentials
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  //alerts
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
   const [alertButtonText, setAlertButtonText] = useState('Cool!');
-  
+  //navigation
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { login, isAuthenticated, loading, error, clearError } = useAuth();
   const { width, height } = useWindowDimensions();
-
+//screen size
   const isSmallScreen = width < 360;
   const isLargeScreen = width >= 410;
   const isTablet = width >= 768;
@@ -100,9 +102,7 @@ const LoginScreen: React.FC = () => {
     if (isSmallScreen) return small;
     return medium;
   };
-
   const responsiveStyles = createResponsiveStyles({ width, height });
-
   const showCustomAlert = useCallback((title: string, message: string, buttonText = 'Cool!') => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -162,13 +162,20 @@ const LoginScreen: React.FC = () => {
       if (result.success) {
         setEmail('');
         setPassword('');
-      } else {
+      } else if (result.reason === 'inactive') {
         showCustomAlert(
             ALERT_MESSAGES.ACCNT_INACTIVE,
             ALERT_MESSAGES.LOGIN_INACTIVE,
             'OK'
           );
           setIsSubmitting(false);
+      } else {
+        showCustomAlert(
+          ALERT_MESSAGES.LOGIN_FAILED,
+          ALERT_MESSAGES.LOGIN_FAILED_MSG,
+          'OK'
+        );
+        setIsSubmitting(false);
       }
     } catch (error) {
       showCustomAlert(
@@ -209,7 +216,7 @@ const LoginScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={[responsiveStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#B22020" />
+        <ActivityIndicator size="large" color= {COLORS.primary}/>
         <Text style={{ 
           marginTop: height * 0.02, 
           fontSize: getResponsiveSize(14, 16, 17, 18), 
@@ -249,13 +256,13 @@ const LoginScreen: React.FC = () => {
 
             {error && (
               <View style={responsiveStyles.errorContainer}>
-                <Ionicons name="alert-circle" size={16} color="#B22020" />
+                <Ionicons name="alert-circle" size={16} color={COLORS.primary}/>
                 <Text style={responsiveStyles.errorText}>{error}</Text>
               </View>
             )}
 
             <View style={responsiveStyles.form}>
-              <View style={responsiveStyles.inputContainer}>
+              <View style={responsiveStyles.inputCon}>
                 <Ionicons 
                   name="mail-outline" 
                   size={getResponsiveSize(18, 20, 21, 22)} 
@@ -275,7 +282,7 @@ const LoginScreen: React.FC = () => {
                 />
               </View>
 
-              <View style={responsiveStyles.inputContainer}>
+              <View style={responsiveStyles.inputCon}>
                 <Ionicons 
                   name="lock-closed-outline" 
                   size={getResponsiveSize(18, 20, 21, 22)} 

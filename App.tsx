@@ -124,10 +124,7 @@ const GradientHeader: React.FC<GradientHeaderProps> = ({
   });
 
   return (
-    <LinearGradient 
-      colors={['#B22020', '#4C0E0E']} 
-      style={responsiveHeaderStyles.headerContainer}
-    >
+    <View style={[responsiveHeaderStyles.headerContainer, {backgroundColor: '#4C0E0E'}]}>
       {canGoBack && (
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -150,7 +147,7 @@ const GradientHeader: React.FC<GradientHeaderProps> = ({
       >
         {title}
       </Text>
-    </LinearGradient>
+    </View>
   );
 };
 
