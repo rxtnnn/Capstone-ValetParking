@@ -22,11 +22,11 @@ export const MapLayout: React.FC<MapLayoutProps> = ({ styles }) => {
       <View style={{ position: 'absolute', left: 630, top: 30, width: 2, height: 59, backgroundColor: '#fff' }} />
       
       {/* Section C - Vertical dividers */}
-      <View style={{ position: 'absolute', left: 437, top: 100, width: 2, height: 100, backgroundColor: '#fff' }} />
-      <View style={{ position: 'absolute', left: 497, top: 98, width: 2, height: 100, backgroundColor: '#fff' }} />
+      <View style={{ position: 'absolute', left: 437, top: 100, width: 2, height: 90, backgroundColor: '#fff' }} />
+      <View style={{ position: 'absolute', left: 497, top: 98, width: 2, height: 90, backgroundColor: '#fff' }} />
       
       {/* Section C - Horizontal dividers */}
-      <View style={{ position: 'absolute', left: 440, top: 155, width: 58, height: 2, backgroundColor: '#fff' }} />
+      <View style={{ position: 'absolute', left: 440, top: 145, width: 58, height: 2, backgroundColor: '#fff' }} />
     
       {/* Section D - Horizontal dividers */}
       <View style={{ position: 'absolute', left: 100, top: 198, width: 335, height: 2, backgroundColor: '#fff' }} />

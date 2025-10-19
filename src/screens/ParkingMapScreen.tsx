@@ -62,7 +62,7 @@ const INITIAL_SPOTS: ParkingSpot[] = [
   { id: 'B2', isOccupied: false, position: { x: 590, y: 32 }, width: 40, height: 55, rotation: '0deg' },
   { id: 'B1', isOccupied: false, position: { x: 635, y: 32 }, width: 40, height: 55, rotation: '0deg' },
   { id: 'C1', isOccupied: false, position: { x: 450, y: 95 }, width: 40, height: 55, rotation: '-90deg' },
-  { id: 'C2', isOccupied: false, position: { x: 450, y: 150 }, width: 40, height: 55, rotation: '90deg' },
+  { id: 'C2', isOccupied: false, position: { x: 450, y: 140 }, width: 40, height: 55, rotation: '90deg' },
   { id: 'D7', isOccupied: false, position: { x: 100, y: 200 }, width: 40, height: 55, rotation: '0deg' },
   { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 40, height: 55, rotation: '0deg' },
   { id: 'D5', isOccupied: false, position: { x: 210, y: 200 }, width: 40, height: 55, rotation: '0deg' },
@@ -313,8 +313,9 @@ const ParkingMapScreen: React.FC = () => {
   }, [updateParkingSpotsFromService]);
 
   useEffect(() => {
+     translateX.value = -300; 
+    translateY.value = 100; 
     subscribeToParkingData();
-
     return () => {
       Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
         if (typeof unsubscribe === 'function') {
@@ -325,7 +326,6 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, [subscribeToParkingData]);
 
-  // Re-subscribe when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       if (!unsubscribeFunctionsRef.current.parkingUpdates) {
@@ -337,12 +337,11 @@ const ParkingMapScreen: React.FC = () => {
   // Component mount/unmount lifecycle
   useEffect(() => {
     isMountedRef.current = true;
-
     return () => {
       isMountedRef.current = false;
     };
   }, []);
-
+  
   const panGestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
       context.startX = translateX.value;
@@ -356,15 +355,15 @@ const ParkingMapScreen: React.FC = () => {
       const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = GESTURE_LIMITS;
 
       if (translateX.value > maxTranslateX) {
-        translateX.value = withSpring(maxTranslateX);
+        translateX.value =maxTranslateX;
       } else if (translateX.value < minTranslateX) {
-        translateX.value = withSpring(minTranslateX);
+        translateX.value = minTranslateX;
       }
 
       if (translateY.value > maxTranslateY) {
-        translateY.value = withSpring(maxTranslateY);
+        translateY.value = maxTranslateY;
       } else if (translateY.value < minTranslateY) {
-        translateY.value = withSpring(minTranslateY);
+        translateY.value = minTranslateY;
       }
     },
   });
@@ -380,9 +379,9 @@ const ParkingMapScreen: React.FC = () => {
     onEnd: () => {
       const { clampMinScale, clampMaxScale } = GESTURE_LIMITS;
       if (scale.value < clampMinScale) {
-        scale.value = withSpring(clampMinScale);
+        scale.value = clampMinScale;
       } else if (scale.value > clampMaxScale) {
-        scale.value = withSpring(clampMaxScale);
+        scale.value = clampMaxScale;
       }
     },
   });
