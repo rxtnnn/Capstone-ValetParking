@@ -191,7 +191,7 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     right: 90,
     top: 260,
-    backgroundColor: '#3ed120ff',
+    backgroundColor: COLORS.primary,
     padding: 8,
     borderRadius: 4,
     width: 90,
@@ -200,7 +200,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   entranceText: {
-    color: 'black',
+    color: 'white',
     fontSize: 15,
     fontFamily: FONTS.semiBold,
     textAlign: 'center',

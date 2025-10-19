@@ -1,219 +1,132 @@
-import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { COLORS, FONTS } from '../../constants/AppConst';
-
-interface GridLineStyle extends ViewStyle {
-  position: 'absolute';
-  backgroundColor: string;
-}
-export const createGridLineStyle = (dimensions: {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}): ViewStyle => ({
-  ...mapLayoutStyles.gridLine,
-  ...dimensions,
-});
-
-export const SPOT_DIVIDER = {
-  // Section A
-  sectionA: [
-    { left: 690, top: 110, width: 44, height: 2 },
-    { left: 690, top: 170, width: 44, height: 2 },
-  ],
-  
-  // Section B - Horizontal
-  sectionBHorizontal: [
-    { left: 498, top: 30, width: 180, height: 2 },
-    { left: 498, top: 90, width: 180, height: 2 },
-  ],
-  
-  // Section B - Vertical
-  sectionBVertical: [
-    { left: 540, top: 30, width: 2, height: 59 },
-    { left: 585, top: 30, width: 2, height: 59 },
-    { left: 630, top: 30, width: 2, height: 59 },
-  ],
-  
-  // Section C
-  sectionC: [
-    { left: 439, top: 100, width: 2, height: 100 },
-    { left: 497, top: 98, width: 2, height: 100 },
-    { left: 440, top: 155, width: 58, height: 2 },
-  ],
-  
-  // Section D - Horizontal
-  sectionDHorizontal: [
-    { left: 100, top: 198, width: 335, height: 2 },
-    { left: 100, top: 257, width: 335, height: 2 },
-  ],
-  
-  // Section D - Vertical
-  sectionDVertical: [
-    { left: 150, top: 198, width: 2, height: 59 },
-    { left: 205, top: 198, width: 2, height: 59 },
-    { left: 250, top: 198, width: 2, height: 59 },
-    { left: 305, top: 198, width: 2, height: 59 },
-    { left: 350, top: 198, width: 2, height: 59 },
-    { left: 395, top: 198, width: 2, height: 59 },
-  ],
-   // Section E
-  sectionE: [
-    { left: 53, top: 313, width: 2, height: 205 },
-    { left: 112, top: 313, width: 2, height: 205 },
-    { left: 53, top: 375, width: 59, height: 2 },
-    { left: 53, top: 440, width: 59, height: 2 },
-  ],
-  
-  // Section F - Horizontal
-  sectionFHorizontal: [
-    { left: 115, top: 518, width: 330, height: 2 },
-    { left: 115, top: 577, width: 330, height: 2 },
-  ],
-  
-  // Section F - Vertical
-  sectionFVertical: [
-    { left: 160, top: 518, width: 2, height: 59 },
-    { left: 215, top: 518, width: 2, height: 59 },
-    { left: 260, top: 518, width: 2, height: 59 },
-    { left: 305, top: 518, width: 2, height: 59 },
-    { left: 360, top: 518, width: 2, height: 59 },
-    { left: 405, top: 518, width: 2, height: 59 },
-  ],
-  
-  // Section G - Vertical
-  sectionGVertical: [
-    { left: 498, top: 588, width: 2, height: 305 },
-    { left: 542, top: 588, width: 2, height: 305 },
-  ],
-  
-  // Section G - Horizontal
-  sectionGHorizontal: [
-    { left: 498, top: 645, width: 44, height: 2 },
-    { left: 498, top: 705, width: 44, height: 2 },
-    { left: 498, top: 765, width: 44, height: 2 },
-    { left: 498, top: 825, width: 44, height: 2 },
-  ],
-  
-  // Section I - Vertical
-  sectionIVertical: [
-    { left: 678, top: 588, width: 2, height: 305 },
-    { left: 722, top: 588, width: 2, height: 305 },
-  ],
-  
-  // Section I - Horizontal
-  sectionIHorizontal: [
-    { left: 678, top: 645, width: 44, height: 2 },
-    { left: 678, top: 705, width: 44, height: 2 },
-    { left: 678, top: 765, width: 44, height: 2 },
-    { left: 678, top: 825, width: 44, height: 2 },
-  ],
-  
-  // Section H - Horizontal
-  sectionHHorizontal: [
-    { left: 545, top: 890, width: 135, height: 2 },
-    { left: 550, top: 947, width: 135, height: 2 },
-  ],
-  
-  // Section H - Vertical
-  sectionHVertical: [
-    { left: 600, top: 890, width: 2, height: 59 },
-    { left: 645, top: 890, width: 2, height: 59 },
-  ],
-   // Section J - Horizontal
-  sectionJHorizontal: [
-    { left: 270, top: 368, width: 250, height: 2 },
-    { left: 270, top: 427, width: 250, height: 2 },
-  ],
-  
-  // Section J - Vertical
-  sectionJVertical: [
-    { left: 310, top: 368, width: 2, height: 59 },
-    { left: 370, top: 368, width: 2, height: 59 },
-    { left: 430, top: 368, width: 2, height: 59 },
-    { left: 485, top: 368, width: 2, height: 59 },
-  ],
-  
-};
+import { StyleSheet } from 'react-native';
+import { FONTS } from '../../constants/AppConst';
 
 export const mapLayoutStyles = StyleSheet.create({
-  gridLine: {
+  // Elevators
+  elevator1: {
     position: 'absolute',
-    backgroundColor: '#fff',
-  } as GridLineStyle,
-  
-  spotContainer: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  
-  spotContent: {
+    left: 450,
+    top: 210,
+    backgroundColor: '#d5d821ff',
+    padding: 10,
     borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  
-  spotText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 18,
-    fontFamily: FONTS.semiBold,
-  } as TextStyle,
-  
-  highlightRing: {
-    position: 'absolute',
-    borderWidth: 4,
-    transform: [{ rotate: '0deg' }],
-  },
-  navigationContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  navigationLine: {
-    position: 'absolute',
-    height: 6,
-    backgroundColor: COLORS.green,
-    borderRadius: 3,
-    zIndex: 100,
-  },
-  waypointDot: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    backgroundColor: COLORS.green,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 101,
-  },
-  
-  startPoint: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    backgroundColor: COLORS.green,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 102,
-    borderWidth: 3,
-    borderColor: 'white',
-  },
-  
-  endPoint: {
-    position: 'absolute',
-    width: 40,
+    width: 60,
     height: 40,
-    backgroundColor: COLORS.green,
-    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 102,
-    borderWidth: 3,
-    borderColor: 'white',
   },
+  elevator2: {
+    position: 'absolute',
+    left: 460,
+    top: 525,
+    backgroundColor: '#d5d821ff',
+    padding: 8,
+    borderRadius: 4,
+    width: 85,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  elevator3: {
+    position: 'absolute',
+    left: 657,
+    top: 495,
+    backgroundColor: '#d5d821ff',
+    padding: 10,
+    borderRadius: 4,
+    width: 85,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ rotate: '90deg' }],
+  },
+  elevatorText: {
+    color: 'black',
+    fontSize: 9,
+    textAlign: 'center',
+    fontFamily: FONTS.semiBold,
+  },
+  
+  // Stairs
+  stairs: {
+    position: 'absolute',
+    left: 30,
+    top: 225,
+    backgroundColor: '#d5d821ff',
+    padding: 8,
+    borderRadius: 4,
+    width: 80,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ rotate: '-90deg' }],
+  },
+  stairsText: {
+    color: 'black',
+    fontSize: 9,
+    textAlign: 'center',
+    fontFamily: FONTS.regular,
+  },
+  
+  // Entrance
+  entrance: {
+    position: 'absolute',
+    right: 90,
+    top: 260,
+    backgroundColor: '#3ed120ff',
+    padding: 8,
+    borderRadius: 4,
+    width: 90,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  entranceText: {
+    color: 'black',
+    fontSize: 15,
+    fontFamily: FONTS.semiBold,
+    textAlign: 'center',
+  },
+  
+  // Exit
+  exitSign: {
+    position: 'absolute',
+    right: 120,
+    top: 400,
+    backgroundColor: 'transparent',
+    padding: 8,
+    borderRadius: 4,
+    width: 100,
+    height: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exitText: {
+    color: 'white',
+    fontSize: 24,
+    textAlign: 'center',
+    fontFamily: FONTS.semiBold,
+  },
+  
+  // Arrows
+  arrow1: { position: 'absolute', right: 140, top: 170 },
+  arrow2: { position: 'absolute', right: 160, top: 120 },
+  arrow3: { position: 'absolute', right: 230, top: 120 },
+  arrow4: { position: 'absolute', right: 270, top: 160 },
+  arrow5: { position: 'absolute', right: 270, top: 260 },
+  arrow6: { position: 'absolute', right: 350, top: 285 },
+  arrow7: { position: 'absolute', right: 470, top: 285 },
+  arrow8: { position: 'absolute', right: 600, top: 285 },
+  arrow9: { position: 'absolute', right: 650, top: 390 },
+  arrow11: { position: 'absolute', right: 580, top: 470 },
+  arrow12: { position: 'absolute', right: 430, top: 470 },
+  arrow13: { position: 'absolute', right: 280, top: 470 },
+  arrow14: { position: 'absolute', right: 220, top: 510 },
+  arrow15: { position: 'absolute', right: 220, top: 620 },
+  arrow16: { position: 'absolute', right: 220, top: 750 },
+  arrow17: { position: 'absolute', right: 180, top: 840 },
+  arrow18: { position: 'absolute', right: 140, top: 750 },
+  arrow19: { position: 'absolute', right: 140, top: 620 },
+  arrow20: { position: 'absolute', right: 140, top: 490 },
+  arrow21: { position: 'absolute', right: 90, top: 410 },
 });
