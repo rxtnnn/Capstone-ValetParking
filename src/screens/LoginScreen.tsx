@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { createResponsiveStyles, createCustomAlertStyles } from './styles/LoginScreen.style';
 import { COLORS } from '../constants/AppConst';
@@ -123,7 +124,18 @@ const LoginScreen: React.FC = () => {
     }
   }, [isAuthenticated, loading, navigation]);
 
-  useEffect(() => clearError, []);
+  useEffect(() => {
+    const loadSavedLogin = async () => {
+      const savedEmail = await AsyncStorage.getItem('savedEmail');
+      const savedPass = await AsyncStorage.getItem('savedPass');
+      if(savedEmail && savedPass) {
+        setEmail(savedEmail);
+        setPassword(savedPass);
+        setRememberMe(true);
+      }
+    };
+    loadSavedLogin();
+  }, []);
 
   useEffect(() => {
     if (error) {
@@ -149,7 +161,7 @@ const LoginScreen: React.FC = () => {
   
   const handleLogin = useCallback(async () => {
     if (!validateForm()) return;
-
+    
     setIsSubmitting(true);
     clearError();
 
@@ -160,6 +172,13 @@ const LoginScreen: React.FC = () => {
       });
 
       if (result.success) {
+        if (rememberMe) {
+          await AsyncStorage.setItem('savedEmail', email);
+          await AsyncStorage.setItem('savedPass', password);
+        }else{
+          await AsyncStorage.removeItem('savedEmail');
+          await AsyncStorage.removeItem('savedPass'); 
+        }
         setEmail('');
         setPassword('');
       } else if (result.reason === 'inactive') {
@@ -186,7 +205,7 @@ const LoginScreen: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [validateForm, clearError, login, email, password, showCustomAlert]);
+  }, [validateForm, clearError, login, email, password, showCustomAlert, rememberMe]);
 
 
   const handleForgotPassword = useCallback(() => {
@@ -231,22 +250,11 @@ const LoginScreen: React.FC = () => {
   return (
     <SafeAreaView style={responsiveStyles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView 
-          style={{ flex: 1 }} 
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={responsiveStyles.content}>
             <View>
-              <Image 
-                source={require('../../assets/logo.png')} 
-                style={responsiveStyles.image}
-                resizeMode="contain"
-              />
+              <Image source={require('../../assets/logo.png')} style={responsiveStyles.image} resizeMode="contain"/>
             </View>
 
             <View style={responsiveStyles.welcomeSection}>
