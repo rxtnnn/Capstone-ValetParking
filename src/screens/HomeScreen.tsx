@@ -125,14 +125,18 @@ const HomeScreen: React.FC = () => {
   
   const getFloorName = (floorNum: number) => {
     const checkLastTwo = floorNum % 100;
+    const lastDigit = floorNum % 10;
+    let suffix = 'th';
+
     if(checkLastTwo >= 11 && checkLastTwo <= 13){
       return `${floorNum}th Floor`;
     }
-    const lastDigit = floorNum % 10;
-    let suffix = 'th';
+    
     if(lastDigit === 1){ suffix = 'st'; }
     else if(lastDigit === 2){ suffix = 'nd'; }
     else if(lastDigit === 3){ suffix = 'rd'; };
+
+    return `${floorNum}${suffix} Floor`;
   }
 
   const getFloorStatus = useCallback((available: number, total: number) => {
