@@ -95,7 +95,6 @@ const LoginScreen: React.FC = () => {
   const isSmallScreen = width < 360;
   const isLargeScreen = width >= 410;
   const isTablet = width >= 768;
-  const isLandscape = width > height;
 
   const getResponsiveSize = (small: number, medium: number, large: number, tablet: number) => {
     if (isTablet) return tablet;

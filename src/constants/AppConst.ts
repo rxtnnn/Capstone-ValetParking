@@ -13,6 +13,7 @@ export const COLORS = {
 export const API_ENDPOINTS = {
   login: '/api/auth/login',
   baseUrl: 'https://valet.up.railway.app/api',
+  userUrl: 'https://valet.up.railway.app/api/public/users',
 };
 
 export const FONTS = {

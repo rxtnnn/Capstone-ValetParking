@@ -7,6 +7,8 @@ import {
   Modal,
   Animated,
   RefreshControl,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -15,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { styles } from './styles/ProfileScreen.style';
+import {API_ENDPOINTS, COLORS} from '../constants/AppConst';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -44,17 +47,12 @@ interface User {
   name: string;
   email: string;
   role?: string;
-  role_display?: string;
   employee_id?: string;
   student_id?: string;
   department?: string;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
-  phone?: string;
-  year_level?: string;
-  course?: string;
-  profile_photo?: string;
 }
 
 interface AlertConfig {
@@ -76,8 +74,28 @@ interface UserStats {
   lastParked: string;
 }
 
+interface PasswordChangeState {
+  current: string;
+  new: string;
+  confirm: string;
+}
+
+interface PasswordErrors {
+  current: string;
+  new: string;
+  confirm: string;
+}
+
+interface PasswordRules {
+  length: boolean;
+  uppercase: boolean;
+  lowercase: boolean;
+  number: boolean;
+  special: boolean;
+}
+
 const API_CONFIG = {
-  BASE_URL: 'https://valet.up.railway.app/api/public/users',
+  BASE_URL: API_ENDPOINTS.userUrl,
   TOKEN: '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad',
   HEADERS: {
     'Accept': 'application/json',
@@ -91,13 +109,6 @@ const ALERT_COLORS = {
   warning: '#FF9800',
   confirm: '#F44336',
   info: '#2196F3'
-} as const;
-
-const ALERT_ICONS = {
-  success: 'check-circle',
-  warning: 'warning',
-  confirm: 'help',
-  info: 'info'
 } as const;
 
 const USER_TYPE_ICONS = {
@@ -120,6 +131,23 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     message: '',
     type: 'info',
   });
+
+  // Password Change States
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwords, setPasswords] = useState<PasswordChangeState>({
+    current: '',
+    new: '',
+    confirm: ''
+  });
+  const [passwordErrors, setPasswordErrors] = useState<PasswordErrors>({
+    current: '',
+    new: '',
+    confirm: ''
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const isMountedRef = useRef(true);
   const userFetchedRef = useRef(false);
@@ -158,53 +186,111 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, []);
 
-  const formatRelativeTime = useCallback((dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 0) return 'Today';
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays < 7) return `${diffDays} days ago`;
-      return formatDate(dateString);
-    } catch {
-      return 'Unknown';
-    }
-  }, [formatDate]);
-
-  const getUserTypeIcon = useCallback((role: string) => {
-    const key = role?.toLowerCase() as keyof typeof USER_TYPE_ICONS;
-    return USER_TYPE_ICONS[key] || USER_TYPE_ICONS.default;
+  // Password validation
+  const validatePassword = useCallback((password: string): PasswordRules => {
+    return {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    };
   }, []);
 
-  const getUserActions = useMemo(() => [
-    {
-      icon: 'settings' as const,
-      title: 'App Settings',
-      desc: 'Manage notifications and preferences',
-      color: '#4CAF50',
-      onPress: () => navigation.navigate('Settings'),
-    },
-    {
-      icon: 'feedback' as const,
-      title: 'Send Feedback',
-      desc: 'Help us improve VALET',
-      color: '#2196F3',
-      onPress: () => navigation.navigate('Feedback'),
-    },
-  ], [navigation]);
+  const handlePasswordChange = useCallback((field: keyof PasswordChangeState, value: string) => {
+    setPasswords(prev => ({ ...prev, [field]: value }));
+    setPasswordErrors(prev => ({ ...prev, [field]: '' }));
+  }, []);
 
-  const handleEditProfilePhoto = useCallback(() => {
-    showAlert({
-      title: 'Profile Photo',
-      message: 'Profile photo management will be available in a future update. For now, your initials will be displayed as your avatar.',
-      type: 'info',
-      icon: 'camera-alt',
-      confirmText: 'Got it!'
-    });
-  }, [showAlert]);
+  const handleSubmitPasswordChange = useCallback(async () => {
+    const newErrors: PasswordErrors = { current: '', new: '', confirm: '' };
+    let hasErrors = false;
+
+    // Validate current password
+    if (!passwords.current) {
+      newErrors.current = 'Current password is required';
+      hasErrors = true;
+    }
+
+    // Validate new password
+    const rules = validatePassword(passwords.new);
+    const allRulesMet = Object.values(rules).every(rule => rule);
+
+    if (!passwords.new) {
+      newErrors.new = 'New password is required';
+      hasErrors = true;
+    } else if (!allRulesMet) {
+      newErrors.new = 'Password must meet all requirements';
+      hasErrors = true;
+    }
+
+    // Validate confirm password
+    if (!passwords.confirm) {
+      newErrors.confirm = 'Please confirm your password';
+      hasErrors = true;
+    } else if (passwords.new !== passwords.confirm) {
+      newErrors.confirm = 'Passwords do not match';
+      hasErrors = true;
+    }
+
+    // Check if new password is same as current
+    if (passwords.current && passwords.new && passwords.current === passwords.new) {
+      newErrors.new = 'New password must be different from current password';
+      hasErrors = true;
+    }
+
+    if (hasErrors) {
+      setPasswordErrors(newErrors);
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/change-password`, {
+        method: 'POST',
+        headers: {
+          ...API_CONFIG.HEADERS,
+          'Authorization': `Bearer ${API_CONFIG.TOKEN}`,
+        },
+        body: JSON.stringify({
+          user_id: user?.id,
+          current_password: passwords.current,
+          new_password: passwords.new,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to change password');
+      }
+
+      showAlert({
+        title: 'Password Changed',
+        message: 'Your password has been successfully updated!',
+        type: 'success',
+        icon: 'check-circle',
+        confirmText: 'OK',
+        onConfirm: () => {
+          setShowPasswordModal(false);
+          setPasswords({ current: '', new: '', confirm: '' });
+          setPasswordErrors({ current: '', new: '', confirm: '' });
+          setShowCurrentPassword(false);
+          setShowNewPassword(false);
+          setShowConfirmPassword(false);
+        }
+      });
+    } catch (error) {
+      showAlert({
+        title: 'Error',
+        message: 'Failed to change password. Please check your current password and try again.',
+        type: 'warning',
+        icon: 'error',
+        confirmText: 'OK'
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }, [passwords, validatePassword, showAlert, user]);
 
   const fetchUserFromAPI = useCallback(async (userId: number): Promise<User | null> => {
     try {
@@ -234,30 +320,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       const currentUser = users.find((u: any) => u.id === userId);
       if (!currentUser) return null;
 
-      if (currentUser.role === 'admin') {
-        showAlert({
-          title: 'Access Restricted',
-          message: 'Admin accounts should use the web dashboard. This mobile app is designed for students and staff only.',
-          type: 'warning',
-          icon: 'block',
-          confirmText: 'Understood',
-          onConfirm: () => navigation.navigate('Home')
-        });
-        return null;
-      }
-
-      if (currentUser.is_active === false) {
-        showAlert({
-          title: 'Account Inactive',
-          message: 'Your account has been deactivated. Please contact the administrator.',
-          type: 'warning',
-          icon: 'block',
-          confirmText: 'OK',
-          onConfirm: handleForceLogout
-        });
-        return null;
-      }
-
       if (authUser && authUser.id === userId) {
         try {
           await AsyncStorage.setItem('valet_user_data', JSON.stringify(currentUser));
@@ -265,23 +327,12 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           console.log('Error updating stored user data:', error);
         }
       }
-      
       return currentUser;
     } catch (error: any) {
       console.log('Error fetching user from API:', error);
       return null;
     }
-  }, [authUser, showAlert, navigation]);
-
-  const handleForceLogout = useCallback(async () => {
-    try {
-      await logout();
-      navigation.navigate('Home');
-    } catch (error) {
-      console.log('Error during force logout:', error);
-      navigation.navigate('Home');
-    }
-  }, [logout, navigation]);
+  }, [authUser]);
 
   const loadUserStats = useCallback(async (userId: number) => {
     if (!isMountedRef.current) return;
@@ -463,6 +514,212 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [alert.visible, fadeAnim, scaleAnim]);
 
+  // Password Requirement Component
+  const PasswordRequirement: React.FC<{ met: boolean; text: string }> = ({ met, text }) => (
+    <View style={styles.passwordRequirement}>
+      <MaterialIcons 
+        name={met ? 'check-circle' : 'cancel'} 
+        size={16} 
+        color={met ? '#4CAF50' : '#BDBDBD'} 
+      />
+      <Text style={[styles.passwordRequirementText, met && styles.passwordRequirementMet]}>
+        {text}
+      </Text>
+    </View>
+  );
+
+  // Password Change Modal
+  const PasswordChangeModal = useCallback(() => {
+    const passwordRules = validatePassword(passwords.new);
+
+    return (
+      <Modal
+        transparent
+        visible={showPasswordModal}
+        onRequestClose={() => setShowPasswordModal(false)}
+        animationType="fade"
+      >
+        <View style={styles.passwordModalOverlay}>
+          <TouchableOpacity 
+            style={styles.passwordModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowPasswordModal(false)}
+          />
+          
+          <View style={styles.passwordModalContainer}>
+            {/* Header */}
+            <LinearGradient
+              colors={[COLORS.primary, COLORS.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 2 }}
+              style={styles.passModalHeader}
+            >
+              <View style={styles.passModal}>
+                <View style={styles.passContainer}>
+                  <MaterialIcons name="lock" size={24} color="#FFFFFF" />
+                </View>
+                <View style={styles.passHeader}>
+                  <Text style={styles.passTitle}>Change Password</Text>
+                  <Text style={styles.passSubtext}>Keep your account secure</Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setShowPasswordModal(false)}
+                style={styles.passCloseBtn}
+              >
+                <MaterialIcons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <ScrollView style={styles.passBody} showsVerticalScrollIndicator={false}>
+              {/* Current Password */}
+              <View style={styles.passInput}>
+                <Text style={styles.passLabel}>Current Password</Text>
+                <View style={[
+                  styles.passInputWrap,
+                  passwordErrors.current ? styles.passError : null
+                ]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    value={passwords.current}
+                    onChangeText={(text) => handlePasswordChange('current', text)}
+                    placeholder="Enter current password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!showCurrentPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity 
+                    onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                    style={styles.passwordToggle}
+                  >
+                    <MaterialIcons 
+                      name={showCurrentPassword ? 'visibility-off' : 'visibility'} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                </View>
+                {passwordErrors.current ? (
+                  <View style={styles.passwordErrorContainer}>
+                    <MaterialIcons name="error" size={14} color="#F44336" />
+                    <Text style={styles.passwordErrorText}>{passwordErrors.current}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* New Password */}
+              <View style={styles.passInput}>
+                <Text style={styles.passLabel}>New Password</Text>
+                <View style={[
+                  styles.passInputWrap,
+                  passwordErrors.new ? styles.passError : null
+                ]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    value={passwords.new}
+                    onChangeText={(text) => handlePasswordChange('new', text)}
+                    placeholder="Enter new password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!showNewPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity 
+                    onPress={() => setShowNewPassword(!showNewPassword)}
+                    style={styles.passwordToggle}
+                  >
+                    <MaterialIcons 
+                      name={showNewPassword ? 'visibility-off' : 'visibility'} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                </View>
+                {passwordErrors.new ? (
+                  <View style={styles.passwordErrorContainer}>
+                    <MaterialIcons name="error" size={14} color="#F44336" />
+                    <Text style={styles.passwordErrorText}>{passwordErrors.new}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Password Requirements */}
+              {passwords.new ? (
+                <View style={styles.passReq}>
+                  <Text style={styles.passReqtitle}>Password Requirements:</Text>
+                  <PasswordRequirement met={passwordRules.length} text="At least 8 characters" />
+                  <PasswordRequirement met={passwordRules.uppercase} text="One uppercase letter" />
+                  <PasswordRequirement met={passwordRules.lowercase} text="One lowercase letter" />
+                  <PasswordRequirement met={passwordRules.number} text="One number" />
+                  <PasswordRequirement met={passwordRules.special} text="One special character" />
+                </View>
+              ) : null}
+
+              {/* Confirm Password */}
+              <View style={styles.passInput}>
+                <Text style={styles.passLabel}>Confirm New Password</Text>
+                <View style={[
+                  styles.passInputWrap,
+                  passwordErrors.confirm ? styles.passError : null
+                ]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    value={passwords.confirm}
+                    onChangeText={(text) => handlePasswordChange('confirm', text)}
+                    placeholder="Re-enter new password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!showConfirmPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity 
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={styles.passwordToggle}
+                  >
+                    <MaterialIcons 
+                      name={showConfirmPassword ? 'visibility-off' : 'visibility'} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                </View>
+                {passwordErrors.confirm ? (
+                  <View style={styles.passwordErrorContainer}>
+                    <MaterialIcons name="error" size={14} color="#F44336" />
+                    <Text style={styles.passwordErrorText}>{passwordErrors.confirm}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Buttons */}
+              <View style={styles.passwordModalButtons}>
+                <TouchableOpacity 
+                  style={styles.passwordCancelButton}
+                  onPress={() => setShowPasswordModal(false)}
+                >
+                  <Text style={styles.passwordCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[
+                    styles.passwordSubmitButton,
+                    isChangingPassword && styles.passwordSubmitButtonDisabled
+                  ]}
+                  onPress={handleSubmitPasswordChange}
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.passwordSubmitButtonText}>Update Password</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  }, [showPasswordModal, passwords, passwordErrors, showCurrentPassword, showNewPassword, showConfirmPassword, isChangingPassword, handlePasswordChange, handleSubmitPasswordChange, validatePassword]);
+
   const CustomAlert = useCallback(() => {
     const getIconColor = () => ALERT_COLORS[alert.type];
 
@@ -540,7 +797,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     return (
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
-          <MaterialIcons name="person" size={48} color="#B71C1C" />
+          <MaterialIcons name="person" size={48} color= {COLORS.primary} />
           <Text style={styles.loadingText}>Loading Your Profile...</Text>
           <Text style={styles.loadingSubtext}>
             {authUser ? `Welcome ${authUser.name || authUser.email}` : 'Fetching latest data from server'}
@@ -563,9 +820,9 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       >
         <LinearGradient
-          colors={['#B72C20', '#4C0E0E']}
+          colors={[COLORS.primary, COLORS.secondary]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 1, y: 1.5}}
           style={styles.profileCard}
         >
           <View style={styles.avatarContainer}>
@@ -575,13 +832,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   {user?.name ? getInitials(user.name) : (authUser?.name ? getInitials(authUser.name) : 'U')}
                 </Text>
               </View>
-              <TouchableOpacity 
-                style={styles.editAvatarButton}
-                onPress={handleEditProfilePhoto}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="camera-alt" size={14} color="#FFFFFF" />
-              </TouchableOpacity>
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.userName}>
@@ -589,11 +839,13 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
               <View style={styles.userStatusContainer}>
                 <Text style={styles.userType}>
-                  {user?.email}
+                  {user?.role
+                    ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                    : 'N/A'}
                 </Text>
                 {(user?.is_active !== false) && (
                   <View style={styles.activeStatus}>
-                    <MaterialIcons name="check-circle" size={12} color="#4CAF50" />
+                    <MaterialIcons name="check-circle" size={12} color={COLORS.green} />
                     <Text style={styles.activeText}>Active</Text>
                   </View>
                 )}
@@ -601,33 +853,52 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
         </LinearGradient>
-
-        <View style={styles.card}>
+<View style={styles.card}>
           <View style={styles.cardHeader}>
-            <MaterialIcons name="dashboard" size={20} color="#B71C1C" />
-            <Text style={styles.cardTitle}>Quick Actions</Text>
+            <MaterialIcons name="account-box" size={22} color="#4F46E5"/>
+            <Text style={styles.cardTitle}>Personal Information</Text>
           </View>
-
-          {getUserActions.map((action, index) => (
-            <View key={action.title}>
-              <TouchableOpacity 
-                style={styles.actionItem}
-                onPress={action.onPress}
-              >
-                <View style={styles.actionLeft}>
-                  <MaterialIcons name={action.icon} size={20} color={action.color} />
-                  <View style={styles.actionText}>
-                    <Text style={styles.actionTitle}>{action.title}</Text>
-                    <Text style={styles.actionDesc}>{action.desc}</Text>
-                  </View>
-                </View>
-                <MaterialIcons name="chevron-right" size={20} color="#999" />
-              </TouchableOpacity>
-              {index < getUserActions.length - 1 && <View style={styles.divider} />}
+                
+          <View style={styles.infoContainer}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Name</Text>
+              <Text style={styles.infoValue}>{user?.name || 'Unknown User'}</Text>
             </View>
-          ))}
+            
+            <View style={styles.infoDivider} />
+            
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Email</Text>
+              <Text style={styles.infoValue}>{user?.email || 'Unknown'}</Text>
+            </View>
+            
+            <View style={styles.infoDivider} />
+            
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Student ID</Text>
+              <Text style={styles.infoValue}>{user?.id || 'Unknown'}</Text>
+            </View>
+            <View style={styles.infoDivider} />
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Department</Text>
+              <Text style={styles.infoValue}>{user?.department || 'Unknown'}</Text>
+            </View>
+            <View style={styles.infoDivider} />
+            <TouchableOpacity 
+            style={styles.actionItem}
+            onPress={() => setShowPasswordModal(true)}
+          >
+            <View style={styles.actionLeft}>
+              <MaterialIcons name="lock" size={20} color="#F44336" />
+              <View style={styles.actionText}>
+                <Text style={styles.actionTitle}>Change Password</Text>
+                <Text style={styles.actionDesc}>Update your account password</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color="#999" />
+          </TouchableOpacity>
+          </View>
         </View>
-
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <MaterialIcons name="help" size={20} color="#B71C1C" />
@@ -675,6 +946,10 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             <MaterialIcons name="chevron-right" size={20} color="#999" />
           </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          
         </View>
 
         <TouchableOpacity style={styles.outBtn} onPress={handleLogout}>
@@ -688,6 +963,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </ScrollView>
 
+      <PasswordChangeModal />
       <CustomAlert />
     </View>
   );

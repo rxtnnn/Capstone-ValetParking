@@ -1,6 +1,7 @@
 import { StyleSheet, Dimensions} from 'react-native';
 
 const { width } = Dimensions.get('window');
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -66,19 +67,19 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-   avatarWrapper: {
+  avatarWrapper: {
     position: 'relative',
-    marginRight: 16,
+    marginRight: 0,
   },
   avatarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   avatar: {
     width: 70,
     height: 70,
-    borderRadius: 35,
+    borderRadius: 50,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.3)',
@@ -90,24 +91,6 @@ export const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
-  },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#B71C1C',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
   profileInfo: {
     flex: 1,
@@ -126,9 +109,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 2,
+    fontSize: 15,
   },
   userType: {
-    fontSize: 14,
+    fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
     flex: 1,
   },
@@ -171,25 +155,82 @@ export const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 16,
-    elevation: 3,
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 16,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-    marginLeft: 10,
+    fontWeight: '600',
+    color: '#111827',
+    marginLeft: 8,
+  },
+  infoContainer: {
+    gap: 0,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  actionContent: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  actionDesc: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginLeft: 0,
+  },
+  infoItem: {
+    paddingVertical: 12,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#111827',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -211,33 +252,6 @@ export const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  infoText: {
-    marginLeft: 14,
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
   actionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,16 +260,6 @@ export const styles = StyleSheet.create({
   actionText: {
     marginLeft: 14,
     flex: 1,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
-  },
-  actionDesc: {
-    fontSize: 14,
-    color: '#666',
   },
   divider: {
     height: 1,
@@ -296,6 +300,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
+  
   // Alert Styles
   alertOverlay: {
     flex: 1,
@@ -381,5 +386,187 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  
+
+  // Password Change Modal Styles
+  passwordModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  passwordModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  passwordModalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: width * 0.9,
+    maxWidth: 400,
+    maxHeight: '85%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    overflow: 'hidden',
+  },
+  passModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  passModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  passContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  passHeader: {
+    flex: 1,
+  },
+  passTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  passSubtext: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  passCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  passBody: {
+    padding: 20,
+  },
+  passInput: {
+    marginBottom: 20,
+  },
+  passLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  passInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+    paddingHorizontal: 12,
+  },
+  passError: {
+    borderColor: '#F44336',
+    backgroundColor: '#FFEBEE',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#333',
+  },
+  passwordToggle: {
+    padding: 8,
+  },
+  passwordErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  passwordErrorText: {
+    fontSize: 12,
+    color: '#F44336',
+    marginLeft: 4,
+  },
+  passReq: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  passReqtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 12,
+  },
+  passwordRequirement: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  passwordRequirementText: {
+    fontSize: 13,
+    color: '#666',
+    marginLeft: 8,
+  },
+  passwordRequirementMet: {
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  passwordModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  passwordCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passwordCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  passwordSubmitButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#B71C1C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#B71C1C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  passwordSubmitButtonDisabled: {
+    opacity: 0.6,
+  },
+  passwordSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
 });
