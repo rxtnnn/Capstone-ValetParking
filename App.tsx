@@ -32,6 +32,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import NotificationService from './src/services/NotificationService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
+import ParkingMapFloor2Screen from './src/screens/ParkingMapFloor2Screen';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -48,6 +49,7 @@ export type RootStackParamList = {
   Home: undefined;
   Floors: undefined;
   ParkingMap: { floor: number };
+  ParkingMapFloor2: undefined;
   Feedback: { showReplies?: boolean };
   Settings: undefined;
   Profile: undefined;
@@ -319,6 +321,12 @@ const AppNavigator: React.FC = () => {
                 ),
                 gestureEnabled: true,
               })}
+            />
+            
+           <Stack.Screen 
+              name="ParkingMapFloor2" 
+              component={ParkingMapFloor2Screen}
+              options={{ headerShown: false }}
             />
             
             <Stack.Screen 
