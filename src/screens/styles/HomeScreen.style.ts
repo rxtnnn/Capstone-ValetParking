@@ -128,6 +128,7 @@ export const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 10,
+    height: 15,
     color: 'black',
     marginTop: 8,
     textAlign: 'center',
@@ -248,6 +249,7 @@ export const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 10,
+    height: 15,
     color: '#666',
     marginTop: 4,
     fontFamily: FONTS.regular
