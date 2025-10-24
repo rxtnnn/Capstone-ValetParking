@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
@@ -134,8 +134,8 @@ const GradientHeader: React.FC<GradientHeaderProps> = ({
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} 
         >
-          <Ionicons 
-            name="chevron-back" 
+          <MaterialIcons 
+            name="arrow-back-ios" 
             size={getResponsiveSize(20, 24, 25, 28)} 
             color="white" 
           />
