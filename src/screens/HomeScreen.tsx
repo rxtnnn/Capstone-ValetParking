@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import {View, Text, TouchableOpacity, ScrollView, RefreshControl, StatusBar, Image, Modal } from 'react-native';
+import {View, Text, TouchableOpacity, ScrollView, RefreshControl, StatusBar, Image, Modal, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
@@ -14,12 +14,14 @@ import NotificationOverlay from '../components/NotifOverlay';
 import { useFeedback } from '../hooks/useFeedback';
 import {COLORS} from '../constants/AppConst';
 
+
 type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   Floors: undefined;
   ParkingMap: undefined;
   Feedback: undefined;
+  ParkingMapFloor2: undefined;
   Settings: undefined;
   Profile: { userId?: number } | undefined;
   ApiTest: undefined;
@@ -40,18 +42,37 @@ const DEFAULT_FLOORS: {
   total: number;
   available: number;
   occupancyRate: number;
-  status:'available';
-}[] = [];
-
-  for(let i = 0; i<4; i++){
-    DEFAULT_FLOORS.push({
-      floor: i + 1,
-      total: 0,
-      available: 0,
-      occupancyRate: 0,
-      status: 'available' as const
-    });
+  status: 'available';
+}[] = [
+  {
+    floor: 2,
+    total: 33, // Floor 2 has 33 parking spots based on the blueprint
+    available: 5,
+    occupancyRate: 0,
+    status: 'available' as const
+  },
+  {
+    floor: 3,
+    total: 0,
+    available: 0,
+    occupancyRate: 0,
+    status: 'available' as const
+  },
+  {
+    floor: 4,
+    total: 42, // Your existing floor with 42 spots
+    available: 0,
+    occupancyRate: 0,
+    status: 'available' as const
+  },
+  {
+    floor: 5,
+    total: 0,
+    available: 0,
+    occupancyRate: 0,
+    status: 'available' as const
   }
+];
 
 const CircularProgress: React.FC<CircularProgressProps> = ({
   size,
@@ -272,14 +293,26 @@ const HomeScreen: React.FC = () => {
   }, [isAuthenticated, currentUserId, checkForNewReplies]);
 
   const handleFloorPress = useCallback((floor: any) => {
-    const status = getFloorStatus(floor.available, floor.total);
-    
-    if (status.text === 'FULL') {
-      setShowFullAlert(true);
-    } else {
+  const status = getFloorStatus(floor.available, floor.total);
+  
+  if (status.text === 'FULL') {
+    setShowFullAlert(true);
+  } else if (status.text === 'NO DATA') {
+    return;
+  } else {
+    if (floor.floor === 2) {
+      navigation.navigate('ParkingMapFloor2');
+    } else if (floor.floor === 4) {
       navigation.navigate('ParkingMap');
+    } else {
+      Alert.alert(
+        'Coming Soon',
+        `Floor ${floor.floor} visualization is not yet available.`,
+        [{ text: 'OK' }]
+      );
     }
-  }, [getFloorStatus, navigation]);
+  }
+}, [getFloorStatus, navigation]);
 
   useEffect(() => {
     if (!isAuthenticated) {

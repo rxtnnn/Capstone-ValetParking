@@ -52,7 +52,8 @@ class RealTimeParkingServiceClass {
   private isInitialized = false;
 
   private readonly SENSOR_ID_TO_LABEL: Record<number, string> = {
-    1: 'B4', 2: 'B3', 3: 'B2', 4: 'B1', 5: 'C1' 
+    1: 'B4', 2: 'B3', 3: 'B2', 4: 'B1', 5: 'C1',
+    43: 'A1', 44: 'A2', 45: 'A3', 46: 'A4', 
   };
 
   constructor() {
@@ -289,16 +290,16 @@ class RealTimeParkingServiceClass {
   private static floorPattern = /(\d+)(?:st|nd|rd|th)?\s*floor/i;
   
   private extractFloorFromLocation = (floor_level: string): number => {
-    if (!floor_level) return 1;
+    if (!floor_level) return 2;
 
     const match = floor_level.match(RealTimeParkingServiceClass.floorPattern);
     if (match) {
       const floorNumber = parseInt(match[1]);
-      if (floorNumber >= 1 && floorNumber <= 4) {
+      if (floorNumber >= 1 && floorNumber <= 5) {
         return floorNumber;
       }
     }
-    return 1;
+    return 2;
   };
 
   private transformRawData(rawData: ParkingSpace[], sensorData: ParkingSpace[]): ParkingStats {   
