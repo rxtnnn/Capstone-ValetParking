@@ -304,11 +304,12 @@ export const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#B22020',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingVertical: 12,
     borderRadius: 25,
     flex: 1,
-    maxWidth: 120,
+    maxWidth: 140,
+    justifyContent: 'center',
   },
   primaryButtonText: {
     color: 'white',

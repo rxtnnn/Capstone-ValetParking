@@ -751,7 +751,7 @@ const ParkingMapScreen: React.FC = () => {
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.primaryButton}>
-                <Text style={styles.primaryButtonText}>Navigate</Text>
+                <Text style={styles.primaryButtonText}>Choose Floor</Text>
               </TouchableOpacity>
             </View>
             
