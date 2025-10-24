@@ -603,27 +603,6 @@ const HomeScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={[styles.tabItem, styles.activeTab]} onPress={() => navigation.navigate('Home')}>
-          <Ionicons name="home" size={24} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('ParkingMap')}>
-          <Ionicons name="map" size={24} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Feedback')}>
-          <Ionicons name="chatbubble-outline" size={24} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => navigation.navigate('Profile', currentUserId ? { userId: currentUserId } : undefined)}
-        >
-          <Ionicons name="person-outline" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-
       <NotificationOverlay
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}

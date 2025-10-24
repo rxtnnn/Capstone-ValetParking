@@ -273,7 +273,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingVertical: 18,
-    marginBottom: 16,
+    marginBottom: 35,
     borderWidth: 2,
     borderColor: '#F44336',
     elevation: 2,
@@ -287,18 +287,6 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#F44336',
-  },
-  refreshHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 32,
-    paddingVertical: 8,
-  },
-  refreshHintText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: '#999',
   },
   
   // Alert Styles

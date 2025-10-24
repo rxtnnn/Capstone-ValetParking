@@ -128,7 +128,8 @@ export const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 10,
-    height: 15,
+    height: 20,
+    width: 70,
     color: 'black',
     marginTop: 8,
     textAlign: 'center',
@@ -249,9 +250,11 @@ export const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 10,
-    height: 15,
+    height: 20,
+    width: 70,
     color: '#666',
     marginTop: 4,
+    textAlign: 'center',
     fontFamily: FONTS.regular
   },
   progressBarContainer: {
@@ -275,23 +278,6 @@ export const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontWeight: '500',
     fontFamily: FONTS.regular
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#333',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    marginHorizontal: 40,
-    marginBottom: 40,
-    borderRadius: 25,
-    justifyContent: 'space-around',
-  },
-  tabItem: {
-    padding: 10,
-    borderRadius: 20,
-  },
-  activeTab: {
-    backgroundColor: COLORS.primary,
   },
   modalOverlay: {
     flex: 1,

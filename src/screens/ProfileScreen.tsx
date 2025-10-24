@@ -956,11 +956,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           <MaterialIcons name="logout" size={20} color="#F44336" />
           <Text style={styles.outBtnText}>Sign Out</Text>
         </TouchableOpacity>
-
-        <View style={styles.refreshHint}>
-          <MaterialIcons name="refresh" size={16} color="#999" />
-          <Text style={styles.refreshHintText}>Pull down to sync with server</Text>
-        </View>
       </ScrollView>
 
       <PasswordChangeModal />

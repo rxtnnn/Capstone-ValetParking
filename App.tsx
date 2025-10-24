@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { 
@@ -15,13 +15,12 @@ import {
 } from 'react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
-
+import { COLORS } from './src/constants/AppConst';
 import SplashScreen from './src/screens/SplashScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ParkingMapScreen from './src/screens/ParkingMapScreen';
@@ -52,7 +51,7 @@ export type RootStackParamList = {
   ParkingMapFloor2: undefined;
   Feedback: { showReplies?: boolean };
   Settings: undefined;
-  Profile: undefined;
+  Profile: { userId?: number } | undefined;
   ApiTest: undefined;
   Login: undefined;
   AdminReplies: undefined;
@@ -76,6 +75,7 @@ const GradientHeader: React.FC<GradientHeaderProps> = ({
   const isLargeScreen = width >= 410;
   const isTablet = width >= 768;
   const isLandscape = width > height;
+  
   const getResponsiveSize = (small: number, medium: number, large: number, tablet: number) => {
     if (isTablet) return tablet;
     if (isLargeScreen) return large;
@@ -126,7 +126,7 @@ const GradientHeader: React.FC<GradientHeaderProps> = ({
   });
 
   return (
-    <View style={[responsiveHeaderStyles.headerContainer, {backgroundColor: '#4C0E0E'}]}>
+    <View style={[responsiveHeaderStyles.headerContainer, {backgroundColor: COLORS.secondary}]}>
       {canGoBack && (
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -169,7 +169,7 @@ const LoadingScreen: React.FC = () => {
       alignItems: 'center',
       backgroundColor: '#F5F5F5'
     }}>
-      <ActivityIndicator size="large" color="#B22020" />
+      <ActivityIndicator size="large" color={COLORS.primary} />
       <Text style={{
         fontSize: getResponsiveSize(14, 16, 17, 18),
         color: '#666',
@@ -179,6 +179,120 @@ const LoadingScreen: React.FC = () => {
         Loading VALET...
       </Text>
     </View>
+  );
+};
+interface TabBarProps {
+  navigation: any;
+  currentRoute: string;
+}
+
+const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
+  const { user } = useAuth();
+  const hiddenScreens = ['ParkingMap', 'ParkingMapFloor2', 'Splash', 'Login'];
+  
+  if (hiddenScreens.includes(currentRoute)) {
+    return null;
+  }
+
+  const tabBarStyles = StyleSheet.create({
+    tabBar: {
+        flexDirection: 'row',
+        backgroundColor: '#333',
+        paddingVertical: 15,
+        paddingHorizontal: 40,
+        marginHorizontal: 40,
+        marginBottom: 40,
+        borderRadius: 25,
+        justifyContent: 'space-between',
+        borderWidth: 0, 
+        shadowColor: 'none', 
+      },
+      tabItem: {
+        padding: 10,
+        borderRadius: 20,
+      },
+      activeTab: {
+        backgroundColor: COLORS.primary,
+      },
+  });
+
+  const isActive = (routeName: string) => currentRoute === routeName;
+
+  return (
+    <View style={tabBarStyles.tabBar}>
+      <TouchableOpacity 
+        style={[tabBarStyles.tabItem, isActive('Home') && tabBarStyles.activeTab]} 
+        onPress={() => navigation.navigate('Home')}
+      >
+        <Ionicons 
+          name={isActive('Home') ? 'home' : 'home-outline'} 
+          size={24} 
+          color="white" 
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]} 
+        onPress={() => navigation.navigate('ParkingMap', { floor: 1 })}
+      >
+        <Ionicons 
+          name={isActive('ParkingMap') ? 'map' : 'map-outline'} 
+          size={24} 
+          color="white" 
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={[tabBarStyles.tabItem, isActive('Feedback') && tabBarStyles.activeTab]} 
+        onPress={() => navigation.navigate('Feedback')}
+      >
+        <Ionicons 
+          name={isActive('Feedback') ? 'chatbubble' : 'chatbubble-outline'} 
+          size={24} 
+          color="white" 
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={[tabBarStyles.tabItem, isActive('Profile') && tabBarStyles.activeTab]} 
+        onPress={() => navigation.navigate('Profile', user?.id ? { userId: user.id } : undefined)}
+      >
+        <Ionicons 
+          name={isActive('Profile') ? 'person' : 'person-outline'} 
+          size={24} 
+          color="white" 
+        />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentRoute, setCurrentRoute] = useState('Home');
+  const navigationRef = React.useRef<any>(null);
+
+  return (
+    <NavigationContainer
+      ref={navigationRef}
+      onStateChange={() => {
+        const route = navigationRef.current?.getCurrentRoute();
+        if (route) {
+          setCurrentRoute(route.name);
+        }
+      }}
+    >
+      <View style={{ flex: 1}}>
+        {children}
+         <View style={{ backgroundColor: 'transparent'}}>
+        {navigationRef.current && (
+          <GlobalTabBar 
+            navigation={navigationRef.current} 
+            currentRoute={currentRoute}
+          />
+        )}
+        </View>
+      </View>
+    </NavigationContainer>
   );
 };
 
@@ -235,6 +349,7 @@ const AppNavigator: React.FC = () => {
       backHandler.remove();
     };
   }, []);
+
   if (loading) {
     return (
       <NavigationContainer>
@@ -245,16 +360,16 @@ const AppNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationWithTabBar>
       <StatusBar 
         barStyle="light-content" 
-        backgroundColor="#4C0E0E"
-        translucent={false}
+        backgroundColor={COLORS.secondary}
+        translucent={true}
       />
       <Stack.Navigator
         initialRouteName={isAuthenticated ? "Home" : "Splash"}
         screenOptions={{
-          headerShown: false,
+          headerShown: true,
           cardStyle: { backgroundColor: '#F5F5F5' },
           gestureEnabled: true,
           gestureDirection: 'horizontal',
@@ -323,10 +438,20 @@ const AppNavigator: React.FC = () => {
               })}
             />
             
-           <Stack.Screen 
+            <Stack.Screen 
               name="ParkingMapFloor2" 
               component={ParkingMapFloor2Screen}
-              options={{ headerShown: false }}
+              options={({ navigation }) => ({
+                headerShown: true,
+                header: () => (
+                  <GradientHeader 
+                    title="Parking Map" 
+                    navigation={navigation}
+                    canGoBack={true}
+                  />
+                ),
+                gestureEnabled: true,
+              })}
             />
             
             <Stack.Screen 
@@ -395,7 +520,7 @@ const AppNavigator: React.FC = () => {
           </>
         )}
       </Stack.Navigator>
-    </NavigationContainer>
+    </NavigationWithTabBar>
   );
 };
 
