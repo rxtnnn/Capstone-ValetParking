@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
      if (token && storedUser) {
       const role = storedUser.role.toLowerCase();
-      if (['admin', 'sdd'].includes(role)) {
+      if (['sdd'].includes(role)) {
         await TokenManager.removeFromStorage();
         setUser(null);
         setIsAuthenticated(false);

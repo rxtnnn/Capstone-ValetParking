@@ -175,20 +175,34 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  withCredentials: false, // Mobile apps don't use cookies for Sanctum
 });
 
+// Request Interceptor - Add Sanctum token
 apiClient.interceptors.request.use(
   async (config) => {
     try {
       await TokenManager.ensureInitialized();
       const token = TokenManager.getToken();
+
       if (token) {
+        // Laravel Sanctum uses Bearer token authentication for mobile
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      // Add custom headers for Sanctum
+      config.headers['X-Requested-With'] = 'XMLHttpRequest';
+
+      // Add User-Agent to help with rate limiting
+      config.headers['User-Agent'] = 'ValetParkingMobileApp/1.0';
+
+      // Add Accept header explicitly
+      config.headers['Accept'] = 'application/json';
+
     } catch (error) {
       console.warn('Failed to initialize TokenManager in request interceptor:', error);
     }
-    
+
     return config;
   },
   (error) => {
@@ -197,49 +211,121 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Response Interceptor - Handle Sanctum errors
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
   },
   async (error) => {
+    const originalRequest = error.config;
+
+    // Handle 401 Unauthorized (token expired or invalid)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log('Unauthorized - token invalid or expired');
+
+      // Clear invalid token
+      await TokenManager.removeFromStorage();
+
+      // You could implement token refresh here if your backend supports it
+      // For now, we'll just reject and force re-login
+    }
+
+    // Handle 419 CSRF token mismatch (shouldn't happen in mobile, but just in case)
+    if (error.response?.status === 419) {
+      console.log('CSRF token mismatch');
+    }
+
+    // Handle 403 Forbidden
+    if (error.response?.status === 403) {
+      console.log('Forbidden - insufficient permissions');
+    }
+
+    // Handle 429 Too Many Requests (Rate Limiting)
+    if (error.response?.status === 429) {
+      console.log('Too many requests - rate limited');
+      const retryAfter = error.response?.headers['retry-after'];
+      const errorMessage = error.response?.data?.message ||
+                          `Too many login attempts. Please try again${retryAfter ? ` in ${retryAfter} seconds` : ' later'}.`;
+
+      // Add custom error message
+      error.userMessage = errorMessage;
+    }
+
     return Promise.reject(error);
   }
 );
 
+/**
+ * Login with Laravel Sanctum
+ *
+ * For mobile apps, Sanctum provides a token-based authentication.
+ * The backend should return a token via the /login endpoint.
+ */
 export const login = async (credentials: { email: string; password: string }): Promise<LoginResponse> => {
   try {
+    // Make login request - backend should return a Sanctum token
     const response = await apiClient.post<LoginResponse>('/login', credentials);
     const { token, user, success, message } = response.data;
-    
+
     if (success && token && user) {
+      // Store the Sanctum token
       await TokenManager.saveToStorage(token, user);
+
       return {
         success: true,
-        message,
+        message: message || 'Login successful',
         token,
         user,
       };
     } else {
       throw new Error(message || 'Login failed');
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log('Login failed:', error);
-    throw error;
+
+    // Handle rate limiting specifically
+    if (error.response?.status === 429) {
+      const retryAfter = error.response?.headers['retry-after'];
+      const rateLimitMessage = error.response?.data?.message ||
+        (retryAfter ?
+          `Too many login attempts. Please try again in ${retryAfter} seconds.` :
+          'Too many login attempts. Please try again later.');
+
+      throw new Error(rateLimitMessage);
+    }
+
+    // Extract error message from response
+    const errorMessage = error.userMessage ||
+                        error.response?.data?.message ||
+                        error.message ||
+                        'Login failed';
+
+    throw new Error(errorMessage);
   }
 };
 
+/**
+ * Logout with Laravel Sanctum
+ *
+ * Revokes the current Sanctum token on the server and clears local storage
+ */
 export const logout = async (): Promise<void> => {
   try {
+    // Call logout endpoint to revoke Sanctum token on server
     try {
       await apiClient.post('/logout');
-    } catch (apiError) {
-      console.warn('Logout API call failed:', apiError);
+      console.log('Sanctum token revoked on server');
+    } catch (apiError: any) {
+      // Log but don't fail - we still want to clear local token
+      console.warn('Logout API call failed:', apiError.response?.data || apiError.message);
     }
   } finally {
+    // Always clear local storage
     try {
       await TokenManager.removeFromStorage();
+      console.log('Local token cleared');
     } catch (clearError) {
-      console.log('Failed to clear data on logout:', clearError);
+      console.log('Failed to clear local token:', clearError);
     }
   }
 };
