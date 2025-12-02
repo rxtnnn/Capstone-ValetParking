@@ -6,7 +6,8 @@ import {
   Alert,
   StatusBar,
   ScrollView,
-  Image
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -22,6 +23,8 @@ import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { COLORS, FONTS, useAppFonts} from '../constants/AppConst';
 import { MapLayout } from '../components/MapLayout';
+import { ParkingConfigService } from '../services/ParkingConfigService';
+import { FloorConfig, Position } from '../types/parkingConfig';
 
 
 type RootStackParamList = { Home: undefined; };
@@ -43,83 +46,27 @@ interface ParkingSection {
   isFull: boolean;
 }
 
-const SENSOR_TO_SPOT_MAPPING: { [key: number]: string } = {
-  7: 'A1',   4: 'B1',   3: 'B2',   2: 'B3',   1: 'B4',
-  5: 'C1',   6: 'C2',   8: 'D1',   9: 'D2',   10: 'D3',
-  11: 'D4',  12: 'D5',  13: 'D6',  14: 'D7',  15: 'E1',
-  16: 'E2',  17: 'E3',  18: 'F1',  19: 'F2',  20: 'F3',
-  21: 'F4',  22: 'F5',  23: 'F6',  24: 'F7',  25: 'G1',
-  26: 'G2',  27: 'G3',  28: 'G4',  29: 'G5',  30: 'H1',
-  31: 'H2',  32: 'H3',  33: 'I1',  34: 'I2',  35: 'I3',
-  36: 'I4',  37: 'I5',  38: 'J1',  39: 'J2',  40: 'J3',
-  41: 'J4',  42: 'J5'
-};
-
-const INITIAL_SPOTS: ParkingSpot[] = [
-  { id: 'A1', isOccupied: false, position: { x: 685, y: 116 }, width: 57, height: 45, rotation: '90deg' },
-  { id: 'B4', isOccupied: false, position: { x: 500, y: 32 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'B3', isOccupied: false, position: { x: 545, y: 32 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'B2', isOccupied: false, position: { x: 590, y: 32 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'B1', isOccupied: false, position: { x: 635, y: 32 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'C1', isOccupied: false, position: { x: 450, y: 95 }, width: 40, height: 55, rotation: '-90deg' },
-  { id: 'C2', isOccupied: false, position: { x: 450, y: 140 }, width: 40, height: 55, rotation: '90deg' },
-  { id: 'D7', isOccupied: false, position: { x: 100, y: 200 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'D6', isOccupied: false, position: { x: 160, y: 200 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'D5', isOccupied: false, position: { x: 210, y: 200 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'D4', isOccupied: false, position: { x: 259, y: 200 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'D3', isOccupied: false, position: { x: 310, y: 200 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'D2', isOccupied: false, position: { x: 355, y: 200 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'D1', isOccupied: false, position: { x: 400, y: 200 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'J5', isOccupied: false, position: { x: 270, y: 370 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'J4', isOccupied: false, position: { x: 320, y: 370 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'J3', isOccupied: false, position: { x: 380, y: 370 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'J2', isOccupied: false, position: { x: 440, y: 370 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'J1', isOccupied: false, position: { x: 490, y: 370 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'E3', isOccupied: false, position: { x: 55, y: 315 }, width: 55, height: 60, rotation: '90deg' },
-  { id: 'E2', isOccupied: false, position: { x: 55, y: 380 }, width: 55, height: 60, rotation: '90deg' },
-  { id: 'E1', isOccupied: false, position: { x: 55, y: 445 }, width: 55, height: 60, rotation: '90deg' },
-  { id: 'F1', isOccupied: false, position: { x: 120, y: 520 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'F2', isOccupied: false, position: { x: 165, y: 520 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'F3', isOccupied: false, position: { x: 220, y: 520 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'F4', isOccupied: false, position: { x: 265, y: 520 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'F5', isOccupied: false, position: { x: 310, y: 520 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'F6', isOccupied: false, position: { x: 365, y: 520 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'F7', isOccupied: false, position: { x: 410, y: 520 }, width: 40, height: 55, rotation: '0deg' },
-  { id: 'G1', isOccupied: false, position: { x: 500, y: 590 }, width: 40, height: 55, rotation: '90deg' },
-  { id: 'G2', isOccupied: false, position: { x: 500, y: 650 }, width: 40, height: 55, rotation: '90deg' },
-  { id: 'G3', isOccupied: false, position: { x: 500, y: 710 }, width: 40, height: 55, rotation: '90deg' }, 
-  { id: 'G4', isOccupied: false, position: { x: 500, y: 770 }, width: 40, height: 55, rotation: '90deg' },
-  { id: 'G5', isOccupied: false, position: { x: 500, y: 830 }, width: 40, height: 55, rotation: '90deg' },
-  { id: 'H1', isOccupied: false, position: { x: 560, y: 890 }, width: 40, height: 55, rotation: '180deg' },
-  { id: 'H2', isOccupied: false, position: { x: 605, y: 890 }, width: 40, height: 55, rotation: '180deg' },
-  { id: 'H3', isOccupied: false, position: { x: 650, y: 890 }, width: 40, height: 55, rotation: '180deg' },
-  { id: 'I5', isOccupied: false, position: { x: 680, y: 590 }, width: 40, height: 55, rotation: '270deg' },
-  { id: 'I4', isOccupied: false, position: { x: 680, y: 650 }, width: 40, height: 55, rotation: '270deg' },
-  { id: 'I3', isOccupied: false, position: { x: 680, y: 710 }, width: 40, height: 55, rotation: '270deg' },
-  { id: 'I2', isOccupied: false, position: { x: 680, y: 770 }, width: 40, height: 55, rotation: '270deg' },
-  { id: 'I1', isOccupied: false, position: { x: 680, y: 830 }, width: 40, height: 55, rotation: '270deg' },
-];
-
-const GESTURE_LIMITS = {
-  maxTranslateX: 300,
-  minTranslateX: -300,
-  maxTranslateY: 200,
-  minTranslateY: -600,
-  minScale: 0.7,
-  maxScale: 3,
-  clampMinScale: 0.8,
-  clampMaxScale: 2.5
-};
+// These constants are now deprecated - kept for backwards compatibility
+// Configuration is now loaded dynamically from ParkingConfigService
 
 const ParkingMapScreen: React.FC = () => {
   const navigation = useNavigation<ParkingMapScreenNavigationProp>();
+
+  // Dynamic configuration state
+  const [floorConfig, setFloorConfig] = useState<FloorConfig | null>(null);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  // Existing state
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
-  const [parkingData, setParkingData] = useState<ParkingSpot[]>(INITIAL_SPOTS);
+  const [parkingData, setParkingData] = useState<ParkingSpot[]>([]);
   const [highlightedSection, setHighlightedSection] = useState<string | null>(null);
   const [navigationPath, setNavigationPath] = useState<{x: number, y: number}[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [parkingStats, setParkingStats] = useState<ParkingStats | null>(null);
+  const [parkingSections, setParkingSections] = useState<ParkingSection[]>([]);
+
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
     parkingUpdates?: () => void;
@@ -134,9 +81,102 @@ const ParkingMapScreen: React.FC = () => {
   const panRef = useRef<PanGestureHandler>(null);
   const pinchRef = useRef<PinchGestureHandler>(null);
 
+  // Load parking configuration on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadConfiguration = async () => {
+      try {
+        setIsLoadingConfig(true);
+        setConfigError(null);
+
+        // Load floor 4 configuration (you can make this dynamic later)
+        const config = await ParkingConfigService.getFloorConfig('usjr_quadricentennial', 4);
+
+        if (!isMounted) return;
+
+        if (!config) {
+          throw new Error('Floor configuration not found');
+        }
+
+        setFloorConfig(config);
+
+        // Initialize parking spots from config
+        const initialSpots: ParkingSpot[] = config.parking_spots.map(spot => ({
+          id: spot.spot_id,
+          isOccupied: false,
+          position: spot.position,
+          width: spot.dimensions.width,
+          height: spot.dimensions.height,
+          section: spot.section,
+          rotation: spot.rotation,
+        }));
+
+        setParkingData(initialSpots);
+
+        // Set initial view position if configured
+        if (config.initial_view) {
+          translateX.value = config.initial_view.translateX;
+          translateY.value = config.initial_view.translateY;
+          scale.value = config.initial_view.scale;
+        }
+
+        console.log('Parking configuration loaded successfully');
+      } catch (error) {
+        console.error('Failed to load parking configuration:', error);
+        if (isMounted) {
+          setConfigError(error instanceof Error ? error.message : 'Unknown error');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingConfig(false);
+        }
+      }
+    };
+
+    loadConfiguration();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Derived values from floor config
+  const sensorToSpotMapping = useMemo(() => {
+    if (!floorConfig) return {};
+    return ParkingConfigService.getSensorToSpotMapping(floorConfig);
+  }, [floorConfig]);
+
+  const navigationWaypointsMap = useMemo(() => {
+    if (!floorConfig) return {};
+    return ParkingConfigService.getWaypointsMap(floorConfig);
+  }, [floorConfig]);
+
+  const gestureLimits = useMemo(() => {
+    if (!floorConfig?.gesture_limits) {
+      // Default gesture limits
+      return {
+        maxTranslateX: 300,
+        minTranslateX: -300,
+        maxTranslateY: 200,
+        minTranslateY: -600,
+        minScale: 0.7,
+        maxScale: 3,
+        clampMinScale: 0.8,
+        clampMaxScale: 2.5,
+      };
+    }
+    return floorConfig.gesture_limits;
+  }, [floorConfig]);
+
+  // Calculate sections from dynamic config
   const calculateSection = useCallback((): ParkingSection[] => {
+    if (!floorConfig) return [];
+
     const sectionMap: { [key: string]: number } = {};
-    Object.values(SENSOR_TO_SPOT_MAPPING).forEach(spotId => {
+    const mapping = ParkingConfigService.getSensorToSpotMapping(floorConfig);
+
+    Object.values(mapping).forEach(spotId => {
       const section = spotId.charAt(0);
       sectionMap[section] = (sectionMap[section] || 0) + 1;
     });
@@ -148,114 +188,57 @@ const ParkingMapScreen: React.FC = () => {
       availableSlots: total,
       isFull: false,
     })).sort((a, b) => a.id.localeCompare(b.id));
-  }, []);
+  }, [floorConfig]);
 
-  const [parkingSections, setParkingSections] = useState<ParkingSection[]>(() => calculateSection());
-
-  // Define navigation waypoints for routing
-  const NAVIGATION_WAYPOINTS = useMemo(() => ({
-    entrance: { x: 650, y: 250 }, // Bottom entrance point
-    
-    // Main intersection points
-    intersectionAB: { x: 650, y: 130 },
-    intersectionBC: { x: 520, y: 130 },
-    intersectionA: { x: 650, y: 150 },
-    intersectionH: { x: 600, y: 900 },
-    intersectionG: { x: 550, y: 830 },
-    intersectionF: { x: 450, y: 550 },
-    intersectionE: { x: 100, y: 450 },
-    intersectionD: { x: 200, y: 230 },
-    intersectionC: { x: 467, y: 150 },
-    intersectionB: { x: 660, y: 60 },
-    intersectionJ: { x: 400, y: 400 },
-  }), []);
+  // Update sections when floor config changes
+  useEffect(() => {
+    if (floorConfig) {
+      setParkingSections(calculateSection());
+    }
+  }, [floorConfig, calculateSection]);
 
   const generateNavigationPath = useCallback((spotId: string) => {
+    if (!floorConfig) return [];
+
     const spot = parkingData.find(s => s.id === spotId);
     if (!spot) return [];
 
     const section = spotId.charAt(0);
-    const entrance = NAVIGATION_WAYPOINTS.entrance;
-    const path: {x: number, y: number}[] = [entrance];
+    const waypointsMap = ParkingConfigService.getWaypointsMap(floorConfig);
 
-    // Route based on section
-    switch(section) {
-      case 'H':
-        path.push(NAVIGATION_WAYPOINTS.intersectionH);
+    // Find the navigation route for this section
+    const route = floorConfig.navigation_routes.find(r => r.section === section);
+    if (!route) return [];
+
+    const path: Position[] = [];
+
+    // Build path from waypoint IDs
+    for (const waypointId of route.waypoints) {
+      if (waypointId === 'destination') {
+        // Destination is the actual parking spot
         path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
-        break;
-      
-      case 'I':
-        path.push(NAVIGATION_WAYPOINTS.intersectionH);
-        path.push(NAVIGATION_WAYPOINTS.intersectionG);
-        path.push({ x: 700, y: spot.position.y + 30 });
-        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
-        break;
-      
-      case 'G':
-        path.push(NAVIGATION_WAYPOINTS.intersectionH);
-        path.push(NAVIGATION_WAYPOINTS.intersectionG);
-        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
-        break;
-      
-      case 'F':
-        path.push(NAVIGATION_WAYPOINTS.intersectionH);
-        path.push(NAVIGATION_WAYPOINTS.intersectionG);
-        path.push(NAVIGATION_WAYPOINTS.intersectionF);
-        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
-        break;
-      
-      case 'E':
-        path.push(NAVIGATION_WAYPOINTS.intersectionH);
-        path.push(NAVIGATION_WAYPOINTS.intersectionG);
-        path.push(NAVIGATION_WAYPOINTS.intersectionF);
-        path.push(NAVIGATION_WAYPOINTS.intersectionE);
-        path.push({ x: spot.position.x + 30, y: spot.position.y + 30 });
-        break;
-      
-      case 'J':
-        path.push(NAVIGATION_WAYPOINTS.intersectionH);
-        path.push(NAVIGATION_WAYPOINTS.intersectionG);
-        path.push(NAVIGATION_WAYPOINTS.intersectionF);
-        path.push(NAVIGATION_WAYPOINTS.intersectionJ);
-        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
-        break;
-      case 'D':
-        path.push(NAVIGATION_WAYPOINTS.intersectionH);
-        path.push(NAVIGATION_WAYPOINTS.intersectionG);
-        path.push(NAVIGATION_WAYPOINTS.intersectionF);
-        path.push(NAVIGATION_WAYPOINTS.intersectionJ);
-        path.push(NAVIGATION_WAYPOINTS.intersectionD);
-        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
-        break;
-      case 'C':
-        path.push(NAVIGATION_WAYPOINTS.intersectionAB);
-        path.push(NAVIGATION_WAYPOINTS.intersectionBC);
-        path.push({ x:520, y:180 });
-        path.push({ x: 470, y: 180 });
-        break;
-      case 'B':
-        path.push(NAVIGATION_WAYPOINTS.intersectionB);
-        break;
-      case 'A':
-        path.push(NAVIGATION_WAYPOINTS.intersectionA);
-        path.push({ x: 710, y: 150});
-        break;
+      } else {
+        const waypoint = waypointsMap[waypointId];
+        if (waypoint) {
+          path.push(waypoint);
+        }
+      }
     }
 
     return path;
-  }, [parkingData, NAVIGATION_WAYPOINTS]);
+  }, [parkingData, floorConfig]);
 
   const updateParkingSpotsFromService = useCallback((stats: ParkingStats) => {
-    if (!isMountedRef.current) return;
-  
+    if (!isMountedRef.current || !floorConfig) return;
+
     setParkingStats(stats);
-    
+
     const spotOccupancyMap: { [key: string]: boolean } = {};
-    
+    const mapping = ParkingConfigService.getSensorToSpotMapping(floorConfig);
+
     if (stats.sensorData && Array.isArray(stats.sensorData)) {
       stats.sensorData.forEach((sensor: any) => {
-        const spotId = SENSOR_TO_SPOT_MAPPING[sensor.sensor_id];
+        const spotId = mapping[sensor.sensor_id];
         if (spotId) {
           spotOccupancyMap[spotId] = sensor.is_occupied === 1;
         }
@@ -264,24 +247,24 @@ const ParkingMapScreen: React.FC = () => {
 
     setParkingData(prevSpots => {
       if (!isMountedRef.current) return prevSpots;
-      
+
       return prevSpots.map(spot => ({
         ...spot,
-        isOccupied: spotOccupancyMap.hasOwnProperty(spot.id) 
-          ? spotOccupancyMap[spot.id] 
+        isOccupied: spotOccupancyMap.hasOwnProperty(spot.id)
+          ? spotOccupancyMap[spot.id]
           : spot.isOccupied
       }));
     });
 
     setParkingSections(prevSections => {
       if (!isMountedRef.current) return prevSections;
-      
+
       return prevSections.map(section => {
-        const sectionSpots = Object.values(SENSOR_TO_SPOT_MAPPING)
+        const sectionSpots = Object.values(mapping)
           .filter(spotId => spotId.startsWith(section.id));
 
         const totalSlots = sectionSpots.length;
-        const availableSlots = sectionSpots.filter(spotId => 
+        const availableSlots = sectionSpots.filter(spotId =>
           !spotOccupancyMap[spotId]
         ).length;
 
@@ -293,7 +276,7 @@ const ParkingMapScreen: React.FC = () => {
         };
       });
     });
-  }, []);
+  }, [floorConfig]);
 
   const subscribeToParkingData = useCallback(() => {
     if (unsubscribeFunctionsRef.current.parkingUpdates) return;
@@ -352,10 +335,10 @@ const ParkingMapScreen: React.FC = () => {
       translateY.value = context.startY + event.translationY;
     },
     onEnd: () => {
-      const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = GESTURE_LIMITS;
+      const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = gestureLimits;
 
       if (translateX.value > maxTranslateX) {
-        translateX.value =maxTranslateX;
+        translateX.value = maxTranslateX;
       } else if (translateX.value < minTranslateX) {
         translateX.value = minTranslateX;
       }
@@ -373,11 +356,11 @@ const ParkingMapScreen: React.FC = () => {
       context.startScale = scale.value;
     },
     onActive: (event: any, context: any) => {
-      const { minScale, maxScale } = GESTURE_LIMITS;
+      const { minScale, maxScale } = gestureLimits;
       scale.value = Math.max(minScale, Math.min(maxScale, context.startScale * event.scale));
     },
     onEnd: () => {
-      const { clampMinScale, clampMaxScale } = GESTURE_LIMITS;
+      const { clampMinScale, clampMaxScale } = gestureLimits;
       if (scale.value < clampMinScale) {
         scale.value = clampMinScale;
       } else if (scale.value > clampMaxScale) {
@@ -670,6 +653,41 @@ const ParkingMapScreen: React.FC = () => {
     );
   }, [showNavigation, navigationPath]);
 
+  // Show loading screen while configuration is being loaded
+  if (isLoadingConfig) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <StatusBar barStyle="light-content" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ color: COLORS.primary, marginTop: 16, fontFamily: FONTS.semiBold }}>
+          Loading parking configuration...
+        </Text>
+      </View>
+    );
+  }
+
+  // Show error screen if configuration failed to load
+  if (configError || !floorConfig) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <StatusBar barStyle="light-content" />
+        <Ionicons name="alert-circle" size={64} color={COLORS.primary} />
+        <Text style={{ color: COLORS.primary, marginTop: 16, fontFamily: FONTS.semiBold, fontSize: 18, textAlign: 'center' }}>
+          Failed to load parking configuration
+        </Text>
+        <Text style={{ color: '#666', marginTop: 8, fontFamily: FONTS.regular, fontSize: 14, textAlign: 'center' }}>
+          {configError || 'Configuration not available'}
+        </Text>
+        <TouchableOpacity
+          style={{ marginTop: 24, backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+          onPress={() => navigation.navigate('Home')}
+        >
+          <Text style={{ color: 'white', fontFamily: FONTS.semiBold }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -722,11 +740,11 @@ const ParkingMapScreen: React.FC = () => {
             <View style={styles.dragHandle} />
             
             <View style={styles.floorInfo}>
-              <Text style={styles.buildingName}>USJ-R Quadricentennial</Text>
+              <Text style={styles.buildingName}>{floorConfig.building_name}</Text>
               <View style={styles.floorDetails}>
                 <View>
                   <Text style={styles.floorLabel}>Floor</Text>
-                  <Text style={styles.floorNumber}>4</Text>
+                  <Text style={styles.floorNumber}>{floorConfig.floor_number}</Text>
                 </View>
                 <View>
                   <Text style={styles.availableLabel}>Available Spots</Text>
