@@ -51,9 +51,19 @@ class RealTimeParkingServiceClass {
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
 
+  // NOTE: This mapping is used for notifications only
+  // The actual sensor-to-spot mapping is now managed dynamically via ParkingConfigService
+  // This should ideally be removed and replaced with dynamic config in the future
   private readonly SENSOR_ID_TO_LABEL: Record<number, string> = {
     1: 'B4', 2: 'B3', 3: 'B2', 4: 'B1', 5: 'C1',
-    43: 'A1', 44: 'A2', 45: 'A3', 46: 'A4', 
+    6: 'C2', 7: 'A1', 8: 'D1', 9: 'D2', 10: 'D3',
+    11: 'D4', 12: 'D5', 13: 'D6', 14: 'D7', 15: 'E1',
+    16: 'E2', 17: 'E3', 18: 'F1', 19: 'F2', 20: 'F3',
+    21: 'F4', 22: 'F5', 23: 'F6', 24: 'F7', 25: 'G1',
+    26: 'G2', 27: 'G3', 28: 'G4', 29: 'G5', 30: 'H1',
+    31: 'H2', 32: 'H3', 33: 'I1', 34: 'I2', 35: 'I3',
+    36: 'I4', 37: 'I5', 38: 'J1', 39: 'J2', 40: 'J3',
+    41: 'J4', 42: 'J5',
   };
 
   constructor() {
