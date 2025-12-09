@@ -185,9 +185,18 @@ apiClient.interceptors.request.use(
       await TokenManager.ensureInitialized();
       const token = TokenManager.getToken();
 
-      if (token) {
+      // IMPORTANT: Don't add token to login request (it generates a NEW token)
+      // BUT do add token to logout request (it needs to revoke the current token)
+      const isLoginEndpoint = config.url === '/login';
+
+      if (token && !isLoginEndpoint) {
         // Laravel Sanctum uses Bearer token authentication for mobile
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('Added token to request:', config.url);
+      } else if (isLoginEndpoint) {
+        // For login, explicitly remove any old Authorization header
+        delete config.headers.Authorization;
+        console.log('Login request - no token added');
       }
 
       // Add custom headers for Sanctum
@@ -263,6 +272,8 @@ apiClient.interceptors.response.use(
  */
 export const login = async (credentials: { email: string; password: string }): Promise<LoginResponse> => {
   try {
+    console.log('Attempting login for:', credentials.email);
+
     // Make login request - backend should return a Sanctum token
     const response = await apiClient.post<LoginResponse>('/login', credentials);
     const { token, user, success, message } = response.data;
@@ -270,6 +281,8 @@ export const login = async (credentials: { email: string; password: string }): P
     if (success && token && user) {
       // Store the Sanctum token
       await TokenManager.saveToStorage(token, user);
+
+      console.log('Login successful for:', user.email);
 
       return {
         success: true,
@@ -282,6 +295,9 @@ export const login = async (credentials: { email: string; password: string }): P
     }
   } catch (error: any) {
     console.log('Login failed:', error);
+    console.log('Error response status:', error.response?.status);
+    console.log('Error response data:', error.response?.data);
+    console.log('Error response headers:', error.response?.headers);
 
     // Handle rate limiting specifically
     if (error.response?.status === 429) {
@@ -289,8 +305,9 @@ export const login = async (credentials: { email: string; password: string }): P
       const rateLimitMessage = error.response?.data?.message ||
         (retryAfter ?
           `Too many login attempts. Please try again in ${retryAfter} seconds.` :
-          'Too many login attempts. Please try again later.');
+          'Too many login attempts. Please wait a moment and try again.');
 
+      console.log('Rate limit hit. Retry after:', retryAfter);
       throw new Error(rateLimitMessage);
     }
 
