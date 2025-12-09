@@ -155,33 +155,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async () => {
     try {
       const currentUser = user;
-      
-      
-      if (currentUser) { // clear notif data for current user
+
+      // Clear notification data for current user
+      if (currentUser) {
         await NotificationManager.onUserLogout();
         await NotificationService.clearUserSettings();
       }
-    
+
+      // Call backend logout endpoint to revoke Sanctum token
       await apiLogout();
+
+      // Clear local state
       setUser(null);
       setIsAuthenticated(false);
       setError(null);
-    
+
+      // Clear additional user data from AsyncStorage
       try {
         await AsyncStorage.removeItem('valet_user_data');
       } catch (error) {
         console.log('Error clearing stored user data:', error);
       }
-      
+
+      console.log('Logout successful - token and user data cleared');
+
     } catch (error) {
       console.log('Error during logout:', error);
-      
-      setUser(null); // if logout fails, clear local state
+
+      // Even if logout API call fails, still clear local state
+      setUser(null);
       setIsAuthenticated(false);
       setError(null);
-      
-      await TokenManager.removeFromStorage(); // force clear token and notification data
+
+      // Force clear token and notification data
+      await TokenManager.removeFromStorage();
       await NotificationManager.onUserLogout();
+
+      console.log('Logout completed with errors - local data cleared anyway');
     }
   }, [user]);
 

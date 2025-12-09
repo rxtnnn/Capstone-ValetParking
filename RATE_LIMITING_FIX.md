@@ -250,7 +250,21 @@ If you need to login right now while backend team implements the fix:
    ```bash
    php artisan cache:clear
    php artisan config:clear
+   php artisan cache:forget rate-limiter:login:{your-email}
    ```
+
+## Emergency Bypass (Development Only)
+
+**TEMPORARY FIX** - Remove rate limiting for development:
+
+File: `routes/api.php`
+```php
+// Temporarily remove throttle middleware for development
+Route::post('/login', [AuthController::class, 'login']);
+// Later add back: ->middleware('throttle:10,1')
+```
+
+**IMPORTANT:** Re-enable rate limiting before production!
 
 ## Verify Headers
 
