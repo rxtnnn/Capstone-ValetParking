@@ -294,14 +294,18 @@ const HomeScreen: React.FC = () => {
 
   const handleFloorPress = useCallback((floor: any) => {
   const status = getFloorStatus(floor.available, floor.total);
-  
+
   if (status.text === 'FULL') {
     setShowFullAlert(true);
   } else if (status.text === 'NO DATA') {
     return;
   } else {
-    if (floor.floor === 2) {
+    if (floor.floor === 1) {
+      navigation.navigate('ParkingMapFloor1');
+    } else if (floor.floor === 2) {
       navigation.navigate('ParkingMapFloor2');
+    } else if (floor.floor === 3) {
+      navigation.navigate('ParkingMapFloor3');
     } else if (floor.floor === 4) {
       navigation.navigate('ParkingMap');
     } else {

@@ -37,6 +37,7 @@ interface ParkingSpot {
   height?: number;
   section?: string;
   rotation?: string;
+  hasSensor?: boolean; // Track if spot has a sensor configured
 }
 interface ParkingSection {
   id: string;
@@ -110,6 +111,7 @@ const ParkingMapScreen: React.FC = () => {
           height: spot.dimensions.height,
           section: spot.section,
           rotation: spot.rotation,
+          hasSensor: spot.sensor_id !== null && spot.sensor_id !== undefined, // Check if spot has a sensor
         }));
 
         setParkingData(initialSpots);
@@ -177,7 +179,7 @@ const ParkingMapScreen: React.FC = () => {
     const mapping = ParkingConfigService.getSensorToSpotMapping(floorConfig);
 
     Object.values(mapping).forEach(spotId => {
-      const section = spotId.charAt(0);
+      const section = spotId.charAt(1); // Extract section from '4A1' -> 'A'
       sectionMap[section] = (sectionMap[section] || 0) + 1;
     });
 
@@ -203,7 +205,7 @@ const ParkingMapScreen: React.FC = () => {
     const spot = parkingData.find(s => s.id === spotId);
     if (!spot) return [];
 
-    const section = spotId.charAt(0);
+    const section = spotId.charAt(1); // Extract section from '4A1' -> 'A'
     const waypointsMap = ParkingConfigService.getWaypointsMap(floorConfig);
 
     // Find the navigation route for this section
@@ -252,7 +254,8 @@ const ParkingMapScreen: React.FC = () => {
         ...spot,
         isOccupied: spotOccupancyMap.hasOwnProperty(spot.id)
           ? spotOccupancyMap[spot.id]
-          : spot.isOccupied
+          : spot.isOccupied,
+        // Preserve hasSensor field during updates
       }));
     });
 
@@ -463,11 +466,23 @@ const ParkingMapScreen: React.FC = () => {
   const renderParkingSpot = useCallback((spot: ParkingSpot) => {
     const carImage = require('../../assets/car_top.png');
     const isSelected = selectedSpot === spot.id;
-    const spotSection = spot.id.charAt(0);
+    const spotSection = spot.id.charAt(1); // Extract section from '4A1' -> 'A'
     const isHighlighted = highlightedSection === spotSection;
     const rotation = spot.rotation || '0deg';
     const w = spot.width || 30;
     const h = spot.height || 30;
+
+    // Determine background color and border style based on sensor status
+    let backgroundColor = 'transparent'; // Transparent background for no sensor
+    let borderColor = '#999'; // Gray border for no sensor
+    let borderWidth = 2;
+    let borderStyle: 'solid' | 'dashed' | 'dotted' = 'dashed'; // Dashed border for no sensor
+
+    if (spot.hasSensor) {
+      borderStyle = 'solid';
+      borderWidth = 0;
+      backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green; // Red if occupied, Green if available
+    }
 
     return (
       <TouchableOpacity
@@ -484,8 +499,8 @@ const ParkingMapScreen: React.FC = () => {
         }}
         activeOpacity={2}
       >
-        {spot.isOccupied ? (
-          <Image 
+        {spot.hasSensor && spot.isOccupied ? (
+          <Image
             source={carImage}
             style={{
               width: w,
@@ -499,7 +514,11 @@ const ParkingMapScreen: React.FC = () => {
             style={{
               width: w,
               height: h,
+              backgroundColor: backgroundColor,
               borderRadius: 4,
+              borderWidth: borderWidth,
+              borderColor: borderColor,
+              borderStyle: borderStyle,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ rotate: rotation }],
@@ -507,7 +526,7 @@ const ParkingMapScreen: React.FC = () => {
           >
             <Text
               style={{
-                color: '#FFF',
+                color: spot.hasSensor ? '#FFF' : '#999',
                 fontWeight: '700',
                 fontSize: 18,
                 fontFamily: FONTS.semiBold,

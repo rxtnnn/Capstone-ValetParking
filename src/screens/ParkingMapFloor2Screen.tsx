@@ -37,6 +37,7 @@ interface ParkingSpot {
   height?: number;
   section?: string;
   rotation?: string;
+  hasSensor?: boolean; // Track if spot has a sensor configured
 }
 
 interface ParkingSection {
@@ -107,6 +108,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
           height: spot.dimensions.height,
           section: spot.section,
           rotation: spot.rotation,
+          hasSensor: spot.sensor_id !== null && spot.sensor_id !== undefined, // Check if spot has a sensor
         }));
 
         setParkingData(initialSpots);
@@ -461,6 +463,18 @@ const ParkingMapFloor2Screen: React.FC = () => {
     const w = spot.width || 30;
     const h = spot.height || 30;
 
+    // Determine background color and border style based on sensor status
+    let backgroundColor = 'transparent'; // Transparent background for no sensor
+    let borderColor = '#999'; // Gray border for no sensor
+    let borderWidth = 2;
+    let borderStyle: 'solid' | 'dashed' | 'dotted' = 'dashed'; // Dashed border for no sensor
+
+    if (spot.hasSensor) {
+      borderStyle = 'solid';
+      borderWidth = 0;
+      backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green; // Red if occupied, Green if available
+    }
+
     return (
       <TouchableOpacity
         key={spot.id}
@@ -476,7 +490,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
         }}
         activeOpacity={2}
       >
-        {spot.isOccupied ? (
+        {spot.hasSensor && spot.isOccupied ? (
           <Image
             source={carImage}
             style={{
@@ -491,7 +505,11 @@ const ParkingMapFloor2Screen: React.FC = () => {
             style={{
               width: w,
               height: h,
+              backgroundColor: backgroundColor,
               borderRadius: 4,
+              borderWidth: borderWidth,
+              borderColor: borderColor,
+              borderStyle: borderStyle,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ rotate: rotation }],
@@ -499,7 +517,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
           >
             <Text
               style={{
-                color: '#FFF',
+                color: spot.hasSensor ? '#FFF' : '#999',
                 fontWeight: '700',
                 fontSize: 18,
                 fontFamily: FONTS.semiBold,
