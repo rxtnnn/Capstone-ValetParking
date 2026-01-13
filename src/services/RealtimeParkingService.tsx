@@ -31,7 +31,7 @@ type ParkingUpdateCallback = (data: ParkingStats) => void;
 type ConnectionStatusCallback = (status: 'connected' | 'disconnected' | 'error') => void;
 
 class RealTimeParkingServiceClass {
-  private apiUrl = 'https://valet.up.railway.app/api/public/parking';
+  private apiUrl = 'https://valetdevelop.up.railway.app/api/public/parking';
   private readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
   
   private updateCallbacks: ParkingUpdateCallback[] = [];
