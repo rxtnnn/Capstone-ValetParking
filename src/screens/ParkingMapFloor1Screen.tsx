@@ -22,7 +22,7 @@ import Animated, {
 import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { COLORS, FONTS } from '../constants/AppConst';
-import { MapLayoutFloor2 } from '../components/MapLayoutFloor2';
+import { MapLayoutFloor1 } from '../components/MapLayoutFloor1';
 import { ParkingConfigService } from '../services/ParkingConfigService';
 import { FloorConfig, Position } from '../types/parkingConfig';
 
@@ -47,7 +47,7 @@ interface ParkingSection {
   isFull: boolean;
 }
 
-const ParkingMapFloor2Screen: React.FC = () => {
+const ParkingMapFloor1Screen: React.FC = () => {
   const navigation = useNavigation<ParkingMapScreenNavigationProp>();
 
   // Dynamic configuration state
@@ -88,7 +88,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
         setIsLoadingConfig(true);
         setConfigError(null);
 
-        const config = await ParkingConfigService.getFloorConfig('usjr_quadricentennial', 2);
+        const config = await ParkingConfigService.getFloorConfig('usjr_quadricentennial', 1);
 
         if (!isMounted) return;
 
@@ -118,7 +118,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
           scale.value = config.initial_view.scale;
         }
 
-        console.log('Floor 2 parking configuration loaded successfully');
+        console.log('Floor 1 parking configuration loaded successfully');
       } catch (error) {
         console.error('Failed to load parking configuration:', error);
         if (isMounted) {
@@ -173,7 +173,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
     const mapping = ParkingConfigService.getSensorToSpotMapping(floorConfig);
 
     Object.values(mapping).forEach(spotId => {
-      const section = spotId.charAt(1); // For '2A1', get 'A'
+      const section = spotId.charAt(1); // For '1A1', get 'A'
       sectionMap[section] = (sectionMap[section] || 0) + 1;
     });
 
@@ -199,7 +199,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
     const spot = parkingData.find(s => s.id === spotId);
     if (!spot) return [];
 
-    const section = spotId.charAt(1); // For '2A1', get 'A'
+    const section = spotId.charAt(1); // For '1A1', get 'A'
     const waypointsMap = ParkingConfigService.getWaypointsMap(floorConfig);
 
     const route = floorConfig.navigation_routes.find(r => r.section === section);
@@ -455,7 +455,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
   const renderParkingSpot = useCallback((spot: ParkingSpot) => {
     const carImage = require('../../assets/car_top.png');
     const isSelected = selectedSpot === spot.id;
-    const spotSection = spot.id.charAt(1); // For '2A1', get 'A'
+    const spotSection = spot.id.charAt(1); // For '1A1', get 'A'
     const isHighlighted = highlightedSection === spotSection;
     const rotation = spot.rotation || '0deg';
     const w = spot.width || 30;
@@ -710,7 +710,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
                 maxPointers={1}
               >
                 <Animated.View style={[styles.parkingLayout, animatedStyle]}>
-                  <MapLayoutFloor2 styles={styles} />
+                  <MapLayoutFloor1 styles={styles} />
                   {parkingData.map(renderParkingSpot)}
                   {renderNavigationPath()}
                 </Animated.View>
@@ -776,4 +776,4 @@ const ParkingMapFloor2Screen: React.FC = () => {
   );
 };
 
-export default ParkingMapFloor2Screen;
+export default ParkingMapFloor1Screen;
