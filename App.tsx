@@ -31,7 +31,9 @@ import LoginScreen from './src/screens/LoginScreen';
 import NotificationService from './src/services/NotificationService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
+import ParkingMapFloor1Screen from './src/screens/ParkingMapFloor1Screen';
 import ParkingMapFloor2Screen from './src/screens/ParkingMapFloor2Screen';
+import ParkingMapFloor3Screen from './src/screens/ParkingMapFloor3Screen';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -48,7 +50,9 @@ export type RootStackParamList = {
   Home: undefined;
   Floors: undefined;
   ParkingMap: { floor: number };
+  ParkingMapFloor1: undefined;
   ParkingMapFloor2: undefined;
+  ParkingMapFloor3: undefined;
   Feedback: { showReplies?: boolean };
   Settings: undefined;
   Profile: { userId?: number } | undefined;
@@ -188,7 +192,7 @@ interface TabBarProps {
 
 const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
   const { user } = useAuth();
-  const hiddenScreens = ['ParkingMap', 'ParkingMapFloor2', 'Splash', 'Login'];
+  const hiddenScreens = ['ParkingMap', 'ParkingMapFloor1', 'ParkingMapFloor2', 'ParkingMapFloor3', 'Splash', 'Login'];
   
   if (hiddenScreens.includes(currentRoute)) {
     return null;
@@ -438,14 +442,46 @@ const AppNavigator: React.FC = () => {
               })}
             />
             
-            <Stack.Screen 
-              name="ParkingMapFloor2" 
+            <Stack.Screen
+              name="ParkingMapFloor1"
+              component={ParkingMapFloor1Screen}
+              options={({ navigation }) => ({
+                headerShown: true,
+                header: () => (
+                  <GradientHeader
+                    title="Parking Map"
+                    navigation={navigation}
+                    canGoBack={true}
+                  />
+                ),
+                gestureEnabled: true,
+              })}
+            />
+
+            <Stack.Screen
+              name="ParkingMapFloor2"
               component={ParkingMapFloor2Screen}
               options={({ navigation }) => ({
                 headerShown: true,
                 header: () => (
-                  <GradientHeader 
-                    title="Parking Map" 
+                  <GradientHeader
+                    title="Parking Map"
+                    navigation={navigation}
+                    canGoBack={true}
+                  />
+                ),
+                gestureEnabled: true,
+              })}
+            />
+
+            <Stack.Screen
+              name="ParkingMapFloor3"
+              component={ParkingMapFloor3Screen}
+              options={({ navigation }) => ({
+                headerShown: true,
+                header: () => (
+                  <GradientHeader
+                    title="Parking Map"
                     navigation={navigation}
                     canGoBack={true}
                   />
