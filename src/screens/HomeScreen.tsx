@@ -297,14 +297,7 @@ const HomeScreen: React.FC = () => {
   }, [isAuthenticated, currentUserId, checkForNewReplies]);
 
   const handleFloorPress = useCallback((floor: any) => {
-  const status = getFloorStatus(floor.available, floor.total);
-
-  // Allow viewing map even when full, only block if NO DATA
-  if (status.text === 'NO DATA') {
-    return;
-  }
-
-  // Navigate to the appropriate floor map
+  // Navigate to the appropriate floor map (allow all floors including NO DATA)
   if (floor.floor === 1) {
     navigation.navigate('ParkingMapFloor1');
   } else if (floor.floor === 2) {
@@ -320,7 +313,7 @@ const HomeScreen: React.FC = () => {
       [{ text: 'OK' }]
     );
   }
-}, [getFloorStatus, navigation]);
+}, [navigation]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -504,22 +497,18 @@ const HomeScreen: React.FC = () => {
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
             const isFull = status.text === 'FULL';
             const noData = status.text === 'NO DATA' || floor.total === 0;
-            const isDisabled = noData;
-            
+
             return (
               <TouchableOpacity
                 key={`floor-${floor.floor}`}
-                style={[styles.floorCard, isFull && styles.fullFloorCard, noData && styles.noDataFloorCard,
-                  isDisabled && styles.disabledFloorCard]}
-                onPress={() => isDisabled ? null : handleFloorPress(floor)}
-                activeOpacity={isDisabled ? 1 : 0.8}
-                disabled={isDisabled}
+                style={[styles.floorCard, isFull && styles.fullFloorCard, noData && styles.noDataFloorCard]}
+                onPress={() => handleFloorPress(floor)}
+                activeOpacity={0.8}
               >
                 <View style={styles.floorHeader}>
                   <Text style={[
                     styles.floorTitle,
-                    (isFull || noData) && styles.fullFloorText,
-                    isDisabled && styles.disabledText
+                    (isFull || noData) && styles.fullFloorText
                   ]}>
                     {getFloorName(floor.floor)}
                   </Text>
@@ -527,10 +516,10 @@ const HomeScreen: React.FC = () => {
                     <View style={[styles.statusBadge, { backgroundColor: status.color }]}>
                       <Text style={styles.statusText}>{status.text}</Text>
                     </View>
-                    <Ionicons 
-                      name="chevron-forward" 
-                      size={24} 
-                      color={isDisabled ? "#ccc" : (isFull || noData) ? "#666" : "#999"} 
+                    <Ionicons
+                      name="chevron-forward"
+                      size={24}
+                      color={(isFull || noData) ? "#666" : "#999"}
                     />
                   </View>
                 </View>
@@ -538,69 +527,62 @@ const HomeScreen: React.FC = () => {
                 <View style={styles.floorStats}>
                   <View style={styles.statItem}>
                     <Text style={[
-                      styles.statNumber, 
+                      styles.statNumber,
                       { color: COLORS.green },
-                      (isFull || noData) && styles.fullFloorText,
-                      isDisabled && styles.disabledText
+                      (isFull || noData) && styles.fullFloorText
                     ]}>
                       {floor.available}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || noData) && styles.fullFloorText,
-                      isDisabled && styles.disabledText
+                      (isFull || noData) && styles.fullFloorText
                     ]}>Available</Text>
                   </View>
-                  
+
                   <View style={styles.statItem}>
                     <Text style={[
-                      styles.statNumber, 
+                      styles.statNumber,
                       { color: COLORS.primary },
-                      (isFull || noData) && styles.fullFloorText,
-                      isDisabled && styles.disabledText
+                      (isFull || noData) && styles.fullFloorText
                     ]}>
                       {floor.total - floor.available}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || noData) && styles.fullFloorText,
-                      isDisabled && styles.disabledText
+                      (isFull || noData) && styles.fullFloorText
                     ]}>Occupied</Text>
                   </View>
-                  
+
                   <View style={styles.statItem}>
                     <Text style={[
-                      styles.statNumber, 
+                      styles.statNumber,
                       { color: COLORS.blue },
-                      (isFull || noData) && styles.fullFloorText,
-                      isDisabled && styles.disabledText
+                      (isFull || noData) && styles.fullFloorText
                     ]}>
                       {floor.total}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || noData) && styles.fullFloorText,
-                      isDisabled && styles.disabledText
+                      (isFull || noData) && styles.fullFloorText
                     ]}>Total Spots</Text>
                   </View>
                 </View>
 
                 <View style={styles.progressBarContainer}>
                   <View style={styles.progressBarBackground}>
-                    <View 
+                    <View
                       style={[
                         styles.progressBarFill,
-                        { 
+                        {
                           width: `${progressPercentage}%`,
-                          backgroundColor: isDisabled ? '#ccc' : status.color
+                          backgroundColor: status.color
                         }
                       ]}
                     />
                   </View>
                   <Text style={[
                     styles.progressBarText,
-                    (isFull || noData) && styles.fullFloorText,
-                    isDisabled && styles.disabledText
+                    (isFull || noData) && styles.fullFloorText
                   ]}>
                     {noData ? 'No sensors' : `${Math.round(progressPercentage)}% Full`}
                   </Text>
