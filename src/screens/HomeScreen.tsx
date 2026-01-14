@@ -21,7 +21,9 @@ type RootStackParamList = {
   Floors: undefined;
   ParkingMap: undefined;
   Feedback: undefined;
+  ParkingMapFloor1: undefined;
   ParkingMapFloor2: undefined;
+  ParkingMapFloor3: undefined;
   Settings: undefined;
   Profile: { userId?: number } | undefined;
   ApiTest: undefined;
@@ -37,6 +39,8 @@ interface CircularProgressProps {
   children?: React.ReactNode;
 }
 const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000;
+// Default floors configuration - matches Railway sensor assignments
+// Sensor 1 → 2B1 (2nd Floor), Sensor 2 → 1D1 (1st Floor), Sensor 3 → 4J3 (4th Floor)
 const DEFAULT_FLOORS: {
   floor: number;
   total: number;
@@ -45,29 +49,29 @@ const DEFAULT_FLOORS: {
   status: 'available';
 }[] = [
   {
+    floor: 1,
+    total: 1, // 1 sensor assigned (Sensor 2 → 1D1)
+    available: 0,
+    occupancyRate: 0,
+    status: 'available' as const
+  },
+  {
     floor: 2,
-    total: 33, // Floor 2 has 33 parking spots based on the blueprint
-    available: 5,
+    total: 1, // 1 sensor assigned (Sensor 1 → 2B1)
+    available: 0,
     occupancyRate: 0,
     status: 'available' as const
   },
   {
     floor: 3,
-    total: 0,
+    total: 0, // No sensors assigned
     available: 0,
     occupancyRate: 0,
     status: 'available' as const
   },
   {
     floor: 4,
-    total: 42, // Your existing floor with 42 spots
-    available: 0,
-    occupancyRate: 0,
-    status: 'available' as const
-  },
-  {
-    floor: 5,
-    total: 0,
+    total: 1, // 1 sensor assigned (Sensor 3 → 4J3)
     available: 0,
     occupancyRate: 0,
     status: 'available' as const
@@ -295,26 +299,26 @@ const HomeScreen: React.FC = () => {
   const handleFloorPress = useCallback((floor: any) => {
   const status = getFloorStatus(floor.available, floor.total);
 
-  if (status.text === 'FULL') {
-    setShowFullAlert(true);
-  } else if (status.text === 'NO DATA') {
+  // Allow viewing map even when full, only block if NO DATA
+  if (status.text === 'NO DATA') {
     return;
+  }
+
+  // Navigate to the appropriate floor map
+  if (floor.floor === 1) {
+    navigation.navigate('ParkingMapFloor1');
+  } else if (floor.floor === 2) {
+    navigation.navigate('ParkingMapFloor2');
+  } else if (floor.floor === 3) {
+    navigation.navigate('ParkingMapFloor3');
+  } else if (floor.floor === 4) {
+    navigation.navigate('ParkingMap');
   } else {
-    if (floor.floor === 1) {
-      navigation.navigate('ParkingMapFloor1');
-    } else if (floor.floor === 2) {
-      navigation.navigate('ParkingMapFloor2');
-    } else if (floor.floor === 3) {
-      navigation.navigate('ParkingMapFloor3');
-    } else if (floor.floor === 4) {
-      navigation.navigate('ParkingMap');
-    } else {
-      Alert.alert(
-        'Coming Soon',
-        `Floor ${floor.floor} visualization is not yet available.`,
-        [{ text: 'OK' }]
-      );
-    }
+    Alert.alert(
+      'Coming Soon',
+      `Floor ${floor.floor} visualization is not yet available.`,
+      [{ text: 'OK' }]
+    );
   }
 }, [getFloorStatus, navigation]);
 

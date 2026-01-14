@@ -17,7 +17,7 @@ export interface Dimensions {
 
 export interface ParkingSpotConfig {
   spot_id: string;           // e.g., "A1", "B2"
-  sensor_id: number;         // Physical sensor ID
+  sensor_id: number | null;  // Physical sensor ID (null if no sensor assigned)
   position: Position;        // X,Y coordinates on map
   dimensions: Dimensions;    // Width and height
   rotation: string;          // e.g., "0deg", "90deg", "180deg", "270deg"
