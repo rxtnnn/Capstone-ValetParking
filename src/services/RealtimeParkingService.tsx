@@ -51,19 +51,13 @@ class RealTimeParkingServiceClass {
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
 
-  // NOTE: This mapping is used for notifications only
-  // The actual sensor-to-spot mapping is now managed dynamically via ParkingConfigService
-  // This should ideally be removed and replaced with dynamic config in the future
+  // Sensor to spot mapping - matches Railway sensor assignments
+  // Only 3 sensors are currently assigned in Railway:
+  // Sensor 1 → 2B1 (2nd Floor), Sensor 2 → 1D1 (1st Floor), Sensor 3 → 4J3 (4th Floor)
   private readonly SENSOR_ID_TO_LABEL: Record<number, string> = {
-    1: 'B4', 2: 'B3', 3: 'B2', 4: 'B1', 5: 'C1',
-    6: 'C2', 7: 'A1', 8: 'D1', 9: 'D2', 10: 'D3',
-    11: 'D4', 12: 'D5', 13: 'D6', 14: 'D7', 15: 'E1',
-    16: 'E2', 17: 'E3', 18: 'F1', 19: 'F2', 20: 'F3',
-    21: 'F4', 22: 'F5', 23: 'F6', 24: 'F7', 25: 'G1',
-    26: 'G2', 27: 'G3', 28: 'G4', 29: 'G5', 30: 'H1',
-    31: 'H2', 32: 'H3', 33: 'I1', 34: 'I2', 35: 'I3',
-    36: 'I4', 37: 'I5', 38: 'J1', 39: 'J2', 40: 'J3',
-    41: 'J4', 42: 'J5',
+    1: '2B1',  // 2nd Floor, Section B, Spot 1
+    2: '1D1',  // 1st Floor, Section D, Spot 1
+    3: '4J3',  // 4th Floor, Section J, Spot 3
   };
 
   constructor() {
@@ -253,7 +247,7 @@ class RealTimeParkingServiceClass {
       
       if (this.shouldStop || !this.isRunning) return;
 
-      const newData = this.transformRawData(rawData, rawData);
+      const newData = this.transformRawData(rawData);
       this.checkForChanges(newData);
       
       this.lastData = newData;
@@ -312,22 +306,28 @@ class RealTimeParkingServiceClass {
     return 2;
   };
 
-  private transformRawData(rawData: ParkingSpace[], sensorData: ParkingSpace[]): ParkingStats {   
-    const totalSpots = rawData.length;
+  private transformRawData(rawData: ParkingSpace[]): ParkingStats {
+    // Filter to only include spots with actual sensor readings (distance_cm is not null)
+    // This identifies spots that have physical sensors connected
+    const activeSpots = rawData.filter(space => space.distance_cm !== null && space.distance_cm !== undefined);
+
+    console.log('Raw API data:', rawData.length, 'records, Active sensors:', activeSpots.length);
+
+    const totalSpots = activeSpots.length;
     let availableSpots = 0;
-    
+
     const floorGroups: { [key: number]: { total: number; available: number; spaces: ParkingSpace[] } } = {};
-    
-    for (const space of rawData) {
+
+    for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
       const isAvailable = !space.is_occupied;
-      
+
       if (isAvailable) availableSpots++;
-      
+
       if (!floorGroups[floor]) {
         floorGroups[floor] = { total: 0, available: 0, spaces: [] };
       }
-      
+
       floorGroups[floor].total++;
       if (isAvailable) floorGroups[floor].available++;
       floorGroups[floor].spaces.push(space);
@@ -335,7 +335,7 @@ class RealTimeParkingServiceClass {
 
     const floors = Object.entries(floorGroups).map(([floorNum, data]) => {
       const occupancyRate = data.total > 0 ? ((data.total - data.available) / data.total) * 100 : 0;
-      
+
       let status: 'available' | 'limited' | 'full';
       if (data.available === 0) {
         status = 'full';
@@ -354,6 +354,9 @@ class RealTimeParkingServiceClass {
       };
     }).sort((a, b) => a.floor - b.floor);
 
+    console.log('Processed floors:', floors);
+    console.log('Total:', totalSpots, 'Available:', availableSpots);
+
     return {
       totalSpots,
       availableSpots,
@@ -361,7 +364,7 @@ class RealTimeParkingServiceClass {
       floors,
       lastUpdated: new Date().toLocaleTimeString(),
       isLive: true,
-      sensorData,
+      sensorData: activeSpots,
     };
   }
 

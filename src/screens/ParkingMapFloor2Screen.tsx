@@ -463,15 +463,12 @@ const ParkingMapFloor2Screen: React.FC = () => {
     const w = spot.width || 30;
     const h = spot.height || 30;
 
-    // Determine background color and border style based on sensor status
-    let backgroundColor = 'transparent'; // Transparent background for no sensor
-    let borderColor = '#999'; // Gray border for no sensor
-    let borderWidth = 2;
-    let borderStyle: 'solid' | 'dashed' | 'dotted' = 'dashed'; // Dashed border for no sensor
+    // Determine background color based on sensor status
+    // Gray for no sensor, Green for available (with sensor), Red for occupied (with sensor)
+    let backgroundColor = '#CCCCCC'; // Gray for spots without sensors
+    let borderWidth = 0;
 
     if (spot.hasSensor) {
-      borderStyle = 'solid';
-      borderWidth = 0;
       backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green; // Red if occupied, Green if available
     }
 
@@ -508,8 +505,6 @@ const ParkingMapFloor2Screen: React.FC = () => {
               backgroundColor: backgroundColor,
               borderRadius: 4,
               borderWidth: borderWidth,
-              borderColor: borderColor,
-              borderStyle: borderStyle,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ rotate: rotation }],
@@ -517,7 +512,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
           >
             <Text
               style={{
-                color: spot.hasSensor ? '#FFF' : '#999',
+                color: spot.hasSensor ? '#FFF' : '#666',
                 fontWeight: '700',
                 fontSize: 18,
                 fontFamily: FONTS.semiBold,
@@ -535,7 +530,7 @@ const ParkingMapFloor2Screen: React.FC = () => {
               width: w + 4,
               height: h + 4,
               borderWidth: 4,
-              borderColor: COLORS.green,
+              borderColor: '#FFD700', // Yellow highlight for section selection
               transform: [{ rotate: rotation }],
             }}
           />
