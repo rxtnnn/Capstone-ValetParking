@@ -3,12 +3,13 @@ import { NotificationManager } from './NotifManager';
 
 export interface ParkingSpace {
   id: number;
-  sensor_id: number;
-  is_occupied: number;      
-  distance_cm: number;
+  sensor_id: number | null;
+  is_occupied: boolean;
+  distance_cm: number | null;
   created_at: string;
   updated_at: string;
-  floor_level: string; 
+  floor_level: string;
+  slot_name: string | null;
 }
 
 export interface ParkingStats {
@@ -50,15 +51,6 @@ class RealTimeParkingServiceClass {
   private consecErrors = 0;
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
-
-  // Sensor to spot mapping - matches Railway sensor assignments
-  // Only 3 sensors are currently assigned in Railway:
-  // Sensor 1 → 2B1 (2nd Floor), Sensor 2 → 1D1 (1st Floor), Sensor 3 → 4J3 (4th Floor)
-  private readonly SENSOR_ID_TO_LABEL: Record<number, string> = {
-    1: '2B1',  // 2nd Floor, Section B, Spot 1
-    2: '1D1',  // 1st Floor, Section D, Spot 1
-    3: '4J3',  // 4th Floor, Section J, Spot 3
-  };
 
   constructor() {
     this.initializeService();
@@ -307,9 +299,17 @@ class RealTimeParkingServiceClass {
   };
 
   private transformRawData(rawData: ParkingSpace[]): ParkingStats {
-    // Filter to only include spots with actual sensor readings (distance_cm is not null)
-    // This identifies spots that have physical sensors connected
-    const activeSpots = rawData.filter(space => space.distance_cm !== null && space.distance_cm !== undefined);
+    // Filter to only include spots that have sensors assigned (sensor_id is not null)
+    // A slot is considered "assigned" if it has a sensor_id linked via sensor_assignments
+    // - is_occupied = true means car is detected (occupied)
+    // - is_occupied = false means no car detected (available)
+    // Slots without sensor_id are unassigned (gray in parking map, not counted)
+    const activeSpots = rawData.filter(space =>
+      space.slot_name !== null &&
+      space.slot_name !== undefined &&
+      space.sensor_id !== null &&
+      space.sensor_id !== undefined
+    );
 
     console.log('Raw API data:', rawData.length, 'records, Active sensors:', activeSpots.length);
 
@@ -352,7 +352,7 @@ class RealTimeParkingServiceClass {
         occupancyRate,
         status,
       };
-    }).sort((a, b) => a.floor - b.floor);
+    }).sort((a, b) => b.available - a.available);
 
     console.log('Processed floors:', floors);
     console.log('Total:', totalSpots, 'Available:', availableSpots);
@@ -372,17 +372,24 @@ class RealTimeParkingServiceClass {
     if (!this.lastData?.sensorData || !newData.sensorData) return;
 
     const oldData = this.lastData;
-    const oldAvailable = new Set((oldData.sensorData ?? []).filter(s => !s.is_occupied).map(s => s.sensor_id));
+    // Track previously available spots by slot_name
+    const oldAvailable = new Set(
+      (oldData.sensorData ?? [])
+        .filter(s => !s.is_occupied && s.slot_name)
+        .map(s => s.slot_name)
+    );
 
+    // Find spots that are now available but weren't before
     const newlyAvailableSpots = newData.sensorData.filter(
-      s => !s.is_occupied && !oldAvailable.has(s.sensor_id)
+      s => !s.is_occupied && s.slot_name && !oldAvailable.has(s.slot_name)
     );
 
     if (newlyAvailableSpots.length > 0) {
       const floorGrouped: Record<number, string[]> = {};
       for (const spot of newlyAvailableSpots) {
         const floor = this.extractFloorFromLocation(spot.floor_level);
-        const label = this.SENSOR_ID_TO_LABEL[spot.sensor_id] || `S${spot.sensor_id}`;
+        // Use slot_name directly from API
+        const label = spot.slot_name || 'Unknown';
         (floorGrouped[floor] = floorGrouped[floor] || []).push(label);
       }
 

@@ -19,11 +19,8 @@ type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   Floors: undefined;
-  ParkingMap: undefined;
+  ParkingMap: { floor: number };
   Feedback: undefined;
-  ParkingMapFloor1: undefined;
-  ParkingMapFloor2: undefined;
-  ParkingMapFloor3: undefined;
   Settings: undefined;
   Profile: { userId?: number } | undefined;
   ApiTest: undefined;
@@ -39,8 +36,9 @@ interface CircularProgressProps {
   children?: React.ReactNode;
 }
 const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000;
-// Default floors configuration - matches Railway sensor assignments
-// Sensor 1 → 2B1 (2nd Floor), Sensor 2 → 1D1 (1st Floor), Sensor 3 → 4J3 (4th Floor)
+// Default floors configuration - all start with 0 total (no data)
+// Real data comes from API and overrides these defaults
+// Floors with no assigned sensors will remain at total: 0 and show "NO DATA"
 const DEFAULT_FLOORS: {
   floor: number;
   total: number;
@@ -50,28 +48,28 @@ const DEFAULT_FLOORS: {
 }[] = [
   {
     floor: 1,
-    total: 1, // 1 sensor assigned (Sensor 2 → 1D1)
+    total: 0,
     available: 0,
     occupancyRate: 0,
     status: 'available' as const
   },
   {
     floor: 2,
-    total: 1, // 1 sensor assigned (Sensor 1 → 2B1)
+    total: 0,
     available: 0,
     occupancyRate: 0,
     status: 'available' as const
   },
   {
     floor: 3,
-    total: 0, // No sensors assigned
+    total: 0,
     available: 0,
     occupancyRate: 0,
     status: 'available' as const
   },
   {
     floor: 4,
-    total: 1, // 1 sensor assigned (Sensor 3 → 4J3)
+    total: 0,
     available: 0,
     occupancyRate: 0,
     status: 'available' as const
@@ -297,22 +295,8 @@ const HomeScreen: React.FC = () => {
   }, [isAuthenticated, currentUserId, checkForNewReplies]);
 
   const handleFloorPress = useCallback((floor: any) => {
-  // Navigate to the appropriate floor map (allow all floors including NO DATA)
-  if (floor.floor === 1) {
-    navigation.navigate('ParkingMapFloor1');
-  } else if (floor.floor === 2) {
-    navigation.navigate('ParkingMapFloor2');
-  } else if (floor.floor === 3) {
-    navigation.navigate('ParkingMapFloor3');
-  } else if (floor.floor === 4) {
-    navigation.navigate('ParkingMap');
-  } else {
-    Alert.alert(
-      'Coming Soon',
-      `Floor ${floor.floor} visualization is not yet available.`,
-      [{ text: 'OK' }]
-    );
-  }
+  // Navigate to the parking map with floor parameter
+  navigation.navigate('ParkingMap', { floor: floor.floor });
 }, [navigation]);
 
   useEffect(() => {
@@ -495,20 +479,22 @@ const HomeScreen: React.FC = () => {
           {displayFloors.map((floor) => {
             const status = getFloorStatus(floor.available, floor.total);
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
-            const isFull = status.text === 'FULL';
             const noData = status.text === 'NO DATA' || floor.total === 0;
+            // Floor is only disabled if there's no sensor data - FULL floors are still clickable
+            const isDisabled = noData;
 
             return (
               <TouchableOpacity
                 key={`floor-${floor.floor}`}
-                style={[styles.floorCard, isFull && styles.fullFloorCard, noData && styles.noDataFloorCard]}
+                style={[styles.floorCard, isDisabled && styles.noDataFloorCard]}
                 onPress={() => handleFloorPress(floor)}
-                activeOpacity={0.8}
+                activeOpacity={isDisabled ? 1 : 0.8}
+                disabled={isDisabled}
               >
                 <View style={styles.floorHeader}>
                   <Text style={[
                     styles.floorTitle,
-                    (isFull || noData) && styles.fullFloorText
+                    isDisabled && styles.fullFloorText
                   ]}>
                     {getFloorName(floor.floor)}
                   </Text>
@@ -519,7 +505,7 @@ const HomeScreen: React.FC = () => {
                     <Ionicons
                       name="chevron-forward"
                       size={24}
-                      color={(isFull || noData) ? "#666" : "#999"}
+                      color={isDisabled ? "#666" : "#999"}
                     />
                   </View>
                 </View>
@@ -529,13 +515,13 @@ const HomeScreen: React.FC = () => {
                     <Text style={[
                       styles.statNumber,
                       { color: COLORS.green },
-                      (isFull || noData) && styles.fullFloorText
+                      isDisabled && styles.fullFloorText
                     ]}>
                       {floor.available}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || noData) && styles.fullFloorText
+                      isDisabled && styles.fullFloorText
                     ]}>Available</Text>
                   </View>
 
@@ -543,13 +529,13 @@ const HomeScreen: React.FC = () => {
                     <Text style={[
                       styles.statNumber,
                       { color: COLORS.primary },
-                      (isFull || noData) && styles.fullFloorText
+                      isDisabled && styles.fullFloorText
                     ]}>
                       {floor.total - floor.available}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || noData) && styles.fullFloorText
+                      isDisabled && styles.fullFloorText
                     ]}>Occupied</Text>
                   </View>
 
@@ -557,13 +543,13 @@ const HomeScreen: React.FC = () => {
                     <Text style={[
                       styles.statNumber,
                       { color: COLORS.blue },
-                      (isFull || noData) && styles.fullFloorText
+                      isDisabled && styles.fullFloorText
                     ]}>
                       {floor.total}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      (isFull || noData) && styles.fullFloorText
+                      isDisabled && styles.fullFloorText
                     ]}>Total Spots</Text>
                   </View>
                 </View>
@@ -582,7 +568,7 @@ const HomeScreen: React.FC = () => {
                   </View>
                   <Text style={[
                     styles.progressBarText,
-                    (isFull || noData) && styles.fullFloorText
+                    isDisabled && styles.fullFloorText
                   ]}>
                     {noData ? 'No sensors' : `${Math.round(progressPercentage)}% Full`}
                   </Text>
