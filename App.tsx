@@ -83,24 +83,24 @@ const GradientHeader: React.FC<GradientHeaderProps> = ({
 
   const responsiveHeaderStyles = StyleSheet.create({
     headerContainer: {
-      height: isLandscape 
-        ? getResponsiveSize(70, 80, 85, 90) 
-        : getResponsiveSize(85, 100, 105, 120),
-      paddingTop: isLandscape 
-        ? getResponsiveSize(15, 20, 22, 25)
-        : getResponsiveSize(25, 30, 32, 35),
+      height: isLandscape
+        ? getResponsiveSize(50, 56, 58, 60)
+        : getResponsiveSize(56, 60, 62, 70),
+      paddingTop: isLandscape
+        ? getResponsiveSize(8, 10, 12, 14)
+        : getResponsiveSize(10, 12, 14, 16),
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'flex-start',
       paddingHorizontal: width * 0.028,
     },
     backButton: {
       position: 'absolute',
       left: width * 0.014,
-      top: isLandscape 
-        ? getResponsiveSize(17, 22, 24, 27)
-        : getResponsiveSize(27, 32, 34, 37),
-      padding: width * 0.022, 
+      top: isLandscape
+        ? getResponsiveSize(12, 14, 16, 18)
+        : getResponsiveSize(14, 16, 18, 22),
+      padding: width * 0.022,
       zIndex: 1,
       minWidth: getResponsiveSize(40, 44, 46, 48),
       minHeight: getResponsiveSize(40, 44, 46, 48),
@@ -109,15 +109,13 @@ const GradientHeader: React.FC<GradientHeaderProps> = ({
     },
     headerTitle: {
       color: 'white',
-      fontSize: getResponsiveSize(16, 20, 21, 24),
+      fontSize: getResponsiveSize(16, 18, 19, 22),
       fontWeight: 'bold',
       textAlign: 'left',
-      marginTop: isLandscape 
-        ? getResponsiveSize(4, 6, 7, 8)
-        : getResponsiveSize(6, 8, 9, 10),
-      marginLeft: canGoBack 
-        ? getResponsiveSize(45, 55, 58, 65) 
-        : width * 0.097, 
+      marginTop: 0,
+      marginLeft: canGoBack
+        ? getResponsiveSize(45, 55, 58, 65)
+        : width * 0.097,
       flex: 1,
       textAlignVertical: 'center',
     },

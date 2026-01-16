@@ -822,89 +822,211 @@ const ParkingMapScreen: React.FC = () => {
       <Modal
         visible={showFloorModal}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowFloorModal(false)}
       >
-        <TouchableOpacity
+        <View
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            justifyContent: 'center',
-            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            justifyContent: 'flex-end',
           }}
-          activeOpacity={1}
-          onPress={() => setShowFloorModal(false)}
         >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowFloorModal(false)}
+          />
           <View
             style={{
               backgroundColor: 'white',
-              borderRadius: 16,
-              padding: 20,
-              width: '80%',
-              maxWidth: 300,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingTop: 12,
+              paddingBottom: 30,
+              paddingHorizontal: 20,
             }}
           >
-            <Text
+            {/* Handle bar */}
+            <View
               style={{
-                fontSize: 18,
-                fontWeight: 'bold',
-                textAlign: 'center',
+                width: 40,
+                height: 4,
+                backgroundColor: '#DDD',
+                borderRadius: 2,
+                alignSelf: 'center',
                 marginBottom: 20,
-                color: COLORS.secondary,
               }}
-            >
-              Select Floor
-            </Text>
+            />
 
-            {[1, 2, 3, 4].map((floor) => (
-              <TouchableOpacity
-                key={floor}
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+              <Text
                 style={{
-                  backgroundColor: floorNumber === floor ? COLORS.primary : '#f5f5f5',
-                  paddingVertical: 14,
-                  paddingHorizontal: 20,
-                  borderRadius: 10,
-                  marginBottom: 10,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-                onPress={() => {
-                  setShowFloorModal(false);
-                  if (floor !== floorNumber) {
-                    navigation.navigate('ParkingMap', { floor });
-                  }
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  color: '#333',
+                  fontFamily: FONTS.semiBold,
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: floorNumber === floor ? 'white' : '#333',
-                  }}
-                >
-                  Floor {floor}
-                </Text>
-                {floorNumber === floor && (
-                  <Ionicons name="checkmark-circle" size={22} color="white" />
-                )}
-              </TouchableOpacity>
-            ))}
+                Select Floor
+              </Text>
+            </View>
 
+            {/* Floor options - sorted by available spots (highest first) */}
+            <View style={{ gap: 12 }}>
+              {[1, 2, 3, 4]
+                .map((floor) => {
+                  const floorData = parkingStats?.floors?.find(f => f.floor === floor);
+                  return {
+                    floor,
+                    available: floorData?.available ?? 0,
+                    total: floorData?.total ?? 0,
+                  };
+                })
+                .sort((a, b) => b.available - a.available)
+                .map(({ floor, available, total }) => {
+                const isCurrentFloor = floorNumber === floor;
+                const availableSpots = available;
+                const totalSpots = total;
+                const hasData = totalSpots > 0;
+
+                return (
+                  <TouchableOpacity
+                    key={floor}
+                    style={{
+                      backgroundColor: isCurrentFloor ? COLORS.primary : '#F8F9FA',
+                      paddingVertical: 12,
+                      paddingHorizontal: 12,
+                      borderRadius: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderWidth: isCurrentFloor ? 0 : 1,
+                      borderColor: '#E8E8E8',
+                      shadowColor: isCurrentFloor ? COLORS.primary : '#000',
+                      shadowOffset: { width: 0, height: isCurrentFloor ? 4 : 1 },
+                      shadowOpacity: isCurrentFloor ? 0.3 : 0.05,
+                      shadowRadius: isCurrentFloor ? 8 : 2,
+                      elevation: isCurrentFloor ? 6 : 1,
+                    }}
+                    onPress={() => {
+                      setShowFloorModal(false);
+                      if (floor !== floorNumber) {
+                        navigation.navigate('ParkingMap', { floor });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    {/* Floor icon */}
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        backgroundColor: isCurrentFloor ? 'rgba(255,255,255,0.2)' : '#FFF',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginRight: 14,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 'bold',
+                          color: isCurrentFloor ? 'white' : COLORS.primary,
+                          fontFamily: FONTS.semiBold,
+                        }}
+                      >
+                        {floor}
+                      </Text>
+                    </View>
+
+                    {/* Floor info */}
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '600',
+                          color: isCurrentFloor ? 'white' : '#333',
+                          fontFamily: FONTS.semiBold,
+                          marginBottom: 2,
+                        }}
+                      >
+                        {floor === 1 ? '1st' : floor === 2 ? '2nd' : floor === 3 ? '3rd' : '4th'} Floor
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: isCurrentFloor ? 'rgba(255,255,255,0.8)' : '#888',
+                          fontFamily: FONTS.regular,
+                        }}
+                      >
+                        {hasData ? `${availableSpots} of ${totalSpots} spots available` : 'No sensors assigned'}
+                      </Text>
+                    </View>
+
+                    {/* Status indicator */}
+                    <View style={{ alignItems: 'flex-end' }}>
+                      {isCurrentFloor ? (
+                        <View
+                          style={{
+                            backgroundColor: 'rgba(255,255,255,0.25)',
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 12,
+                          }}
+                        >
+                          <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>Current</Text>
+                        </View>
+                      ) : hasData ? (
+                        <View
+                          style={{
+                            backgroundColor: availableSpots > 0 ? COLORS.green : COLORS.primary,
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 12,
+                          }}
+                        >
+                          <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+                            {availableSpots > 0 ? 'Available' : 'Full'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            backgroundColor: '#E0E0E0',
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 12,
+                          }}
+                        >
+                          <Text style={{ color: '#888', fontSize: 12, fontWeight: '600' }}>No Data</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Cancel button */}
             <TouchableOpacity
               style={{
-                marginTop: 10,
+                marginTop: 20,
                 paddingVertical: 12,
                 alignItems: 'center',
+                backgroundColor: COLORS.primary,
+                borderRadius: 12,
               }}
               onPress={() => setShowFloorModal(false)}
+              activeOpacity={0.7}
             >
-              <Text style={{ color: COLORS.primary, fontWeight: '600', fontSize: 16 }}>
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 16, fontFamily: FONTS.semiBold}}>
                 Cancel
               </Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );

@@ -269,7 +269,7 @@ class ParkingConfigServiceClass {
   private getHardcodedFallbackConfig(locationId: string): ParkingLocationConfig {
     console.warn('Using hardcoded fallback configuration');
 
-    // Floor 1 configuration - Only 1D1 has Sensor 2 assigned
+    // Floor 1 configuration - sensor_id is null in fallback, real values come from API
     const floor1Spots: ParkingSpotConfig[] = [
       { spot_id: '1A1', sensor_id: null, position: { x: 685, y: 116 }, dimensions: { width: 57, height: 45 }, rotation: '90deg', section: 'A' },
       { spot_id: '1B4', sensor_id: null, position: { x: 500, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' },
@@ -284,7 +284,7 @@ class ParkingConfigServiceClass {
       { spot_id: '1D4', sensor_id: null, position: { x: 259, y: 200 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'D' },
       { spot_id: '1D3', sensor_id: null, position: { x: 310, y: 200 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'D' },
       { spot_id: '1D2', sensor_id: null, position: { x: 355, y: 200 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'D' },
-      { spot_id: '1D1', sensor_id: 2, position: { x: 400, y: 200 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'D' }, // Sensor 2
+      { spot_id: '1D1', sensor_id: null, position: { x: 400, y: 200 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'D' },
       { spot_id: '1J5', sensor_id: null, position: { x: 270, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
       { spot_id: '1J4', sensor_id: null, position: { x: 320, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
       { spot_id: '1J3', sensor_id: null, position: { x: 380, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
@@ -315,13 +315,13 @@ class ParkingConfigServiceClass {
       { spot_id: '1I1', sensor_id: null, position: { x: 680, y: 830 }, dimensions: { width: 40, height: 55 }, rotation: '270deg', section: 'I' },
     ];
 
-    // Floor 2 configuration - Only 2B1 has Sensor 1 assigned
+    // Floor 2 configuration - sensor_id is null in fallback, real values come from API
     const floor2Spots: ParkingSpotConfig[] = [
       { spot_id: '2A1', sensor_id: null, position: { x: 685, y: 116 }, dimensions: { width: 57, height: 45 }, rotation: '90deg', section: 'A' },
       { spot_id: '2B4', sensor_id: null, position: { x: 500, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' },
       { spot_id: '2B3', sensor_id: null, position: { x: 545, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' },
       { spot_id: '2B2', sensor_id: null, position: { x: 590, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' },
-      { spot_id: '2B1', sensor_id: 1, position: { x: 635, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' }, // Sensor 1
+      { spot_id: '2B1', sensor_id: null, position: { x: 635, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' },
       { spot_id: '2C1', sensor_id: null, position: { x: 450, y: 95 }, dimensions: { width: 40, height: 55 }, rotation: '-90deg', section: 'C' },
       { spot_id: '2C2', sensor_id: null, position: { x: 450, y: 140 }, dimensions: { width: 40, height: 55 }, rotation: '90deg', section: 'C' },
       { spot_id: '2D7', sensor_id: null, position: { x: 100, y: 200 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'D' },
@@ -361,7 +361,7 @@ class ParkingConfigServiceClass {
       { spot_id: '2I1', sensor_id: null, position: { x: 680, y: 830 }, dimensions: { width: 40, height: 55 }, rotation: '270deg', section: 'I' },
     ];
 
-    // Floor 3 configuration - No sensors assigned
+    // Floor 3 configuration - sensor_id is null in fallback, real values come from API
     const floor3Spots: ParkingSpotConfig[] = [
       { spot_id: '3A1', sensor_id: null, position: { x: 685, y: 116 }, dimensions: { width: 57, height: 45 }, rotation: '90deg', section: 'A' },
       { spot_id: '3B4', sensor_id: null, position: { x: 500, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' },
@@ -407,7 +407,7 @@ class ParkingConfigServiceClass {
       { spot_id: '3I1', sensor_id: null, position: { x: 680, y: 830 }, dimensions: { width: 40, height: 55 }, rotation: '270deg', section: 'I' },
     ];
 
-    // Floor 4 configuration - Only 4J3 has Sensor 3 assigned
+    // Floor 4 configuration - sensor_id is null in fallback, real values come from API
     const floor4Spots: ParkingSpotConfig[] = [
       { spot_id: '4A1', sensor_id: null, position: { x: 685, y: 116 }, dimensions: { width: 57, height: 45 }, rotation: '90deg', section: 'A' },
       { spot_id: '4B4', sensor_id: null, position: { x: 500, y: 32 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'B' },
@@ -425,7 +425,7 @@ class ParkingConfigServiceClass {
       { spot_id: '4D1', sensor_id: null, position: { x: 400, y: 200 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'D' },
       { spot_id: '4J5', sensor_id: null, position: { x: 270, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
       { spot_id: '4J4', sensor_id: null, position: { x: 320, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
-      { spot_id: '4J3', sensor_id: 3, position: { x: 380, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' }, // Sensor 3
+      { spot_id: '4J3', sensor_id: null, position: { x: 380, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
       { spot_id: '4J2', sensor_id: null, position: { x: 440, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
       { spot_id: '4J1', sensor_id: null, position: { x: 490, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '0deg', section: 'J' },
       { spot_id: '4E3', sensor_id: null, position: { x: 55, y: 315 }, dimensions: { width: 55, height: 60 }, rotation: '90deg', section: 'E' },
