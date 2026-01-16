@@ -145,7 +145,7 @@ const HomeScreen: React.FC = () => {
     connectionStatus?: () => void;
     notifications?: () => void;
   }>({});
-  
+
   const getFloorName = (floorNum: number) => {
     const checkLastTwo = floorNum % 100;
     const lastDigit = floorNum % 10;
@@ -154,7 +154,7 @@ const HomeScreen: React.FC = () => {
     if(checkLastTwo >= 11 && checkLastTwo <= 13){
       return `${floorNum}th Floor`;
     }
-    
+
     if(lastDigit === 1){ suffix = 'st'; }
     else if(lastDigit === 2){ suffix = 'nd'; }
     else if(lastDigit === 3){ suffix = 'rd'; };
@@ -170,7 +170,7 @@ const HomeScreen: React.FC = () => {
     switch (true) {
       case percent === 0:
         return { text: 'FULL', color: COLORS.primary };
-      case percent < 25: 
+      case percent < 25:
         return { text: 'LIMITED', color: COLORS.limited };
       default:
         return { text: 'AVAILABLE', color: COLORS.secondary };
@@ -184,7 +184,7 @@ const HomeScreen: React.FC = () => {
   //display floor cards
   const displayFloors = useMemo(() => {
     const fixedFloors = [...DEFAULT_FLOORS];
-    
+
     fixedFloors.forEach(fixedFloor => {
       const realFloor = parkingData.floors.find(rf => rf.floor === fixedFloor.floor);
       if (realFloor) {
@@ -204,10 +204,10 @@ const HomeScreen: React.FC = () => {
     try {
       if (newData.availableSpots > lastParkingData.availableSpots) {
         const increase = newData.availableSpots - lastParkingData.availableSpots;
-        const bestFloor = newData.floors.reduce((prev, current) => 
+        const bestFloor = newData.floors.reduce((prev, current) =>
           prev.available > current.available ? prev : current
         );
-        
+
         NotificationManager.addSpotAvailableNotification(increase, bestFloor.floor);
       }
       setLastParkingData(newData);
@@ -218,23 +218,23 @@ const HomeScreen: React.FC = () => {
 
   const initializeUser = useCallback(async () => {
     if (!isMountedRef.current || !isAuthenticated) return;
-    
+
     try {
       const userData = await AsyncStorage.getItem('valet_user_data');
       if (userData && isMountedRef.current) {
         const user = JSON.parse(userData);
         const userId = user.id;
         setCurrentUserId(userId);
-        
+
         await NotificationManager.setCurrentUserId(userId);
         await checkForNewReplies();
         await NotificationManager.checkForFeedbackReplies(userId);
-        
+
         const unsubscribeNotifications = NotificationManager.subscribe((notifications) => {
           if (!isMountedRef.current) return;
           setUnreadNotificationCount(NotificationManager.getUnreadCount());
         });
-        
+
         unsubscribeFunctionsRef.current.notifications = unsubscribeNotifications;
       }
     } catch (error) {
@@ -250,7 +250,7 @@ const HomeScreen: React.FC = () => {
 
     const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
       if (!isMountedRef.current) return;
-      
+
       console.log('Received parking update:', data.lastUpdated);
       checkParkingChanges(data);
       setParkingData(data);
@@ -280,7 +280,7 @@ const HomeScreen: React.FC = () => {
     setRefreshing(true);
     try {
       await RealTimeParkingService.forceUpdate();
-      
+
       if (currentUserId) {
         await checkForNewReplies();
         await NotificationManager.checkForFeedbackReplies(currentUserId);
@@ -321,11 +321,11 @@ const HomeScreen: React.FC = () => {
   useFocusEffect(
     React.useCallback(() => {
       if (!isAuthenticated) return;
-      
+
       if (!unsubscribeFunctionsRef.current.parkingUpdates) {
         subscribeToParkingData();
       }
-      
+
       setUnreadNotificationCount(NotificationManager.getUnreadCount());
     }, [isAuthenticated, subscribeToParkingData])
   );
@@ -373,7 +373,7 @@ const HomeScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor= {COLORS.primary} />
-      
+
       <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }} style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoSection}>
@@ -387,10 +387,10 @@ const HomeScreen: React.FC = () => {
               </Text>
             </View>
           </View>
-          
+
           <View style={styles.headerIcons}>
-            <TouchableOpacity 
-              style={styles.iconButton} 
+            <TouchableOpacity
+              style={styles.iconButton}
               onPress={() => setShowNotifications(true)}
             >
               <View style={styles.notificationIconContainer}>
@@ -412,7 +412,7 @@ const HomeScreen: React.FC = () => {
 
         <View style={styles.campusCard}>
           <Text style={styles.campusTitle}>USJ-R Quadricentennial Campus</Text>
-          
+
           <View style={styles.circularProgressRow}>
             <View style={styles.progressItem}>
               <CircularProgress
