@@ -7,10 +7,11 @@ import {
   StatusBar,
   ScrollView,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { NavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NavigationProp, useNavigation, useFocusEffect, RouteProp, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { PanGestureHandler, PinchGestureHandler } from 'react-native-gesture-handler';
 import Animated, {
@@ -21,14 +22,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
-import { COLORS, FONTS, useAppFonts} from '../constants/AppConst';
+import { COLORS, FONTS} from '../constants/AppConst';
 import { MapLayout } from '../components/MapLayout';
 import { ParkingConfigService } from '../services/ParkingConfigService';
 import { FloorConfig, Position } from '../types/parkingConfig';
 
 
-type RootStackParamList = { Home: undefined; };
+type RootStackParamList = {
+  Home: undefined;
+  ParkingMap: { floor: number };
+};
 type ParkingMapScreenNavigationProp = NavigationProp<RootStackParamList>;
+type ParkingMapScreenRouteProp = RouteProp<RootStackParamList, 'ParkingMap'>;
 interface ParkingSpot {
   id: string;
   isOccupied: boolean;
@@ -52,6 +57,8 @@ interface ParkingSection {
 
 const ParkingMapScreen: React.FC = () => {
   const navigation = useNavigation<ParkingMapScreenNavigationProp>();
+  const route = useRoute<ParkingMapScreenRouteProp>();
+  const floorNumber = route.params?.floor ?? 4;
 
   // Dynamic configuration state
   const [floorConfig, setFloorConfig] = useState<FloorConfig | null>(null);
@@ -67,6 +74,7 @@ const ParkingMapScreen: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [parkingStats, setParkingStats] = useState<ParkingStats | null>(null);
   const [parkingSections, setParkingSections] = useState<ParkingSection[]>([]);
+  const [showFloorModal, setShowFloorModal] = useState(false);
 
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
@@ -91,8 +99,8 @@ const ParkingMapScreen: React.FC = () => {
         setIsLoadingConfig(true);
         setConfigError(null);
 
-        // Load floor 4 configuration (you can make this dynamic later)
-        const config = await ParkingConfigService.getFloorConfig('usjr_quadricentennial', 4);
+        // Load floor configuration based on route parameter
+        const config = await ParkingConfigService.getFloorConfig('usjr_quadricentennial', floorNumber);
 
         if (!isMounted) return;
 
@@ -141,7 +149,7 @@ const ParkingMapScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [floorNumber]);
 
   // Derived values from floor config
   const sensorToSpotMapping = useMemo(() => {
@@ -235,14 +243,20 @@ const ParkingMapScreen: React.FC = () => {
 
     setParkingStats(stats);
 
+    // Build maps from API data using slot_name directly
     const spotOccupancyMap: { [key: string]: boolean } = {};
-    const mapping = ParkingConfigService.getSensorToSpotMapping(floorConfig);
+    const spotHasSensorMap: { [key: string]: boolean } = {};
 
     if (stats.sensorData && Array.isArray(stats.sensorData)) {
       stats.sensorData.forEach((sensor: any) => {
-        const spotId = mapping[sensor.sensor_id];
-        if (spotId) {
-          spotOccupancyMap[spotId] = sensor.is_occupied === 1;
+        if (sensor.slot_name) {
+          // Mark spot as having sensor if it has sensor_id assigned (from sensor_assignments)
+          // This syncs with backend sensor management
+          spotHasSensorMap[sensor.slot_name] = sensor.sensor_id !== null && sensor.sensor_id !== undefined;
+          // Get occupancy status directly from API
+          // is_occupied = true means car detected (occupied/red)
+          // is_occupied = false means no car detected (available/green)
+          spotOccupancyMap[sensor.slot_name] = sensor.is_occupied === true || sensor.is_occupied === 1;
         }
       });
     }
@@ -252,10 +266,12 @@ const ParkingMapScreen: React.FC = () => {
 
       return prevSpots.map(spot => ({
         ...spot,
+        hasSensor: spotHasSensorMap.hasOwnProperty(spot.id)
+          ? spotHasSensorMap[spot.id]
+          : spot.hasSensor,
         isOccupied: spotOccupancyMap.hasOwnProperty(spot.id)
           ? spotOccupancyMap[spot.id]
           : spot.isOccupied,
-        // Preserve hasSensor field during updates
       }));
     });
 
@@ -263,12 +279,13 @@ const ParkingMapScreen: React.FC = () => {
       if (!isMountedRef.current) return prevSections;
 
       return prevSections.map(section => {
-        const sectionSpots = Object.values(mapping)
-          .filter(spotId => spotId.startsWith(section.id));
+        // Get all slot names for this section from the occupancy map
+        const sectionSpots = Object.keys(spotOccupancyMap)
+          .filter(slotName => slotName.charAt(1) === section.id);
 
         const totalSlots = sectionSpots.length;
-        const availableSlots = sectionSpots.filter(spotId =>
-          !spotOccupancyMap[spotId]
+        const availableSlots = sectionSpots.filter(slotName =>
+          !spotOccupancyMap[slotName]
         ).length;
 
         return {
@@ -782,24 +799,113 @@ const ParkingMapScreen: React.FC = () => {
                 <Text style={styles.secondaryButtonText} onPress={navigateHome}>View other levels</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.primaryButton}>
+              <TouchableOpacity style={styles.primaryButton} onPress={() => setShowFloorModal(true)}>
                 <Text style={styles.primaryButtonText}>Choose Floor</Text>
               </TouchableOpacity>
             </View>
-            
+
             <TouchableOpacity style={styles.closeButton} onPress={navigateHome}>
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </LinearGradient>
         </Animated.View>
       </PanGestureHandler>
-      
+
       {showNavigation && (
         <TouchableOpacity style={styles.clearRouteButton} onPress={clearNavigation}>
           <Ionicons name="close-circle" size={20} color="white" />
           <Text style={styles.clearRouteText}>Clear Route</Text>
         </TouchableOpacity>
       )}
+
+      {/* Floor Selection Modal */}
+      <Modal
+        visible={showFloorModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFloorModal(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+          activeOpacity={1}
+          onPress={() => setShowFloorModal(false)}
+        >
+          <View
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 16,
+              padding: 20,
+              width: '80%',
+              maxWidth: 300,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                marginBottom: 20,
+                color: COLORS.secondary,
+              }}
+            >
+              Select Floor
+            </Text>
+
+            {[1, 2, 3, 4].map((floor) => (
+              <TouchableOpacity
+                key={floor}
+                style={{
+                  backgroundColor: floorNumber === floor ? COLORS.primary : '#f5f5f5',
+                  paddingVertical: 14,
+                  paddingHorizontal: 20,
+                  borderRadius: 10,
+                  marginBottom: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+                onPress={() => {
+                  setShowFloorModal(false);
+                  if (floor !== floorNumber) {
+                    navigation.navigate('ParkingMap', { floor });
+                  }
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: floorNumber === floor ? 'white' : '#333',
+                  }}
+                >
+                  Floor {floor}
+                </Text>
+                {floorNumber === floor && (
+                  <Ionicons name="checkmark-circle" size={22} color="white" />
+                )}
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={{
+                marginTop: 10,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => setShowFloorModal(false)}
+            >
+              <Text style={{ color: COLORS.primary, fontWeight: '600', fontSize: 16 }}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
