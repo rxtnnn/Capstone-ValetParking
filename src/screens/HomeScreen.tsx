@@ -173,7 +173,7 @@ const HomeScreen: React.FC = () => {
       case percent < 25:
         return { text: 'LIMITED', color: COLORS.limited };
       default:
-        return { text: 'AVAILABLE', color: COLORS.secondary };
+        return { text: 'AVAILABLE', color: COLORS.green };
     }
   }, []);
 
@@ -480,13 +480,18 @@ const HomeScreen: React.FC = () => {
             const status = getFloorStatus(floor.available, floor.total);
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
             const noData = status.text === 'NO DATA' || floor.total === 0;
-            // Floor is only disabled if there's no sensor data - FULL floors are still clickable
-            const isDisabled = noData;
+            const isFull = floor.total > 0 && floor.available === 0;
+            // Floor is disabled if no sensor data OR if floor is full
+            const isDisabled = noData || isFull;
 
             return (
               <TouchableOpacity
                 key={`floor-${floor.floor}`}
-                style={[styles.floorCard, isDisabled && styles.noDataFloorCard]}
+                style={[
+                  styles.floorCard,
+                  noData && styles.noDataFloorCard,
+                  isFull && styles.fullFloorCard
+                ]}
                 onPress={() => handleFloorPress(floor)}
                 activeOpacity={isDisabled ? 1 : 0.8}
                 disabled={isDisabled}

@@ -188,19 +188,19 @@ export const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   fullFloorCard: {
-    backgroundColor: '#f0f0f0',
-    opacity: 0.7,
-  },
-  noDataFloorCard: {
-    backgroundColor: '#f9f9f9',
-    opacity: 0.8,
-  },
-  disabledFloorCard: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#E8E8E8',
     opacity: 0.6,
   },
+  noDataFloorCard: {
+    backgroundColor: '#F0F0F0',
+    opacity: 0.5,
+  },
+  disabledFloorCard: {
+    backgroundColor: '#E8E8E8',
+    opacity: 0.5,
+  },
   fullFloorText: {
-    color: '#666',
+    color: '#999',
     fontFamily: FONTS.regular
   },
   disabledText: {
