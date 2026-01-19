@@ -1,5 +1,6 @@
 import { TokenManager } from '../config/api';
 import apiClient from '../config/api';
+import { API_ENDPOINTS } from '../constants/AppConst';
 
 export interface User {
   id: number;
@@ -26,8 +27,8 @@ export interface LoginResponse {
 }
 
 const API_CONFIG = {
-  BASE_URL: 'https://valet.up.railway.app/api',
-  USERS_URL: 'https://valet.up.railway.app/api/users',
+  BASE_URL: API_ENDPOINTS.baseUrl,
+  USERS_URL: API_ENDPOINTS.userUrl,
 } as const;
 
 const ERROR_MESSAGES = {

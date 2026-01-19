@@ -124,7 +124,7 @@ export const mapLayoutStyles = StyleSheet.create({
   arrow14: { position: 'absolute', right: 220, top: 510 },
   arrow15: { position: 'absolute', right: 220, top: 620 },
   arrow16: { position: 'absolute', right: 220, top: 750 },
-  arrow17: { position: 'absolute', right: 180, top: 840 },
+  arrow17: { position: 'absolute', right: 180, top: 690 },
   arrow18: { position: 'absolute', right: 140, top: 750 },
   arrow19: { position: 'absolute', right: 140, top: 620 },
   arrow20: { position: 'absolute', right: 140, top: 490 },

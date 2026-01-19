@@ -50,25 +50,27 @@ export const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 15,
     paddingHorizontal: 20,
   },
-  headerContent: {
+  headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   backButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: 'white',
     fontFamily: 'Poppins_600SemiBold',
-  },
-  headerRight: {
-    width: 32, // Same width as back button for centering
   },
   content: {
     flex: 1,
@@ -79,6 +81,16 @@ export const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  LogoutCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom:40,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

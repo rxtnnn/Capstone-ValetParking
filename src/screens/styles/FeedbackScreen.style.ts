@@ -62,7 +62,7 @@ export const createResponsiveStyles = (width: number, height: number) => {
     badgeText: {
       fontSize: getResponsiveSize(9, 10, 10, 11),
       fontFamily: 'Poppins_600SemiBold',
-      color: '#B22020',
+      color: 'COLORS.primary',
     },
     headerSubtitle: {
       fontSize: getResponsiveSize(12, 14, 15, 16),
@@ -154,7 +154,7 @@ export const createResponsiveStyles = (width: number, height: number) => {
       elevation: 2,
     },
     selectedTypeCard: {
-      borderColor: '#B22020',
+      borderColor: 'COLORS.primary',
       backgroundColor: '#FEF7F7',
       transform: [{ scale: 0.98 }],
     },
@@ -168,7 +168,7 @@ export const createResponsiveStyles = (width: number, height: number) => {
       marginBottom: height * 0.01,
     },
     selectedTypeIcon: {
-      backgroundColor: '#B22020',
+      backgroundColor: 'COLORS.primary',
     },
     typeLabel: {
       fontSize: getResponsiveSize(12, 14, 15, 16),
@@ -178,7 +178,7 @@ export const createResponsiveStyles = (width: number, height: number) => {
       marginBottom: height * 0.005,
     },
     selectedTypeLabel: {
-      color: '#B22020',
+      color: 'COLORS.primary',
     },
     typeDescription: {
       fontSize: getResponsiveSize(10, 12, 13, 14),
@@ -213,7 +213,7 @@ export const createResponsiveStyles = (width: number, height: number) => {
     ratingFeedback: {
       fontSize: getResponsiveSize(12, 14, 15, 16),
       fontFamily: 'Poppins_600SemiBold',
-      color: '#B22020',
+      color: 'COLORS.primary',
       textAlign: 'center',
     },
 
@@ -232,8 +232,8 @@ export const createResponsiveStyles = (width: number, height: number) => {
       margin: width * 0.011, 
     },
     selectedChip: {
-      backgroundColor: '#B22020',
-      borderColor: '#B22020',
+      backgroundColor: 'COLORS.primary',
+      borderColor: 'COLORS.primary',
     },
     chipText: {
       fontSize: getResponsiveSize(10, 12, 13, 14),
@@ -304,7 +304,7 @@ export const createResponsiveStyles = (width: number, height: number) => {
     submitButton: {
       borderRadius: 16,
       overflow: 'hidden',
-      shadowColor: '#B22020',
+      shadowColor: 'COLORS.primary',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.2,
       shadowRadius: 8,
@@ -405,12 +405,12 @@ export const createResponsiveStyles = (width: number, height: number) => {
       paddingVertical: height * 0.015,
       borderRadius: 24,
       borderWidth: 2,
-      borderColor: '#B22020',
+      borderColor: 'COLORS.primary',
     },
     emptyActionText: {
       fontSize: getResponsiveSize(12, 14, 15, 16),
       fontFamily: 'Poppins_600SemiBold',
-      color: '#B22020',
+      color: 'COLORS.primary',
     },
     replyCard: {
       backgroundColor: 'white',

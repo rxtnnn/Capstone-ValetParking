@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { NotificationSettings } from '../services/NotificationService';
@@ -18,6 +19,7 @@ import { NotificationManager } from '../services/NotifManager';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { styles } from './styles/SettingsScreen.style';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COLORS } from '../constants/AppConst'; 
 
 type RootStackParamList = {
   Home: undefined;
@@ -41,7 +43,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
 
 const SWITCH_COLORS = {
   false: '#E0E0E0',
-  true: '#B22020'
+  true: COLORS.primary
 } as const;
 
 interface SettingItem {
@@ -417,7 +419,7 @@ const SettingsScreen: React.FC = () => {
     return (
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
-          <Ionicons name="settings" size={48} color="#B22020" />
+          <Ionicons name="settings" size={48} color="#B22020 "/>
           <Text style={styles.loadingText}>
             {logoutInProgressRef.current ? 'Logging out...' : 'Updating Settings...'}
           </Text>
@@ -431,7 +433,21 @@ const SettingsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#B22020" />
+      <StatusBar barStyle="light-content" backgroundColor="COLORS.primary" />
+
+      <LinearGradient colors={[COLORS.primary, COLORS.secondary]} style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={24} color="white" />
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
+      </LinearGradient>
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           {settingsLoading ? (
@@ -454,7 +470,7 @@ const SettingsScreen: React.FC = () => {
           {APP_SETTINGS.map(renderAppSettingItem)}
         </View>
 
-        <View style={styles.card}>
+        <View style={styles.LogoutCard}>
           <View style={styles.cardHeader}>
             <Ionicons name="log-out" size={24} color="#F44336" />
             <Text style={styles.cardTitle}>Account Actions</Text>
