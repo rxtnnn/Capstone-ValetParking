@@ -31,7 +31,7 @@ import { NotificationManager } from '../services/NotifManager';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { createResponsiveStyles, createCustomAlertStyles } from './styles/FeedbackScreen.style';
-
+import { COLORS } from '../constants/AppConst';
 type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
@@ -159,7 +159,7 @@ const getCommonIssuesForType = (type: FeedbackData['type']): string[] => {
   return category?.commonIssues || [];
 };
 
-const RATING_LABELS = ['Very Poor 😞', 'Poor 😐', 'Average 🙂', 'Good 😊', 'Excellent 🤩'];
+const RATING_LABELS = ['Very Poor', 'Poor', 'Average', 'Good', 'Excellent'];
 
 const STATUS_COLORS = {
   pending: '#F59E0B',
@@ -605,7 +605,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           <Ionicons 
             name={getTypeIcon(item.type) as any} 
             size={getResponsiveSize(14, 16, 17, 18)} 
-            color="#B22020" 
+            color="COLORS.secondary" 
           />
           <Text style={responsiveStyles.replyTypeText}>
             {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
@@ -668,7 +668,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       activeOpacity={0.8}
     >
       <LinearGradient
-        colors={loading ? ['#9CA3AF', '#6B7280'] : ['#B22020', '#8B1917']}
+        colors={loading ? ['#9CA3AF', '#6B7280'] : [COLORS.primary, '#8B1917']}
         style={responsiveStyles.submitGradient}
       >
         {loading ? (
@@ -688,7 +688,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       return (
         <View style={responsiveStyles.emptyContainer}>
           <View style={responsiveStyles.emptyIconContainer}>
-            <Ionicons name="chatbubbles-outline" size={getResponsiveSize(40, 48, 50, 56)} color="#B22020" />
+            <Ionicons name="chatbubbles-outline" size={getResponsiveSize(40, 48, 50, 56)} color="COLORS.secondary" />
           </View>
           <Text style={responsiveStyles.emptyTitle}>No replies yet</Text>
           <Text style={responsiveStyles.emptySubtitle}>
@@ -712,8 +712,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            colors={['#B22020']}
-            tintColor="#B22020"
+            colors={[COLORS.primary]}
+            tintColor="COLORS.secondary"
           />
         }
         showsVerticalScrollIndicator={false}
@@ -730,14 +730,14 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   if (!fontsLoaded) {
     return (
       <View style={[responsiveStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#B22020" />
+        <ActivityIndicator size="large" color="COLORS.secondary" />
       </View>
     );
   }
 
   return (
     <View style={responsiveStyles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#B22020" />
+      <StatusBar barStyle="light-content" backgroundColor="COLORS.secondary" />
       
       <CustomAlert
         visible={alertVisible}
@@ -747,7 +747,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         onClose={() => setAlertVisible(false)}
       />
       
-      <LinearGradient colors={['#B22020', '#4C0E0E']} style={responsiveStyles.header}>
+      <LinearGradient colors={[COLORS.primary, COLORS.secondary]} style={responsiveStyles.header}>
         <View style={responsiveStyles.headerTop}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()} 
@@ -837,7 +837,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                       <Ionicons 
                         name={type.icon as any} 
                         size={getResponsiveSize(18, 20, 21, 24)} 
-                        color={feedbackType === type.value ? 'white' : '#B22020'} 
+                        color={feedbackType === type.value ? 'white' : COLORS.primary} 
                       />
                     </View>
                     <Text style={[
@@ -951,7 +951,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             <View style={responsiveStyles.section}>
               <View style={responsiveStyles.contactCard}>
                 <View style={responsiveStyles.contactHeader}>
-                  <Ionicons name="headset" size={getResponsiveSize(18, 20, 21, 24)} color="#B22020" />
+                  <Ionicons name="headset" size={getResponsiveSize(18, 20, 21, 24)} color="COLORS.secondary" />
                   <Text style={responsiveStyles.contactTitle}>Need immediate help?</Text>
                 </View>
                 <Text style={responsiveStyles.contactSubtitle}>

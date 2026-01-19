@@ -214,10 +214,19 @@ const ParkingMapScreen: React.FC = () => {
     if (!spot) return [];
 
     const section = spotId.charAt(1); // Extract section from '4A1' -> 'A'
+    const index = parseInt(spotId.slice(2)); // Extract index from '4A1' -> 1
     const waypointsMap = ParkingConfigService.getWaypointsMap(floorConfig);
 
-    // Find the navigation route for this section
-    const route = floorConfig.navigation_routes.find(r => r.section === section);
+    // Find the navigation route for this specific spot (section + index)
+    // Falls back to section-only route if no index-specific route exists
+    let route = floorConfig.navigation_routes.find(
+      (r: any) => r.section === section && r.index === index
+    );
+    if (!route) {
+      route = floorConfig.navigation_routes.find(
+        (r: any) => r.section === section && !r.index
+      );
+    }
     if (!route) return [];
 
     const path: Position[] = [];
@@ -226,7 +235,7 @@ const ParkingMapScreen: React.FC = () => {
     for (const waypointId of route.waypoints) {
       if (waypointId === 'destination') {
         // Destination is the actual parking spot
-        path.push({ x: spot.position.x + 20, y: spot.position.y + 30 });
+        path.push({ x: spot.position.x + 10, y: spot.position.y + 30 });
       } else {
         const waypoint = waypointsMap[waypointId];
         if (waypoint) {
@@ -474,11 +483,11 @@ const ParkingMapScreen: React.FC = () => {
     navigation.navigate('Home');
   }, [navigation]);
 
-  const totalAvailableSpots = useMemo(() => 
-    parkingStats?.availableSpots || 
-    parkingSections.reduce((sum, section) => sum + section.availableSlots, 0),
-    [parkingStats, parkingSections]
-  );
+  // Get available spots for current floor
+  const currentFloorAvailableSpots = useMemo(() => {
+    const floorData = parkingStats?.floors?.find(f => f.floor === floorNumber);
+    return floorData?.available ?? 0;
+  }, [parkingStats, floorNumber]);
 
   const renderParkingSpot = useCallback((spot: ParkingSpot) => {
     const carImage = require('../../assets/car_top.png');
@@ -661,25 +670,6 @@ const ParkingMapScreen: React.FC = () => {
         >
         </View>
 
-        {/* Destination point indicator */}
-        <View
-          style={{
-            position: 'absolute',
-            left: navigationPath[navigationPath.length - 1].x - 20,
-            top: navigationPath[navigationPath.length - 1].y - 20,
-            width: 40,
-            height: 40,
-            backgroundColor: '#00E676',
-            borderRadius: 20,
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 102,
-            borderWidth: 3,
-            borderColor: 'white',
-          }}
-        >
-          <Ionicons name="flag" size={20} color="white" />
-        </View>
       </View>
     );
   }, [showNavigation, navigationPath]);
@@ -723,16 +713,27 @@ const ParkingMapScreen: React.FC = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      <View style={[styles.header, {backgroundColor: '#4C0E0E'}]}>
-        <ScrollView 
-          horizontal 
+      <LinearGradient colors={[COLORS.primary, COLORS.secondary]} style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={24} color="white" />
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>Parking Map</Text>
+        </View>
+
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.sectionIndicators}
           contentContainerStyle={styles.sectionIndicatorsContent}
         >
           {parkingSections.map(renderSectionIndicator)}
         </ScrollView>
-      </View>
+      </LinearGradient>
 
       <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
         <Ionicons name="refresh" size={20} color="white" />
@@ -779,7 +780,7 @@ const ParkingMapScreen: React.FC = () => {
                 </View>
                 <View>
                   <Text style={styles.availableLabel}>Available Spots</Text>
-                  <Text style={styles.availableNumber}>{totalAvailableSpots}</Text>
+                  <Text style={styles.availableNumber}>{currentFloorAvailableSpots}</Text>
                 </View>
               </View>
               
@@ -796,7 +797,7 @@ const ParkingMapScreen: React.FC = () => {
             
             <View style={styles.bottomButtons}>
               <TouchableOpacity style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText} onPress={navigateHome}>View other levels</Text>
+                <Text style={styles.secondaryButtonText} onPress={navigateHome}>Back Home</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.primaryButton} onPress={() => setShowFloorModal(true)}>

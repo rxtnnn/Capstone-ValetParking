@@ -422,7 +422,7 @@ const AppNavigator: React.FC = () => {
               name="ParkingMap" 
               component={ParkingMapScreen}
               options={({ navigation }) => ({
-                headerShown: true,
+                headerShown: false,
                 header: () => (
                   <GradientHeader 
                     title="Parking Map" 
@@ -454,7 +454,7 @@ const AppNavigator: React.FC = () => {
               name="Settings" 
               component={SettingsScreen}
               options={({ navigation }) => ({
-                headerShown: true,
+                headerShown: false,
                 header: () => (
                   <GradientHeader 
                     title="Settings" 
@@ -470,7 +470,7 @@ const AppNavigator: React.FC = () => {
               name="Profile" 
               component={ProfileScreen}
               options={({ navigation }) => ({
-                headerShown: true,
+                headerShown: false,
                 header: () => (
                   <GradientHeader 
                     title="Profile" 
