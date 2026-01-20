@@ -23,7 +23,7 @@ import Animated, {
 import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { COLORS, FONTS} from '../constants/AppConst';
-import { MapLayout } from '../components/MapLayout';
+import { MapLayout, DESTINATION_OFFSETS } from '../components/MapLayout';
 import { ParkingConfigService } from '../services/ParkingConfigService';
 import { FloorConfig, Position } from '../types/parkingConfig';
 
@@ -217,7 +217,7 @@ const ParkingMapScreen: React.FC = () => {
     const index = parseInt(spotId.slice(2)); // Extract index from '4A1' -> 1
     const waypointsMap = ParkingConfigService.getWaypointsMap(floorConfig);
 
-    // Find the navigation route for this specific spot (section + index)
+    // Find the navigation route for this specific slot (section + index)
     // Falls back to section-only route if no index-specific route exists
     let route = floorConfig.navigation_routes.find(
       (r: any) => r.section === section && r.index === index
@@ -234,8 +234,13 @@ const ParkingMapScreen: React.FC = () => {
     // Build path from waypoint IDs
     for (const waypointId of route.waypoints) {
       if (waypointId === 'destination') {
-        // Destination is the actual parking spot
-        path.push({ x: spot.position.x + 10, y: spot.position.y + 30 });
+        // Get custom offset for this spot, or use default
+        const spotKey = `${section}${index}`;
+        const offset = DESTINATION_OFFSETS[spotKey] || { offsetX: 20, offsetY: 30 };
+        path.push({
+          x: spot.position.x + offset.offsetX,
+          y: spot.position.y + offset.offsetY
+        });
       } else {
         const waypoint = waypointsMap[waypointId];
         if (waypoint) {
