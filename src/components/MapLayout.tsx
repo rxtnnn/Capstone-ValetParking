@@ -77,7 +77,20 @@ export const SPOT_LAYOUT = [
 // Navigation waypoints - adjust x, y to change navigation path positions
 // You can add custom waypoints for each slot (e.g., 'A1_turn', 'B2_turn')
 export const NAVIGATION_WAYPOINTS = [
+  // Default entrance
   { id: 'entrance', position: { x: 650, y: 250 } },
+
+  // Section-specific entrances (customize starting point per section)
+  { id: 'entranceA', position: { x: 650, y: 250 } },
+  { id: 'entranceB', position: { x: 650, y: 250 } },
+  { id: 'entranceC', position: { x: 650, y: 250 } },
+  { id: 'entranceD', position: { x: 620, y: 280 } },
+  { id: 'entranceE', position: { x: 650, y: 250 } },
+  { id: 'entranceF', position: { x: 650, y: 250 } },
+  { id: 'entranceG', position: { x: 650, y: 250 } },
+  { id: 'entranceH', position: { x: 650, y: 250 } },
+  { id: 'entranceI', position: { x: 650, y: 250 } },
+  { id: 'entranceJ', position: { x: 650, y: 250 } },
 
   // Section intersection waypoints
   { id: 'intersectionA', position: { x: 650, y: 125 } },
@@ -105,13 +118,13 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'C2_turn', position: { x: 525, y: 170 } },
 
   // Section D slot waypoints
-  { id: 'D1_turn', position: { x: 420, y: 260 } },
-  { id: 'D2_turn', position: { x: 375, y: 260 } },
-  { id: 'D3_turn', position: { x: 330, y: 260 } },
-  { id: 'D4_turn', position: { x: 285, y: 260 } },
-  { id: 'D5_turn', position: { x: 240, y: 260 } },
-  { id: 'D6_turn', position: { x: 195, y: 260 } },
-  { id: 'D7_turn', position: { x: 150, y: 260 } },
+  { id: 'D1_turn', position: { x: 420, y: 280 } },
+  { id: 'D2_turn', position: { x: 376, y: 280 } },
+  { id: 'D3_turn', position: { x: 330, y: 280 } },
+  { id: 'D4_turn', position: { x: 285, y: 280 } },
+  { id: 'D5_turn', position: { x: 240, y: 280 } },
+  { id: 'D6_turn', position: { x: 195, y: 280 } },
+  { id: 'D7_turn', position: { x: 150, y: 280 } },
 
   // Section E slot waypoints
   { id: 'E1_turn', position: { x: 120, y: 475 } },
@@ -236,13 +249,13 @@ export const NAVIGATION_ROUTES = [
   { section: 'C', index: 2, waypoints: ['entrance', 'intersectionA', 'B4_turn', 'C2_turn', 'destination'] },
 
   // Section D
-  { section: 'D', index: 1, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'destination'] },
-  { section: 'D', index: 2, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'destination'] },
-  { section: 'D', index: 3, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'destination'] },
-  { section: 'D', index: 4, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'destination'] },
-  { section: 'D', index: 5, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'destination'] },
-  { section: 'D', index: 6, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'destination'] },
-  { section: 'D', index: 7, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'destination'] },
+  { section: 'D', index: 1, waypoints: ['entranceD', 'D1_turn', 'destination'] },
+  { section: 'D', index: 2, waypoints: ['entranceD', 'D2_turn', 'destination'] },
+  { section: 'D', index: 3, waypoints: ['entranceD', 'D3_turn','destination'] },
+  { section: 'D', index: 4, waypoints: ['entranceD', 'D4_turn', 'destination'] },
+  { section: 'D', index: 5, waypoints: ['entranceD', 'D5_turn', 'destination'] },
+  { section: 'D', index: 6, waypoints: ['entranceD', 'D6_turn', 'destination'] },
+  { section: 'D', index: 7, waypoints: ['entranceD', 'D7_turn', 'destination'] },
 
   // Section E
   { section: 'E', index: 1, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionE', 'destination'] },
