@@ -41,9 +41,9 @@ export const SPOT_LAYOUT = [
   { section: 'J', index: 1, position: { x: 460, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '270deg' },
 
   // Section E - left side
-  { section: 'E', index: 3, position: { x: 55, y: 315 }, dimensions: { width: 55, height: 60 }, rotation: '270deg' },
-  { section: 'E', index: 2, position: { x: 55, y: 380 }, dimensions: { width: 55, height: 60 }, rotation: '270deg' },
-  { section: 'E', index: 1, position: { x: 55, y: 445 }, dimensions: { width: 55, height: 60 }, rotation: '270deg' },
+  { section: 'E', index: 1, position: { x: 55, y: 340 }, dimensions: { width: 40, height: 55 }, rotation: '270deg' },
+  { section: 'E', index: 2, position: { x: 55, y: 390 }, dimensions: { width: 40, height: 55 }, rotation: '270deg' },
+  { section: 'E', index: 3, position: { x: 55, y: 440 }, dimensions: { width: 40, height: 55 }, rotation: '270deg' },
 
   // Section F - lower middle row
   { section: 'F', index: 1, position: { x: 140, y: 520 }, dimensions: { width: 40, height: 55 }, rotation: '0deg' },
@@ -129,9 +129,9 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'D7_turn', position: { x: 150, y: 280 } },
 
   // Section E slot waypoints
-  { id: 'E1_turn', position: { x: 180, y: 475 } },
-  { id: 'E2_turn', position: { x: 180, y: 410 } },
-  { id: 'E3_turn', position: { x: 180, y: 345 } },
+  { id: 'E3_turn', position: { x: 180, y: 470  } },
+  { id: 'E2_turn', position: { x: 180, y: 420 } },
+  { id: 'E1_turn', position: { x: 180, y: 370 } },
 
   // Section F slot waypoints
   { id: 'F1_turn', position: { x: 160, y: 290 } },
@@ -195,9 +195,9 @@ export const DESTINATION_OFFSETS: { [key: string]: { offsetX: number; offsetY: n
   'D7': { offsetX: 20, offsetY: 60 },
 
   // Section E
-  'E1': { offsetX: 70, offsetY: 30 },
-  'E2': { offsetX: 70, offsetY: 30 },
-  'E3': { offsetX: 70, offsetY: 30 },
+  'E3': { offsetX: 60, offsetY: 30 },
+  'E2': { offsetX: 60, offsetY: 30 },
+  'E1': { offsetX: 60, offsetY: 30 },
 
   // Section F
   'F1': { offsetX: 20, offsetY: 5 },
@@ -260,9 +260,9 @@ export const NAVIGATION_ROUTES = [
   { section: 'D', index: 7, waypoints: ['entranceD', 'D7_turn', 'destination'] },
 
   // Section E
-  { section: 'E', index: 1, waypoints: ['entranceE', 'intersectionD', 'E1_turn', 'destination'] },
-  { section: 'E', index: 2, waypoints: ['entranceE', 'intersectionD', 'E2_turn', 'destination'] },
   { section: 'E', index: 3, waypoints: ['entranceE', 'intersectionD', 'E3_turn', 'destination'] },
+  { section: 'E', index: 2, waypoints: ['entranceE', 'intersectionD', 'E2_turn', 'destination'] },
+  { section: 'E', index: 1, waypoints: ['entranceE', 'intersectionD', 'E1_turn', 'destination'] },
 
   // Section F
   { section: 'F', index: 1, waypoints: ['entranceE', 'F1_turn', 'destination'] },
