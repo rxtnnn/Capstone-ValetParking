@@ -85,7 +85,7 @@ export const styles = StyleSheet.create({
   },
   refreshButton: {
     position: 'absolute',
-    top: 120,
+    top: 150,
     left: 20,
     backgroundColor: 'rgba(178, 32, 32, 0.8)',
     borderRadius: 20,
@@ -342,7 +342,7 @@ export const styles = StyleSheet.create({
   },
   clearRouteButton: {
     position: 'absolute',
-    top: 120,
+    top: 150,
     right: 20,
     backgroundColor: 'rgba(255, 0, 0, 0.8)',
     borderRadius: 20,
