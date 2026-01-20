@@ -675,6 +675,41 @@ const ParkingMapScreen: React.FC = () => {
         >
         </View>
 
+        {/* Arrow pointing to destination */}
+        {navigationPath.length >= 2 && (() => {
+          const lastPoint = navigationPath[navigationPath.length - 1];
+          const prevPoint = navigationPath[navigationPath.length - 2];
+          const deltaX = lastPoint.x - prevPoint.x;
+          const deltaY = lastPoint.y - prevPoint.y;
+          const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+          return (
+            <View
+              style={{
+                position: 'absolute',
+                left: lastPoint.x - 12,
+                top: lastPoint.y - 12,
+                width: 24,
+                height: 24,
+                backgroundColor: '#00E676',
+                borderRadius: 12,
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 103,
+                borderWidth: 2,
+                borderColor: 'white',
+              }}
+            >
+              <Ionicons
+                name="arrow-forward"
+                size={14}
+                color="white"
+                style={{ transform: [{ rotate: `${angle}deg` }] }}
+              />
+            </View>
+          );
+        })()}
+
       </View>
     );
   }, [showNavigation, navigationPath]);
