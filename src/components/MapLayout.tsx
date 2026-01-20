@@ -41,9 +41,9 @@ export const SPOT_LAYOUT = [
   { section: 'J', index: 1, position: { x: 460, y: 370 }, dimensions: { width: 40, height: 55 }, rotation: '270deg' },
 
   // Section E - left side
-  { section: 'E', index: 3, position: { x: 55, y: 315 }, dimensions: { width: 55, height: 60 }, rotation: '90deg' },
-  { section: 'E', index: 2, position: { x: 55, y: 380 }, dimensions: { width: 55, height: 60 }, rotation: '90deg' },
-  { section: 'E', index: 1, position: { x: 55, y: 445 }, dimensions: { width: 55, height: 60 }, rotation: '90deg' },
+  { section: 'E', index: 3, position: { x: 55, y: 315 }, dimensions: { width: 55, height: 60 }, rotation: '270deg' },
+  { section: 'E', index: 2, position: { x: 55, y: 380 }, dimensions: { width: 55, height: 60 }, rotation: '270deg' },
+  { section: 'E', index: 1, position: { x: 55, y: 445 }, dimensions: { width: 55, height: 60 }, rotation: '270deg' },
 
   // Section F - lower middle row
   { section: 'F', index: 1, position: { x: 140, y: 520 }, dimensions: { width: 40, height: 55 }, rotation: '0deg' },
@@ -85,7 +85,7 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'entranceB', position: { x: 650, y: 250 } },
   { id: 'entranceC', position: { x: 650, y: 250 } },
   { id: 'entranceD', position: { x: 620, y: 280 } },
-  { id: 'entranceE', position: { x: 650, y: 250 } },
+  { id: 'entranceE', position: { x: 610, y: 290 } },
   { id: 'entranceF', position: { x: 650, y: 250 } },
   { id: 'entranceG', position: { x: 650, y: 250 } },
   { id: 'entranceH', position: { x: 650, y: 250 } },
@@ -96,8 +96,8 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'intersectionA', position: { x: 650, y: 125 } },
   { id: 'intersectionB', position: { x: 560, y: 125 } },
   { id: 'intersectionC', position: { x: 467, y: 150 } },
-  { id: 'intersectionD', position: { x: 270, y: 260 } },
-  { id: 'intersectionE', position: { x: 120, y: 380 } },
+  { id: 'intersectionD', position: { x: 180, y: 300  } },
+  { id: 'intersectionE', position: { x: 180, y: 345 } },
   { id: 'intersectionF', position: { x: 270, y: 580 } },
   { id: 'intersectionG', position: { x: 560, y: 700 } },
   { id: 'intersectionH', position: { x: 600, y: 920 } },
@@ -127,9 +127,9 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'D7_turn', position: { x: 150, y: 280 } },
 
   // Section E slot waypoints
-  { id: 'E1_turn', position: { x: 120, y: 475 } },
-  { id: 'E2_turn', position: { x: 120, y: 410 } },
-  { id: 'E3_turn', position: { x: 120, y: 345 } },
+  { id: 'E1_turn', position: { x: 180, y: 475 } },
+  { id: 'E2_turn', position: { x: 180, y: 410 } },
+  { id: 'E3_turn', position: { x: 180, y: 345 } },
 
   // Section F slot waypoints
   { id: 'F1_turn', position: { x: 160, y: 580 } },
@@ -258,9 +258,9 @@ export const NAVIGATION_ROUTES = [
   { section: 'D', index: 7, waypoints: ['entranceD', 'D7_turn', 'destination'] },
 
   // Section E
-  { section: 'E', index: 1, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionE', 'destination'] },
-  { section: 'E', index: 2, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionE', 'destination'] },
-  { section: 'E', index: 3, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionE', 'destination'] },
+  { section: 'E', index: 1, waypoints: ['entranceE', 'intersectionD', 'E1_turn', 'destination'] },
+  { section: 'E', index: 2, waypoints: ['entranceE', 'intersectionD', 'E2_turn', 'destination'] },
+  { section: 'E', index: 3, waypoints: ['entranceE', 'intersectionD', 'intersectionE', 'E3_turn', 'destination'] },
 
   // Section F
   { section: 'F', index: 1, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionE', 'intersectionF', 'destination'] },
