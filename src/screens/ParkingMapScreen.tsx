@@ -151,6 +151,13 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, [floorNumber]);
 
+  // Clear navigation when floor changes
+  useEffect(() => {
+    setShowNavigation(false);
+    setNavigationPath([]);
+    setSelectedSpot(null);
+  }, [floorNumber]);
+
   // Derived values from floor config
   const sensorToSpotMapping = useMemo(() => {
     if (!floorConfig) return {};
@@ -461,11 +468,18 @@ const ParkingMapScreen: React.FC = () => {
   }, []);
 
   const handleSpotPress = useCallback((spot: ParkingSpot) => {
+    // Only allow interaction with spots that have sensors
+    if (!spot.hasSensor) {
+      // Spot is unassigned - do nothing (unclickable)
+      return;
+    }
+
     if (spot.isOccupied) {
       Alert.alert('Spot Occupied', 'This parking spot is currently occupied.');
       return;
     }
 
+    // Spot is available (has sensor and not occupied) - allow navigation
     setSelectedSpot(spot.id);
     Alert.alert(
       'Navigate to Spot',
@@ -512,10 +526,14 @@ const ParkingMapScreen: React.FC = () => {
       backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green; // Red if occupied, Green if available
     }
 
+    // Only spots with sensors and available (not occupied) are clickable
+    const isClickable = spot.hasSensor && !spot.isOccupied;
+
     return (
       <TouchableOpacity
         key={spot.id}
         onPress={() => handleSpotPress(spot)}
+        disabled={!isClickable}
         style={{
           position: 'absolute',
           left: spot.position.x,
@@ -524,8 +542,9 @@ const ParkingMapScreen: React.FC = () => {
           height: h,
           alignItems: 'center',
           justifyContent: 'center',
+          opacity: isClickable ? 1 : 0.8,
         }}
-        activeOpacity={2}
+        activeOpacity={isClickable ? 0.7 : 1}
       >
         {spot.hasSensor && spot.isOccupied ? (
           <Image
