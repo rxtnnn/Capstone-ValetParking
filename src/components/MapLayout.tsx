@@ -102,7 +102,7 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'intersectionG', position: { x: 560, y: 700 } },
   { id: 'intersectionH', position: { x: 600, y: 920 } },
   { id: 'intersectionI', position: { x: 720, y: 700 } },
-  { id: 'intersectionJ', position: { x: 350, y: 430 } },
+  { id: 'intersectionJ', position: {  x: 240, y: 290 } },
 
   // Section A slot waypoints
   { id: 'A1_turn', position: { x: 710, y: 125 } },
@@ -160,11 +160,11 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'I5_turn', position: { x: 720, y: 620 } },
 
   // Section J slot waypoints
-  { id: 'J1_turn', position: { x: 480, y: 400 } },
-  { id: 'J2_turn', position: { x: 420, y: 400 } },
-  { id: 'J3_turn', position: { x: 360, y: 400 } },
-  { id: 'J4_turn', position: { x: 300, y: 400 } },
-  { id: 'J5_turn', position: { x: 240, y: 400 } },
+  { id: 'J1_turn', position: { x: 480, y: 290 } },
+  { id: 'J2_turn', position: { x: 420, y: 290 } },
+  { id: 'J3_turn', position: { x: 360, y: 290 } },
+  { id: 'J4_turn', position: { x: 300, y: 290 } },
+  { id: 'J5_turn', position: { x: 240, y: 290 } },
 ];
 
 // Destination offsets - customize where the line ends for each spot
@@ -226,11 +226,11 @@ export const DESTINATION_OFFSETS: { [key: string]: { offsetX: number; offsetY: n
   'I5': { offsetX: -20, offsetY: 30 },
 
   // Section J
-  'J1': { offsetX: -20, offsetY: 30 },
-  'J2': { offsetX: -20, offsetY: 30 },
-  'J3': { offsetX: -20, offsetY: 30 },
-  'J4': { offsetX: -20, offsetY: 30 },
-  'J5': { offsetX: -20, offsetY: 30 },
+  'J1': { offsetX: 20, offsetY: -5 },
+  'J2': { offsetX: 20, offsetY: -5 },
+  'J3': { offsetX: 20, offsetY: -5 },
+  'J4': { offsetX: 20, offsetY: 5 },
+  'J5': { offsetX: 20, offsetY: 5 },
 };
 
 // Navigation routes - path from entrance to each slot (customizable per index)
@@ -291,11 +291,11 @@ export const NAVIGATION_ROUTES = [
   { section: 'I', index: 5, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionE', 'intersectionF', 'intersectionG', 'intersectionH', 'intersectionI', 'destination'] },
 
   // Section J
-  { section: 'J', index: 1, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionJ', 'destination'] },
-  { section: 'J', index: 2, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionJ', 'destination'] },
-  { section: 'J', index: 3, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionJ', 'destination'] },
-  { section: 'J', index: 4, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionJ', 'destination'] },
-  { section: 'J', index: 5, waypoints: ['entrance', 'intersectionA', 'intersectionB', 'intersectionC', 'intersectionD', 'intersectionJ', 'destination'] },
+  { section: 'J', index: 1, waypoints: ['entranceE', 'J1_turn', 'destination'] },
+  { section: 'J', index: 2, waypoints: ['entranceE', 'J2_turn', 'destination'] },
+  { section: 'J', index: 3, waypoints: ['entranceE', 'J3_turn', 'destination'] },
+  { section: 'J', index: 4, waypoints: ['entranceE', 'J4_turn', 'destination'] },
+  { section: 'J', index: 5, waypoints: ['entranceE', 'J5_turn', 'destination'] },
 ];
 
 // Gesture limits for map interaction
