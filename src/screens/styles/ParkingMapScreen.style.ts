@@ -439,13 +439,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navigationModalContent: {
-    padding: 24,
+    padding: 20,
   },
   navigationQuestion: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#333',
     lineHeight: 24,
     fontFamily: FONTS.regular,
+    textAlign: 'center',
   },
   navigationModalActions: {
     flexDirection: 'row',
@@ -513,7 +514,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   parkingConfirmMessage: {
-    fontSize: 12,
+    fontSize: 15,
     color: '#666',
     fontFamily: FONTS.regular,
     textAlign: 'center',
@@ -696,10 +697,6 @@ export const styles = StyleSheet.create({
   floorIconDisabled: {
     backgroundColor: '#cfcece',
   },
-<<<<<<< HEAD
-=======
-
->>>>>>> 861edc2 (added stop notif)
   // Success Modal Styles
   successModalOverlay: {
     flex: 1,
@@ -734,11 +731,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   successModalMessage: {
-<<<<<<< HEAD
     fontSize: 12,
-=======
-    fontSize: 15,
->>>>>>> 861edc2 (added stop notif)
     color: '#666',
     fontFamily: FONTS.regular,
     textAlign: 'center',
@@ -788,11 +781,7 @@ export const styles = StyleSheet.create({
   spotTakenModalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-<<<<<<< HEAD
     color: COLORS.primary,
-=======
-    color: '#333',
->>>>>>> 861edc2 (added stop notif)
     fontFamily: FONTS.semiBold,
     marginBottom: 12,
     textAlign: 'center',
