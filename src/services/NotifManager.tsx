@@ -24,6 +24,7 @@ class NotificationManagerClass {
   private currentUserId: number | null = null;
   private userChangeListeners: (() => void)[] = [];
   private isInitializing = false; // FIX: Prevent race conditions
+  private spotNotificationsPaused = false; // Flag to pause spot notifications when user has parked
 
   constructor() {
     this.init();
@@ -250,6 +251,11 @@ class NotificationManagerClass {
 
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
     if (spotsAvailable <= 0 || !spotIds || spotIds.length === 0) return;
+
+    // Don't send spot notifications if user has parked
+    if (this.spotNotificationsPaused) {
+      return;
+    }
 
     if (!this.currentUserId) {
       console.warn('No current user - cannot add spot notification');
@@ -598,6 +604,21 @@ class NotificationManagerClass {
     await this.loadNotifications();
     await this.loadProcessedReplies();
     this.notifyListeners();
+  }
+
+  // Pause spot notifications (when user has parked)
+  pauseSpotNotifications(): void {
+    this.spotNotificationsPaused = true;
+  }
+
+  // Resume spot notifications (when user leaves or wants notifications again)
+  resumeSpotNotifications(): void {
+    this.spotNotificationsPaused = false;
+  }
+
+  // Check if spot notifications are paused
+  isSpotNotificationsPaused(): boolean {
+    return this.spotNotificationsPaused;
   }
 }
 

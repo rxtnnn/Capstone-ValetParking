@@ -26,6 +26,7 @@ import { COLORS, FONTS} from '../constants/AppConst';
 import { MapLayout, DESTINATION_OFFSETS } from '../components/MapLayout';
 import { ParkingConfigService } from '../services/ParkingConfigService';
 import { FloorConfig, Position } from '../types/parkingConfig';
+import { NotificationManager } from '../services/NotifManager';
 
 
 type RootStackParamList = {
@@ -75,6 +76,9 @@ const ParkingMapScreen: React.FC = () => {
   const [parkingStats, setParkingStats] = useState<ParkingStats | null>(null);
   const [parkingSections, setParkingSections] = useState<ParkingSection[]>([]);
   const [showFloorModal, setShowFloorModal] = useState(false);
+  const [showParkingConfirmModal, setShowParkingConfirmModal] = useState(false);
+const [showNavigationModal, setShowNavigationModal] = useState(false);
+const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null);
 
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
@@ -463,14 +467,31 @@ const ParkingMapScreen: React.FC = () => {
     setSelectedSpot(null);
   }, []);
 
+  const handleParkingConfirm = useCallback(() => {
+    // Pause spot notifications when user confirms they've parked
+    NotificationManager.pauseSpotNotifications();
+    setShowParkingConfirmModal(false);
+    clearNavigation();
+    Alert.alert('Parked Successfully', 'Navigation cleared and notifications paused. Enjoy your visit!');
+  }, [clearNavigation]);
+
+  const handleParkingCancel = useCallback(() => {
+    setShowParkingConfirmModal(false);
+  }, []);
+
+  const showParkingConfirmation = useCallback(() => {
+    setShowParkingConfirmModal(true);
+  }, []);
+
   const handleSectionPress = useCallback((sectionId: string) => {
     setHighlightedSection(prev => prev === sectionId ? null : sectionId);
   }, []);
 
   const handleSpotPress = useCallback((spot: ParkingSpot) => {
+    
     // Only allow interaction with spots that have sensors
     if (!spot.hasSensor) {
-      // Spot is unassigned - do nothing (unclickable)
+      // unclickable unassigned spots
       return;
     }
 
@@ -479,24 +500,11 @@ const ParkingMapScreen: React.FC = () => {
       return;
     }
 
-    // Spot is available (has sensor and not occupied) - allow navigation
+    // with assigned sensor and available
     setSelectedSpot(spot.id);
-    Alert.alert(
-      'Navigate to Spot',
-      `Would you like to navigate to parking spot ${spot.id}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Guide Me',
-          onPress: () => {
-            const path = generateNavigationPath(spot.id);
-            setNavigationPath(path);
-            setShowNavigation(true);
-          },
-        },
-      ]
-    );
-  }, [generateNavigationPath]);
+    setSelectedSpotForNav(spot.id);
+    setShowNavigationModal(true);
+  }, []);
 
   const navigateHome = useCallback(() => {
     navigation.navigate('Home');
@@ -872,222 +880,253 @@ const ParkingMapScreen: React.FC = () => {
       </PanGestureHandler>
 
       {showNavigation && (
-        <TouchableOpacity style={styles.clearRouteButton} onPress={clearNavigation}>
-          <Ionicons name="close-circle" size={20} color="white" />
-          <Text style={styles.clearRouteText}>Clear Route</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={[styles.clearRouteButton, { backgroundColor: COLORS.primary }]} onPress={clearNavigation}>
+            <Ionicons name="close-circle" size={20} color="white" />
+            <Text style={styles.clearRouteText}>Clear Route</Text>
+          </TouchableOpacity>
       )}
 
       {/* Floor Selection Modal */}
-      <Modal
-        visible={showFloorModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowFloorModal(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            justifyContent: 'flex-end',
-          }}
-        >
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={() => setShowFloorModal(false)}
-          />
-          <View
-            style={{
-              backgroundColor: 'white',
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              paddingTop: 12,
-              paddingBottom: 30,
-              paddingHorizontal: 20,
-            }}
-          >
-            {/* Handle bar */}
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: '#DDD',
-                borderRadius: 2,
-                alignSelf: 'center',
-                marginBottom: 20,
-              }}
-            />
+    <Modal
+      visible={showFloorModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowFloorModal(false)}
+    >
+      <View style={styles.floorModalOverlay}>
+        <TouchableOpacity
+          style={styles.floorModalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowFloorModal(false)}
+        />
+        <View style={styles.floorModalContainer}>
+          {/* Handle bar */}
+          <View style={styles.floorModalHandle} />
 
-            {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: 'bold',
-                  color: '#333',
-                  fontFamily: FONTS.semiBold,
-                }}
-              >
-                Select Floor
-              </Text>
-            </View>
+          {/* Header */}
+          <View style={styles.floorModalHeader}>
+            <Text style={styles.floorModalHeaderText}>
+              Select Floor
+            </Text>
+          </View>
 
-            {/* Floor options - sorted by available spots (highest first) */}
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3, 4]
-                .map((floor) => {
-                  const floorData = parkingStats?.floors?.find(f => f.floor === floor);
-                  return {
-                    floor,
-                    available: floorData?.available ?? 0,
-                    total: floorData?.total ?? 0,
-                  };
-                })
-                .sort((a, b) => b.available - a.available)
-                .map(({ floor, available, total }) => {
-                const isCurrentFloor = floorNumber === floor;
-                const availableSpots = available;
-                const totalSpots = total;
-                const hasData = totalSpots > 0;
+          {/* Floor options - sorted by available spots (highest first) */}
+          <View style={styles.floorOptionsContainer}>
+            {[1, 2, 3, 4]
+              .map((floor) => {
+                const floorData = parkingStats?.floors?.find(f => f.floor === floor);
+                return {
+                  floor,
+                  available: floorData?.available ?? 0,
+                  total: floorData?.total ?? 0,
+                };
+              })
+              .sort((a, b) => b.available - a.available)
+              .map(({ floor, available, total }) => {
+              const isCurrentFloor = floorNumber === floor;
+              const availableSpots = available;
+              const totalSpots = total;
+              const hasData = totalSpots > 0;
 
-                return (
-                  <TouchableOpacity
-                    key={floor}
-                    style={{
-                      backgroundColor: isCurrentFloor ? COLORS.primary : '#F8F9FA',
-                      paddingVertical: 12,
-                      paddingHorizontal: 12,
-                      borderRadius: 14,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      borderWidth: isCurrentFloor ? 0 : 1,
-                      borderColor: '#E8E8E8',
-                      shadowColor: isCurrentFloor ? COLORS.primary : '#000',
+              return (
+                <TouchableOpacity
+                  key={floor}
+                  style={[
+                    styles.floorOption,
+                    isCurrentFloor ? styles.floorOptionCurrent : styles.floorOptionInactive,
+                    !hasData && styles.floorOptionDisabled, //
+                    {
+                      shadowColor: isCurrentFloor ? COLORS.primary : '#474747',
                       shadowOffset: { width: 0, height: isCurrentFloor ? 4 : 1 },
                       shadowOpacity: isCurrentFloor ? 0.3 : 0.05,
                       shadowRadius: isCurrentFloor ? 8 : 2,
                       elevation: isCurrentFloor ? 6 : 1,
-                    }}
-                    onPress={() => {
-                      setShowFloorModal(false);
-                      if (floor !== floorNumber) {
-                        navigation.navigate('ParkingMap', { floor });
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    {/* Floor icon */}
-                    <View
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        backgroundColor: isCurrentFloor ? 'rgba(255,255,255,0.2)' : '#FFF',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        marginRight: 14,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 18,
-                          fontWeight: 'bold',
-                          color: isCurrentFloor ? 'white' : COLORS.primary,
-                          fontFamily: FONTS.semiBold,
-                        }}
-                      >
-                        {floor}
-                      </Text>
-                    </View>
+                    }
+                  ]}
+                  onPress={() => {
+                    if (!hasData) return; // Prevent action if no data
+                    setShowFloorModal(false);
+                    if (floor !== floorNumber) {
+                      navigation.navigate('ParkingMap', { floor });
+                    }
+                  }}
+                  activeOpacity={hasData ? 0.7 : 1} // No opacity change if disabled
+                  disabled={!hasData} // Disable touch if no data
+                >
+                  {/* Floor icon */}
+                  <View style={[
+                    styles.floorIconContainer,
+                    isCurrentFloor ? styles.floorIconCurrent : styles.floorIconInactive,
+                    !hasData && styles.floorIconDisabled // Add disabled style
+                  ]}>
+                    <Text style={[
+                      styles.floorIconText,
+                      { color: isCurrentFloor ? 'white' : !hasData ? '#999' : COLORS.primary }
+                    ]}>
+                      {floor}
+                    </Text>
+                  </View>
 
-                    {/* Floor info */}
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          fontSize: 16,
-                          fontWeight: '600',
-                          color: isCurrentFloor ? 'white' : '#333',
-                          fontFamily: FONTS.semiBold,
-                          marginBottom: 2,
-                        }}
-                      >
-                        {floor === 1 ? '1st' : floor === 2 ? '2nd' : floor === 3 ? '3rd' : '4th'} Floor
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          color: isCurrentFloor ? 'rgba(255,255,255,0.8)' : '#888',
-                          fontFamily: FONTS.regular,
-                        }}
-                      >
-                        {hasData ? `${availableSpots} of ${totalSpots} spots available` : 'No sensors assigned'}
-                      </Text>
-                    </View>
+                  {/* Floor info */}
+                  <View style={styles.floorInfoContainer}>
+                    <Text style={[
+                      styles.floorLabel1,
+                      { color: isCurrentFloor ? 'white' : !hasData ? '#999' : '#333' }
+                    ]}>
+                      {floor === 1 ? '1st' : floor === 2 ? '2nd' : floor === 3 ? '3rd' : '4th'} Floor
+                    </Text>
+                    <Text style={[
+                      styles.floorAvailability,
+                      { color: isCurrentFloor ? 'rgba(255,255,255,0.8)' : !hasData ? '#999' : '#888' }
+                    ]}>
+                      {hasData ? `${availableSpots} ${availableSpots === 1 ? 'spot' : 'spots'} available` : 'No sensors assigned'}
+                    </Text>
+                  </View>
 
-                    {/* Status indicator */}
-                    <View style={{ alignItems: 'flex-end' }}>
-                      {isCurrentFloor ? (
-                        <View
-                          style={{
-                            backgroundColor: 'rgba(255,255,255,0.25)',
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 12,
-                          }}
-                        >
-                          <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>Current</Text>
-                        </View>
-                      ) : hasData ? (
-                        <View
-                          style={{
-                            backgroundColor: availableSpots > 0 ? COLORS.green : COLORS.primary,
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 12,
-                          }}
-                        >
-                          <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
-                            {availableSpots > 0 ? 'Available' : 'Full'}
-                          </Text>
-                        </View>
-                      ) : (
-                        <View
-                          style={{
-                            backgroundColor: '#E0E0E0',
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 12,
-                          }}
-                        >
-                          <Text style={{ color: '#888', fontSize: 12, fontWeight: '600' }}>No Data</Text>
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                  {/* Status indicator */}
+                  <View style={styles.floorStatusContainer}>
+                    {isCurrentFloor ? (
+                      <View style={styles.floorStatusBadgeCurrent}>
+                        <Text style={styles.floorStatusTextCurrent}>Current</Text>
+                      </View>
+                    ) : hasData ? (
+                      <View style={[
+                        styles.floorStatusBadge,
+                        { backgroundColor: availableSpots > 0 ? COLORS.green : COLORS.primary }
+                      ]}>
+                        <Text style={styles.floorStatusText}>
+                          {availableSpots > 0 ? 'Available' : 'Full'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.floorStatusBadgeNoData}>
+                        <Text style={styles.floorStatusTextNoData}>No Data</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Cancel button */}
+          <TouchableOpacity
+            style={styles.floorModalCancelButton}
+            onPress={() => setShowFloorModal(false)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.floorModalCancelText}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+
+      {/* Navigation Modal */}
+      <Modal
+        visible={showNavigationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNavigationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.navigationModalContainer}>
+            <View style={styles.navigationModalHeader}>
+              <View style={styles.navigationHeaderText}>
+                <Text style={styles.navigationModalTitle}>Navigate to Spot</Text>
+                <Text style={styles.navigationModalSubtitle}>
+                  Find your way to the parking spot
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowNavigationModal(false)}
+                style={styles.navigationCloseButton}
+              >
+                <Ionicons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
 
-            {/* Cancel button */}
+            <View style={styles.navigationModalContent}>
+              <Text style={styles.navigationQuestion}>
+                Would you like to navigate to parking spot {selectedSpotForNav}?
+              </Text>
+            </View>
+
+            <View style={styles.navigationModalActions}>
+              <TouchableOpacity
+                style={styles.navigationCancelButton}
+                onPress={() => setShowNavigationModal(false)}
+              >
+                <Text style={styles.navigationCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.navigationGuideButton}
+                onPress={() => {
+                  if (selectedSpotForNav) {
+                    const path = generateNavigationPath(selectedSpotForNav);
+                    setNavigationPath(path);
+                    setShowNavigation(true);
+                    setShowNavigationModal(false);
+                  }
+                }}
+              >
+                <Text style={styles.navigationGuideText}>GUIDE ME</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Parking Confirmation Modal */}
+    <Modal
+      visible={showParkingConfirmModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={handleParkingCancel}
+    >
+      <View style={styles.parkingConfirmOverlay}>
+        <View style={styles.parkingConfirmContainer}>
+          {/* Icon */}
+          <View style={styles.parkingConfirmIconContainer}>
+            <Ionicons name="car" size={40} color="white" />
+          </View>
+
+          {/* Title */}
+          <Text style={styles.parkingConfirmTitle}>
+            Have you parked?
+          </Text>
+
+          {/* Message */}
+          <Text style={styles.parkingConfirmMessage}>
+            Confirming will clear your navigation route and stop sending parking spot notifications to your device.
+          </Text>
+
+          {/* Buttons */}
+          <View style={styles.parkingConfirmButtonsContainer}>
             <TouchableOpacity
-              style={{
-                marginTop: 20,
-                paddingVertical: 12,
-                alignItems: 'center',
-                backgroundColor: COLORS.primary,
-                borderRadius: 12,
-              }}
-              onPress={() => setShowFloorModal(false)}
-              activeOpacity={0.7}
+              style={styles.parkingConfirmYesButton}
+              onPress={handleParkingConfirm}
+              activeOpacity={0.8}
             >
-              <Text style={{ color: 'white', fontWeight: '600', fontSize: 16, fontFamily: FONTS.semiBold}}>
-                Cancel
+              <Text style={styles.parkingConfirmYesButtonText}>
+                Yes, I've Parked
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.parkingConfirmNoButton}
+              onPress={handleParkingCancel}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.parkingConfirmNoButtonText}>
+                Not Yet
               </Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </View>
+    </Modal>
     </View>
   );
 };
