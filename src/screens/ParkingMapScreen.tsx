@@ -79,12 +79,6 @@ const ParkingMapScreen: React.FC = () => {
   const [showParkingConfirmModal, setShowParkingConfirmModal] = useState(false);
 const [showNavigationModal, setShowNavigationModal] = useState(false);
 const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null);
-const [navigatingToSpot, setNavigatingToSpot] = useState<string | null>(null); // Track which spot user is navigating to
-const [showSuccessModal, setShowSuccessModal] = useState(false); // Success modal after parking confirmed
-const [showSpotTakenModal, setShowSpotTakenModal] = useState(false); // Modal when someone else took the spot
-const [suggestedSpots, setSuggestedSpots] = useState<string[]>([]); // Suggested spots when spot is taken
-const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); // Highlight specific spots (not whole section)
-const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
 
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
@@ -166,8 +160,6 @@ const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous park
     setShowNavigation(false);
     setNavigationPath([]);
     setSelectedSpot(null);
-    setNavigatingToSpot(null);
-    setHighlightedSpots([]); // Clear highlighted spots
   }, [floorNumber]);
 
   // Monitor when the spot user is navigating to becomes occupied
@@ -490,8 +482,6 @@ const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous park
     setShowNavigation(false);
     setNavigationPath([]);
     setSelectedSpot(null);
-    setNavigatingToSpot(null);
-    setHighlightedSpots([]); // Clear highlighted spots
   }, []);
 
   const handleParkingConfirm = useCallback(() => {
@@ -1191,89 +1181,6 @@ const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous park
         </View>
       </View>
     </Modal>
-
-      {/* Success Modal - Parked Successfully */}
-      <Modal
-        visible={showSuccessModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSuccessModal(false)}
-      >
-        <View style={styles.successModalOverlay}>
-          <View style={styles.successModalContainer}>
-
-            {/* Title */}
-            <Text style={styles.successModalTitle}>
-              Parked Successfully!
-            </Text>
-
-            {/* Message */}
-            <Text style={styles.successModalMessage}>
-              Navigation cleared and notifications paused. Enjoy your visit!
-            </Text>
-
-            {/* OK Button */}
-            <TouchableOpacity
-              style={styles.successModalButton}
-              onPress={() => setShowSuccessModal(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.successModalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Spot Taken Modal - Suggest Other Spots */}
-      <Modal
-        visible={showSpotTakenModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSpotTakenModal(false)}
-      >
-        <View style={styles.spotTakenModalOverlay}>
-          <View style={styles.spotTakenModalContainer}>
-            {/* Title */}
-            <Text style={styles.spotTakenModalTitle}>
-              Spot Taken
-            </Text>
-
-            {/* Message */}
-            <Text style={styles.spotTakenModalMessage}>
-              {suggestedSpots.length > 0
-                ? "No worries! Here are nearby available spots:"
-                : "Sorry, there are no available spots on this floor. Try checking another floor."}
-            </Text>
-
-            {/* Suggested Spots */}
-            {suggestedSpots.length > 0 && (
-              <View style={styles.suggestedSpotsContainer}>
-                {suggestedSpots.map((spotId) => (
-                  <View key={spotId} style={styles.suggestedSpotBadge}>
-                    <Text style={styles.suggestedSpotText}>{spotId}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Hint */}
-            {suggestedSpots.length > 0 && (
-              <Text style={styles.spotTakenHint}>
-                Tap on any available (green) spot to navigate
-              </Text>
-            )}
-
-            {/* OK Button */}
-            <TouchableOpacity
-              style={styles.spotTakenModalButton}
-              onPress={() => setShowSpotTakenModal(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.spotTakenModalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };

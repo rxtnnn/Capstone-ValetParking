@@ -524,10 +524,16 @@ export const styles = StyleSheet.create({
     width: '100%',
     gap: 12,
   },
+  parkingConfirmYesButtonsContainer: {
+    width: '100%',
+    gap: 12,
+    height: 50,
+  },
   parkingConfirmYesButton: {
     backgroundColor: COLORS.green,
     paddingVertical: 14,
     borderRadius: 12,
+    height: 50,
     alignItems: 'center',
   },
   parkingConfirmYesButtonText: {
@@ -725,7 +731,11 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   successModalMessage: {
+<<<<<<< HEAD
     fontSize: 12,
+=======
+    fontSize: 15,
+>>>>>>> rxtn
     color: '#666',
     fontFamily: FONTS.regular,
     textAlign: 'center',
@@ -775,7 +785,11 @@ export const styles = StyleSheet.create({
   spotTakenModalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
+<<<<<<< HEAD
     color: COLORS.primary,
+=======
+    color: '#333',
+>>>>>>> rxtn
     fontFamily: FONTS.semiBold,
     marginBottom: 12,
     textAlign: 'center',
