@@ -524,16 +524,10 @@ export const styles = StyleSheet.create({
     width: '100%',
     gap: 12,
   },
-  parkingConfirmYesButtonsContainer: {
-    width: '100%',
-    gap: 12,
-    height: 50,
-  },
   parkingConfirmYesButton: {
     backgroundColor: COLORS.green,
     paddingVertical: 14,
     borderRadius: 12,
-    height: 50,
     alignItems: 'center',
   },
   parkingConfirmYesButtonText: {
@@ -696,6 +690,7 @@ export const styles = StyleSheet.create({
   floorIconDisabled: {
     backgroundColor: '#cfcece',
   },
+<<<<<<< HEAD
 
   // Success Modal Styles
   successModalOverlay: {
@@ -843,4 +838,6 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: FONTS.semiBold,
   },
+=======
+>>>>>>> parent of 861edc2 (added stop notif)
 });
