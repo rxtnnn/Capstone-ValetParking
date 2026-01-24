@@ -99,10 +99,13 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'intersectionD', position: { x: 180, y: 300  } },
   { id: 'intersectionE', position: { x: 180, y: 345 } },
   { id: 'intersectionF', position: { x: 165, y: 470 } },
-  { id: 'intersectionG', position: { x: 580, y: 290 } },
+  { id: 'intersectionG', position: { x: 580, y: 470 } },
   { id: 'intersectionH', position: { x: 565, y: 290 } },
   { id: 'intersectionGH', position: { x: 570, y: 820 } },
-  { id: 'intersectionHI', position: { x: 650, y: 820 } },
+  { id: 'intersectionGH2', position: { x: 580, y: 820 } },
+  { id: 'intersectionGH3', position: { x: 580, y: 820 } },
+  { id: 'intersectionHI', position: { x: 580, y: 820 } },
+  { id: 'intersectionIH', position: { x: 650, y: 820  } },
   { id: 'intersectionI', position: { x: 720, y: 700 } },
   { id: 'intersectionJ', position: {  x: 240, y: 290 } },
 
@@ -274,23 +277,23 @@ export const NAVIGATION_ROUTES = [
   { section: 'F', index: 7, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'F7_turn', 'destination'] },
 
   // Section G
-  { section: 'G', index: 1, waypoints: ['entranceE', 'intersectionG', 'G1_turn', 'destination'] },
-  { section: 'G', index: 2, waypoints: ['entranceE', 'intersectionG', 'G2_turn', 'destination'] },
-  { section: 'G', index: 3, waypoints: ['entranceE', 'intersectionG', 'G3_turn', 'destination'] },
-  { section: 'G', index: 4, waypoints: ['entranceE', 'intersectionG', 'G4_turn', 'destination'] },
-  { section: 'G', index: 5, waypoints: ['entranceE', 'intersectionG', 'G5_turn', 'destination'] },
+  { section: 'G', index: 1, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'G1_turn', 'destination'] },
+  { section: 'G', index: 2, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG',  'G2_turn', 'destination'] },
+  { section: 'G', index: 3, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG',  'G3_turn', 'destination'] },
+  { section: 'G', index: 4, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG',  'G4_turn', 'destination'] },
+  { section: 'G', index: 5, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG',  'G5_turn', 'destination'] },
 
   // Section H
-  { section: 'H', index: 1, waypoints: ['entranceE', 'intersectionH', 'destination'] },
-  { section: 'H', index: 2, waypoints: ['entranceE', 'intersectionH',  'intersectionGH', 'H2_turn', 'destination'] },
-  { section: 'H', index: 3, waypoints: ['entranceE', 'intersectionH', 'intersectionGH', 'H3_turn', 'destination'] },
+  { section: 'H', index: 1, waypoints: ['entranceE','F1_turn', 'intersectionF', 'intersectionG', 'H1_turn', 'destination'] },
+  { section: 'H', index: 2, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'intersectionGH2', 'H2_turn', 'destination'] },
+  { section: 'H', index: 3, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'intersectionGH3', 'H3_turn', 'destination'] },
 
   // Section I
-  { section: 'I', index: 1, waypoints: ['entranceE', 'intersectionH', 'intersectionGH', 'destination'] },
-  { section: 'I', index: 2, waypoints: ['entranceE', 'intersectionH', 'intersectionGH', 'intersectionHI', 'I2_turn', 'destination'] },
-  { section: 'I', index: 3, waypoints: ['entranceE', 'intersectionH', 'intersectionGH', 'intersectionHI', 'I3_turn', 'destination'] },
-  { section: 'I', index: 4, waypoints: ['entranceE', 'intersectionH', 'intersectionGH', 'intersectionHI', 'I4_turn', 'destination'] },
-  { section: 'I', index: 5, waypoints: ['entranceE', 'intersectionH', 'intersectionGH', 'intersectionHI', 'I5_turn', 'destination'] },
+  { section: 'I', index: 1, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'intersectionHI', 'destination'] },
+  { section: 'I', index: 2, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'intersectionHI', 'intersectionIH', 'I2_turn', 'destination'] },
+  { section: 'I', index: 3, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'intersectionHI', 'intersectionIH', 'I3_turn', 'destination'] },
+  { section: 'I', index: 4, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'intersectionHI', 'intersectionIH', 'I4_turn', 'destination'] },
+  { section: 'I', index: 5, waypoints: ['entranceE', 'F1_turn', 'intersectionF', 'intersectionG', 'intersectionHI', 'intersectionIH', 'I5_turn', 'destination'] },
 
   // Section J
   { section: 'J', index: 1, waypoints: ['entranceE', 'J1_turn', 'destination'] },
