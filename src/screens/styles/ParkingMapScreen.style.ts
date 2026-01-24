@@ -690,8 +690,6 @@ export const styles = StyleSheet.create({
   floorIconDisabled: {
     backgroundColor: '#cfcece',
   },
-<<<<<<< HEAD
-
   // Success Modal Styles
   successModalOverlay: {
     flex: 1,
@@ -726,11 +724,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   successModalMessage: {
-<<<<<<< HEAD
     fontSize: 12,
-=======
-    fontSize: 15,
->>>>>>> rxtn
     color: '#666',
     fontFamily: FONTS.regular,
     textAlign: 'center',
@@ -780,11 +774,7 @@ export const styles = StyleSheet.create({
   spotTakenModalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-<<<<<<< HEAD
     color: COLORS.primary,
-=======
-    color: '#333',
->>>>>>> rxtn
     fontFamily: FONTS.semiBold,
     marginBottom: 12,
     textAlign: 'center',
@@ -838,6 +828,4 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: FONTS.semiBold,
   },
-=======
->>>>>>> parent of 861edc2 (added stop notif)
 });
