@@ -705,7 +705,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   ]}
                   onPress={handleSubmitPasswordChange}
                   disabled={isChangingPassword}
-                >
+                >   
                   {isChangingPassword ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
