@@ -162,23 +162,6 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
     setSelectedSpot(null);
   }, [floorNumber]);
 
-  // Monitor when the spot user is navigating to becomes occupied
-  useEffect(() => {
-    if (!navigatingToSpot || !showNavigation) return;
-
-    const targetSpot = parkingData.find(spot => spot.id === navigatingToSpot);
-    const previousSpot = previousParkingDataRef.current.find(spot => spot.id === navigatingToSpot);
-
-    // Check if the spot just became occupied (was not occupied before, now is occupied)
-    if (targetSpot && previousSpot && !previousSpot.isOccupied && targetSpot.isOccupied) {
-      // Show confirmation modal asking if user parked
-      setShowParkingConfirmModal(true);
-    }
-
-    // Update previous data reference
-    previousParkingDataRef.current = parkingData;
-  }, [parkingData, navigatingToSpot, showNavigation]);
-
   // Derived values from floor config
   const sensorToSpotMapping = useMemo(() => {
     if (!floorConfig) return {};
@@ -488,42 +471,13 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
     // Pause spot notifications when user confirms they've parked
     NotificationManager.pauseSpotNotifications();
     setShowParkingConfirmModal(false);
-    setNavigatingToSpot(null);
     clearNavigation();
-    setShowSuccessModal(true);
+    Alert.alert('Parked Successfully', 'Navigation cleared and notifications paused. Enjoy your visit!');
   }, [clearNavigation]);
 
   const handleParkingCancel = useCallback(() => {
     setShowParkingConfirmModal(false);
-
-    // If someone else took the spot, find nearby available spots
-    if (navigatingToSpot) {
-      const takenSpotSection = navigatingToSpot.charAt(1); // Extract section from '4A1' -> 'A'
-
-      // Find available spots, prioritizing same section
-      const availableSpots = parkingData
-        .filter(spot => spot.hasSensor && !spot.isOccupied && spot.id !== navigatingToSpot)
-        .sort((a, b) => {
-          const aSection = a.id.charAt(1);
-          const bSection = b.id.charAt(1);
-          // Prioritize same section
-          if (aSection === takenSpotSection && bSection !== takenSpotSection) return -1;
-          if (bSection === takenSpotSection && aSection !== takenSpotSection) return 1;
-          return a.id.localeCompare(b.id);
-        });
-
-      // Clear current navigation
-      clearNavigation();
-
-      // Get up to 3 nearby suggestions
-      const suggestions = availableSpots.slice(0, 3).map(s => s.id);
-      setSuggestedSpots(suggestions);
-      setShowSpotTakenModal(true);
-
-      // Highlight the specific suggested spots (not the whole section)
-      setHighlightedSpots(suggestions);
-    }
-  }, [navigatingToSpot, parkingData, clearNavigation]);
+  }, []);
 
   const showParkingConfirmation = useCallback(() => {
     setShowParkingConfirmModal(true);
@@ -549,7 +503,6 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
     // with assigned sensor and available
     setSelectedSpot(spot.id);
     setSelectedSpotForNav(spot.id);
-    setHighlightedSpots([]); // Clear any highlighted spots when selecting a new one
     setShowNavigationModal(true);
   }, []);
 
@@ -567,8 +520,7 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
     const carImage = require('../../assets/car_top.png');
     const isSelected = selectedSpot === spot.id;
     const spotSection = spot.id.charAt(1); // Extract section from '4A1' -> 'A'
-    const isSectionHighlighted = highlightedSection === spotSection;
-    const isSpotHighlighted = highlightedSpots.includes(spot.id); // Check if this specific spot is highlighted
+    const isHighlighted = highlightedSection === spotSection;
     const rotation = spot.rotation || '0deg';
     const w = spot.width || 30;
     const h = spot.height || 30;
@@ -637,7 +589,7 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
             </Text>
           </View>
         )}
-        {(isSelected || isSectionHighlighted || isSpotHighlighted) && (
+        {(isSelected || isHighlighted) && (
           <View
             pointerEvents="none"
             style={{
@@ -645,14 +597,14 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
               width: w + 4,
               height: h + 4,
               borderWidth: 4,
-              borderColor: '#FFD700', // Yellow highlight
+              borderColor: '#FFD700', // Yellow highlight for section selection
               transform: [{ rotate: rotation }],
             }}
           />
         )}
       </TouchableOpacity>
     );
-  }, [selectedSpot, highlightedSection, highlightedSpots, handleSpotPress]);
+  }, [selectedSpot, highlightedSection, handleSpotPress]);
 
   const renderSectionIndicator = useCallback((section: ParkingSection) => (
     <TouchableOpacity
@@ -928,16 +880,10 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
       </PanGestureHandler>
 
       {showNavigation && (
-        <View style={{ position: 'absolute', top: 150, right: 20, gap: 10, zIndex: 2000 }}>
-          <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.green }]} onPress={() => setShowParkingConfirmModal(true)}>
-            <Ionicons name="checkmark-circle" size={20} color="white" />
-            <Text style={styles.clearRouteText}>I've Parked</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.primary }]} onPress={clearNavigation}>
+          <TouchableOpacity style={[styles.clearRouteButton, { backgroundColor: COLORS.primary }]} onPress={clearNavigation}>
             <Ionicons name="close-circle" size={20} color="white" />
             <Text style={styles.clearRouteText}>Clear Route</Text>
           </TouchableOpacity>
-        </View>
       )}
 
       {/* Floor Selection Modal */}
@@ -1121,8 +1067,6 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
                     const path = generateNavigationPath(selectedSpotForNav);
                     setNavigationPath(path);
                     setShowNavigation(true);
-                    setNavigatingToSpot(selectedSpotForNav); // Track which spot user is heading to
-                    previousParkingDataRef.current = parkingData; // Store current state to detect changes
                     setShowNavigationModal(false);
                   }
                 }}
@@ -1143,17 +1087,19 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
     >
       <View style={styles.parkingConfirmOverlay}>
         <View style={styles.parkingConfirmContainer}>
+          {/* Icon */}
+          <View style={styles.parkingConfirmIconContainer}>
+            <Ionicons name="car" size={40} color="white" />
+          </View>
 
           {/* Title */}
           <Text style={styles.parkingConfirmTitle}>
-            {navigatingToSpot ? `Spot ${navigatingToSpot} is now occupied` : 'Have you parked?'}
+            Have you parked?
           </Text>
 
           {/* Message */}
           <Text style={styles.parkingConfirmMessage}>
-            {navigatingToSpot
-              ? 'Did you park here? Confirming will clear your navigation and stop parking spot notifications.'
-              : 'Confirming will clear your navigation route and stop sending parking spot notifications to your device.'}
+            Confirming will clear your navigation route and stop sending parking spot notifications to your device.
           </Text>
 
           {/* Buttons */}
@@ -1174,7 +1120,7 @@ const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null
               activeOpacity={0.8}
             >
               <Text style={styles.parkingConfirmNoButtonText}>
-                No, Someone Else Took It
+                Not Yet
               </Text>
             </TouchableOpacity>
           </View>
