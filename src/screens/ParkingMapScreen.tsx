@@ -77,14 +77,14 @@ const ParkingMapScreen: React.FC = () => {
   const [parkingSections, setParkingSections] = useState<ParkingSection[]>([]);
   const [showFloorModal, setShowFloorModal] = useState(false);
   const [showParkingConfirmModal, setShowParkingConfirmModal] = useState(false);
-const [showNavigationModal, setShowNavigationModal] = useState(false);
-const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null);
-const [navigatingToSpot, setNavigatingToSpot] = useState<string | null>(null); // Track which spot user is navigating to
-const [showSuccessModal, setShowSuccessModal] = useState(false); // Success modal after parking confirmed
-const [showSpotTakenModal, setShowSpotTakenModal] = useState(false); // Modal when someone else took the spot
-const [suggestedSpots, setSuggestedSpots] = useState<string[]>([]); // Suggested spots when spot is taken
-const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); // Highlight specific spots
-const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
+  const [showNavigationModal, setShowNavigationModal] = useState(false);
+  const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null);
+  const [navigatingToSpot, setNavigatingToSpot] = useState<string | null>(null); // Track which spot user is navigating to
+  const [showSuccessModal, setShowSuccessModal] = useState(false); // Success modal after parking confirmed
+  const [showSpotTakenModal, setShowSpotTakenModal] = useState(false); // Modal when someone else took the spot
+  const [suggestedSpots, setSuggestedSpots] = useState<string[]>([]); // Suggested spots when spot is taken
+  const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); // Highlight specific spots
+  const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
 
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
