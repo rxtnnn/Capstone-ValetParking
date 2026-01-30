@@ -103,7 +103,7 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'intersectionH', position: { x: 565, y: 290 } },
   { id: 'intersectionGH', position: { x: 570, y: 820 } },
   { id: 'intersectionGH2', position: { x: 580, y: 820 } },
-  { id: 'intersectionGH3', position: { x: 580, y: 820 } },
+  { id: 'intersectionGH3', position: { x: 580, y: 820 } },   
   { id: 'intersectionHI', position: { x: 580, y: 820 } },
   { id: 'intersectionIH', position: { x: 650, y: 820  } },
   { id: 'intersectionI', position: { x: 720, y: 700 } },
