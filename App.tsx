@@ -216,6 +216,9 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
   const { user } = useAuth();
   const userRole = user?.role?.toLowerCase();
 
+  // Debug: Log the user role to help identify issues
+  console.log('GlobalTabBar - User role:', userRole, '| User:', user?.name);
+
   // Hide tab bar on these screens
   const hiddenScreens = ['ParkingMap', 'Splash', 'Login', 'RfidTagDetail', 'RfidTagForm'];
 
@@ -429,11 +432,14 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 
 const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRoute, setCurrentRoute] = useState('Home');
+  const [navReady, setNavReady] = useState(false);
   const navigationRef = React.useRef<any>(null);
+  const { user } = useAuth();
 
   return (
     <NavigationContainer
       ref={navigationRef}
+      onReady={() => setNavReady(true)}
       onStateChange={() => {
         const route = navigationRef.current?.getCurrentRoute();
         if (route) {
@@ -444,9 +450,10 @@ const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ childre
       <View style={{ flex: 1}}>
         {children}
          <View style={{ backgroundColor: 'transparent'}}>
-        {navigationRef.current && (
-          <GlobalTabBar 
-            navigation={navigationRef.current} 
+        {navReady && navigationRef.current && (
+          <GlobalTabBar
+            key={`tabbar-${user?.id}-${user?.role}`}
+            navigation={navigationRef.current}
             currentRoute={currentRoute}
           />
         )}

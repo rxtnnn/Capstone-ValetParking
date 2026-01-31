@@ -17,6 +17,7 @@ import {
   RfidApiResponse,
   PaginatedResponse,
 } from '../types/rfid';
+import NotificationService from './NotificationService';
 
 // ============================================
 // Mock Data Generators
@@ -277,10 +278,13 @@ class RfidSecurityServiceClass {
           this.recentScans = this.recentScans.slice(0, 100);
         }
 
-        // Create alert for invalid scans
+        // Create alert for invalid scans and trigger push notification
         if (newScan.status !== 'valid') {
           const alert = generateMockAlert(newScan);
           this.alerts.unshift(alert);
+
+          // Trigger push notification for security personnel
+          this.triggerInvalidScanNotification(newScan, alert);
         }
       }
 
@@ -401,13 +405,28 @@ class RfidSecurityServiceClass {
   onStatsUpdate(callback: StatsUpdateCallback): () => void {
     this.statsCallbacks.push(callback);
 
-    // Send current stats immediately
+    // Send current stats immediately if available
     if (this.lastStats) {
       try {
         callback({ ...this.lastStats });
       } catch (error) {
         console.log('Error in stats callback:', error);
       }
+    } else {
+      // If no stats yet, generate them now and send
+      this.updateStats();
+      if (this.lastStats) {
+        try {
+          callback({ ...this.lastStats });
+        } catch (error) {
+          console.log('Error in stats callback:', error);
+        }
+      }
+    }
+
+    // Auto-start if not running (same as onScanUpdate)
+    if (!this.updateInterval) {
+      this.start();
     }
 
     return () => {
@@ -465,6 +484,59 @@ class RfidSecurityServiceClass {
           console.log('Error in connection callback:', error);
         }
       }
+    }
+  }
+
+  // ----------------------------------------
+  // Push Notification for Invalid Scans
+  // ----------------------------------------
+
+  private async triggerInvalidScanNotification(scan: RfidScanEvent, alert: RfidAlert): Promise<void> {
+    try {
+      // Map scan status to notification alert type
+      const alertTypeMap: Record<string, 'invalid' | 'expired' | 'suspended' | 'unknown'> = {
+        invalid: 'invalid',
+        expired: 'expired',
+        suspended: 'suspended',
+        unknown: 'unknown',
+      };
+
+      const alertType = alertTypeMap[scan.status] || 'unknown';
+
+      // Build additional info for the notification
+      const additionalInfo: Record<string, string> = {
+        'Scan Type': scan.scan_type === 'entry' ? 'Entry Attempt' : 'Exit Attempt',
+        'Time': new Date(scan.timestamp).toLocaleTimeString(),
+        'Alert ID': alert.id,
+        'Severity': alert.severity.toUpperCase(),
+      };
+
+      // Trigger the push notification
+      await NotificationService.showRfidAlertNotification(
+        alertType,
+        scan.rfid_uid,
+        `${scan.reader_name} (${scan.reader_location})`,
+        additionalInfo
+      );
+
+      console.log(`RFID Alert notification sent for ${alertType} scan: ${scan.rfid_uid}`);
+    } catch (error) {
+      console.log('Error sending RFID alert notification:', error);
+    }
+  }
+
+  // Public method to trigger guest request notification (can be called when guest is created)
+  async notifyNewGuestRequest(guest: GuestAccess): Promise<void> {
+    try {
+      await NotificationService.showGuestRequestNotification(
+        guest.name,
+        guest.vehicle_plate,
+        guest.purpose,
+        guest.id
+      );
+      console.log(`Guest request notification sent for: ${guest.name}`);
+    } catch (error) {
+      console.log('Error sending guest request notification:', error);
     }
   }
 

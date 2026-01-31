@@ -25,6 +25,8 @@ const CHANNELS = {
   SPOT_AVAILABLE: 'spot-available',
   FLOOR_UPDATES: 'floor-updates',
   FEEDBACK_REPLIES: 'feedback-replies',
+  RFID_ALERTS: 'rfid-alerts',
+  GUEST_REQUESTS: 'guest-requests',
   DEFAULT: 'default'
 } as const;
 
@@ -109,6 +111,28 @@ class NotificationServiceClass {
         description: 'Admin replies to your feedback',
         importance: Notifications.AndroidImportance.HIGH,
         lightColor: '#B22020',
+        vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined,
+        enableLights: true,
+      },
+      {
+        id: CHANNELS.RFID_ALERTS,
+        name: 'RFID Security Alerts',
+        description: 'Alerts for invalid or unregistered RFID scans',
+        importance: Notifications.AndroidImportance.MAX,
+        lightColor: '#FF0000',
+        vibrationPattern: settings.vibration ? [0, 500, 200, 500] : [0],
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined,
+        enableLights: true,
+      },
+      {
+        id: CHANNELS.GUEST_REQUESTS,
+        name: 'Guest Access Requests',
+        description: 'New guest access requests pending approval',
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: '#FF9800',
         vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         enableVibrate: settings.vibration,
         sound: settings.sound ? 'default' : undefined,
@@ -365,7 +389,7 @@ class NotificationServiceClass {
       await this.showLocalNotification(
         title,
         message,
-        { 
+        {
           type: 'feedback-reply',
           feedbackId,
           originalFeedback: originalFeedback.substring(0, 50) + '...',
@@ -379,6 +403,94 @@ class NotificationServiceClass {
       );
     } catch (error) {
       console.log('Error showing feedback reply notification:', error);
+    }
+  }
+
+  // RFID Alert Notifications - For Security Personnel
+  async showRfidAlertNotification(
+    alertType: 'invalid' | 'expired' | 'suspended' | 'unknown',
+    rfidUid: string,
+    readerLocation: string,
+    additionalInfo?: {
+      userName?: string;
+      vehiclePlate?: string;
+      message?: string;
+    }
+  ): Promise<void> {
+    try {
+      const settings = await this.getNotificationSettings();
+
+      const alertMessages: Record<string, { title: string; message: string }> = {
+        invalid: {
+          title: 'Invalid RFID Detected',
+          message: `Unregistered card ${rfidUid} at ${readerLocation}`,
+        },
+        expired: {
+          title: 'Expired RFID Detected',
+          message: `Expired card ${rfidUid} at ${readerLocation}${additionalInfo?.userName ? ` - ${additionalInfo.userName}` : ''}`,
+        },
+        suspended: {
+          title: 'Suspended RFID Detected',
+          message: `Suspended card ${rfidUid} at ${readerLocation}${additionalInfo?.userName ? ` - ${additionalInfo.userName}` : ''}`,
+        },
+        unknown: {
+          title: 'Unknown Card Detected',
+          message: `Unknown card ${rfidUid} scanned at ${readerLocation}`,
+        },
+      };
+
+      const { title, message } = alertMessages[alertType] || alertMessages.unknown;
+
+      await this.showLocalNotification(
+        title,
+        additionalInfo?.message || message,
+        {
+          type: 'rfid-alert',
+          alertType,
+          rfidUid,
+          readerLocation,
+          userName: additionalInfo?.userName,
+          vehiclePlate: additionalInfo?.vehiclePlate,
+          timestamp: Date.now(),
+          userId: TokenManager.getUser()?.id,
+        },
+        CHANNELS.RFID_ALERTS,
+        settings
+      );
+    } catch (error) {
+      console.log('Error showing RFID alert notification:', error);
+    }
+  }
+
+  // Guest Request Notifications - For Security Personnel
+  async showGuestRequestNotification(
+    guestName: string,
+    vehiclePlate: string,
+    purpose: string,
+    guestId?: string
+  ): Promise<void> {
+    try {
+      const settings = await this.getNotificationSettings();
+      const title = 'New Guest Access Request';
+      const message = `${guestName} (${vehiclePlate}) - ${purpose}`;
+
+      await this.showLocalNotification(
+        title,
+        message,
+        {
+          type: 'guest-request',
+          guestName,
+          vehiclePlate,
+          purpose,
+          guestId,
+          timestamp: Date.now(),
+          userId: TokenManager.getUser()?.id,
+        },
+        CHANNELS.GUEST_REQUESTS,
+        settings
+      );
+    } catch (error) {
+      console.log('Error showing guest request notification:', error);
     }
   }
 
