@@ -710,6 +710,68 @@ class NotificationServiceClass {
       console.log('Failed to sync settings with server:', error);
     }
   }
+
+  // ----------------------------------------
+  // Push Token Backend Sync
+  // ----------------------------------------
+
+  /**
+   * Send the Expo push token to the backend for push notifications
+   * Should be called after user login
+   */
+  async syncPushTokenWithBackend(): Promise<boolean> {
+    try {
+      // Get or register the push token
+      let token = this.expoPushToken;
+      if (!token) {
+        token = await this.registerPushNotif();
+      }
+
+      if (!token) {
+        console.log('No push token available to sync');
+        return false;
+      }
+
+      // Send to backend
+      const response = await apiClient.post('/user/push-token', {
+        expo_push_token: token,
+      });
+
+      if (response.data?.success) {
+        console.log('Push token synced with backend successfully');
+        return true;
+      }
+
+      console.log('Failed to sync push token:', response.data?.message);
+      return false;
+    } catch (error: any) {
+      // Don't fail silently - log the error but don't crash
+      console.log('Error syncing push token with backend:', error?.message || error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove the push token from the backend
+   * Should be called on user logout
+   */
+  async removePushTokenFromBackend(): Promise<boolean> {
+    try {
+      const response = await apiClient.delete('/user/push-token');
+
+      if (response.data?.success) {
+        console.log('Push token removed from backend successfully');
+        return true;
+      }
+
+      console.log('Failed to remove push token:', response.data?.message);
+      return false;
+    } catch (error: any) {
+      // Don't fail on logout - just log it
+      console.log('Error removing push token from backend:', error?.message || error);
+      return false;
+    }
+  }
 }
 
 export { NotificationServiceClass };
