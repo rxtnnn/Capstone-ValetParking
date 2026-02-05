@@ -169,7 +169,7 @@ export const styles = StyleSheet.create({
     color: '#ccc',
   },
 
-  // 🔥 NEW STYLES FOR ENHANCED SETTINGS SCREEN
+  // NEW STYLES FOR ENHANCED SETTINGS SCREEN
   userIndicator: {
     fontSize: 12,
     color: '#666',
@@ -364,7 +364,7 @@ export const styles = StyleSheet.create({
     borderBottomRightRadius: 28,
   },
 
-  // 🎯 ADDITIONAL UTILITY STYLES
+  // ADDITIONAL UTILITY STYLES
   switchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
