@@ -75,7 +75,7 @@ export const styles = StyleSheet.create({
     marginLeft: 16,
     padding: 4,
   },
-  // 🔥 NEW NOTIFICATION STYLES
+  // NEW NOTIFICATION STYLES
   notificationIconContainer: {
     position: 'relative',
   },
