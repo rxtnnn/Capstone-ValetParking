@@ -32,6 +32,24 @@ import NotificationService from './src/services/NotificationService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
 
+// Admin Screens
+import {
+  AdminDashboard,
+  RfidTagListScreen,
+  RfidTagDetailScreen,
+  RfidTagFormScreen,
+  RfidReaderStatusScreen,
+} from './src/screens/admin';
+
+// Security Screens
+import {
+  SecurityDashboard,
+  ScanMonitorScreen,
+  AlertsScreen,
+  GuestManagementScreen,
+  ScanHistoryScreen,
+} from './src/screens/security';
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,      
@@ -53,6 +71,18 @@ export type RootStackParamList = {
   ApiTest: undefined;
   Login: undefined;
   AdminReplies: undefined;
+  // Admin routes
+  AdminDashboard: undefined;
+  RfidTagList: undefined;
+  RfidTagDetail: { tagId: number };
+  RfidTagForm: { tagId?: number };
+  RfidReaderStatus: undefined;
+  // Security routes
+  SecurityDashboard: undefined;
+  ScanMonitor: undefined;
+  AlertsScreen: undefined;
+  GuestManagement: undefined;
+  ScanHistory: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -184,8 +214,14 @@ interface TabBarProps {
 
 const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
   const { user } = useAuth();
-  const hiddenScreens = ['ParkingMap', 'Splash', 'Login'];
-  
+  const userRole = user?.role?.toLowerCase();
+
+  // Debug: Log the user role to help identify issues
+  console.log('GlobalTabBar - User role:', userRole, '| User:', user?.name);
+
+  // Hide tab bar on these screens
+  const hiddenScreens = ['ParkingMap', 'Splash', 'Login', 'RfidTagDetail', 'RfidTagForm'];
+
   if (hiddenScreens.includes(currentRoute)) {
     return null;
   }
@@ -200,8 +236,8 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
         marginBottom: 40,
         borderRadius: 25,
         justifyContent: 'space-between',
-        borderWidth: 0, 
-        shadowColor: 'none', 
+        borderWidth: 0,
+        shadowColor: 'none',
       },
       tabItem: {
         padding: 10,
@@ -214,49 +250,180 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 
   const isActive = (routeName: string) => currentRoute === routeName;
 
+  // Check if current screen is RFID-related (for highlighting RFID tab)
+  const isRfidScreen = ['AdminDashboard', 'RfidTagList', 'RfidTagDetail', 'RfidTagForm', 'RfidReaderStatus'].includes(currentRoute);
+  const isSecurityScreen = ['SecurityDashboard', 'ScanMonitor', 'AlertsScreen', 'GuestManagement', 'ScanHistory'].includes(currentRoute);
+
+  // Admin role tabs - includes original tabs + RFID Configuration
+  if (userRole === 'admin') {
+    return (
+      <View style={tabBarStyles.tabBar}>
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('Home') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('Home')}
+        >
+          <Ionicons
+            name={isActive('Home') ? 'home' : 'home-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('ParkingMap', { floor: 1 })}
+        >
+          <Ionicons
+            name={isActive('ParkingMap') ? 'map' : 'map-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        {/* RFID Configuration - NEW for Admin */}
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isRfidScreen && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('AdminDashboard')}
+        >
+          <Ionicons
+            name={isRfidScreen ? 'card' : 'card-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('Feedback') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('Feedback')}
+        >
+          <Ionicons
+            name={isActive('Feedback') ? 'chatbubble' : 'chatbubble-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('Profile') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('Profile', user?.id ? { userId: user.id } : undefined)}
+        >
+          <Ionicons
+            name={isActive('Profile') ? 'person' : 'person-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Security role tabs - includes original tabs + Security Monitor
+  if (userRole === 'ssd' || userRole === 'security') {
+    return (
+      <View style={tabBarStyles.tabBar}>
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('Home') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('Home')}
+        >
+          <Ionicons
+            name={isActive('Home') ? 'home' : 'home-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('ParkingMap', { floor: 1 })}
+        >
+          <Ionicons
+            name={isActive('ParkingMap') ? 'map' : 'map-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        {/* Security Monitor - NEW for Security */}
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isSecurityScreen && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('SecurityDashboard')}
+        >
+          <Ionicons
+            name={isSecurityScreen ? 'shield' : 'shield-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('Feedback') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('Feedback')}
+        >
+          <Ionicons
+            name={isActive('Feedback') ? 'chatbubble' : 'chatbubble-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[tabBarStyles.tabItem, isActive('Profile') && tabBarStyles.activeTab]}
+          onPress={() => navigation.navigate('Profile', user?.id ? { userId: user.id } : undefined)}
+        >
+          <Ionicons
+            name={isActive('Profile') ? 'person' : 'person-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Default user tabs (unchanged)
   return (
     <View style={tabBarStyles.tabBar}>
-      <TouchableOpacity 
-        style={[tabBarStyles.tabItem, isActive('Home') && tabBarStyles.activeTab]} 
+      <TouchableOpacity
+        style={[tabBarStyles.tabItem, isActive('Home') && tabBarStyles.activeTab]}
         onPress={() => navigation.navigate('Home')}
       >
-        <Ionicons 
-          name={isActive('Home') ? 'home' : 'home-outline'} 
-          size={24} 
-          color="white" 
+        <Ionicons
+          name={isActive('Home') ? 'home' : 'home-outline'}
+          size={24}
+          color="white"
         />
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]} 
+      <TouchableOpacity
+        style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]}
         onPress={() => navigation.navigate('ParkingMap', { floor: 1 })}
       >
-        <Ionicons 
-          name={isActive('ParkingMap') ? 'map' : 'map-outline'} 
-          size={24} 
-          color="white" 
+        <Ionicons
+          name={isActive('ParkingMap') ? 'map' : 'map-outline'}
+          size={24}
+          color="white"
         />
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[tabBarStyles.tabItem, isActive('Feedback') && tabBarStyles.activeTab]} 
+      <TouchableOpacity
+        style={[tabBarStyles.tabItem, isActive('Feedback') && tabBarStyles.activeTab]}
         onPress={() => navigation.navigate('Feedback')}
       >
-        <Ionicons 
-          name={isActive('Feedback') ? 'chatbubble' : 'chatbubble-outline'} 
-          size={24} 
-          color="white" 
+        <Ionicons
+          name={isActive('Feedback') ? 'chatbubble' : 'chatbubble-outline'}
+          size={24}
+          color="white"
         />
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[tabBarStyles.tabItem, isActive('Profile') && tabBarStyles.activeTab]} 
+      <TouchableOpacity
+        style={[tabBarStyles.tabItem, isActive('Profile') && tabBarStyles.activeTab]}
         onPress={() => navigation.navigate('Profile', user?.id ? { userId: user.id } : undefined)}
       >
-        <Ionicons 
-          name={isActive('Profile') ? 'person' : 'person-outline'} 
-          size={24} 
-          color="white" 
+        <Ionicons
+          name={isActive('Profile') ? 'person' : 'person-outline'}
+          size={24}
+          color="white"
         />
       </TouchableOpacity>
     </View>
@@ -265,11 +432,14 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 
 const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRoute, setCurrentRoute] = useState('Home');
+  const [navReady, setNavReady] = useState(false);
   const navigationRef = React.useRef<any>(null);
+  const { user } = useAuth();
 
   return (
     <NavigationContainer
       ref={navigationRef}
+      onReady={() => setNavReady(true)}
       onStateChange={() => {
         const route = navigationRef.current?.getCurrentRoute();
         if (route) {
@@ -280,9 +450,10 @@ const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ childre
       <View style={{ flex: 1}}>
         {children}
          <View style={{ backgroundColor: 'transparent'}}>
-        {navigationRef.current && (
-          <GlobalTabBar 
-            navigation={navigationRef.current} 
+        {navReady && navigationRef.current && (
+          <GlobalTabBar
+            key={`tabbar-${user?.id}-${user?.role}`}
+            navigation={navigationRef.current}
             currentRoute={currentRoute}
           />
         )}
@@ -293,7 +464,14 @@ const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ childre
 };
 
 const AppNavigator: React.FC = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+  const userRole = user?.role?.toLowerCase();
+
+  // Determine initial route - all authenticated users start at Home
+  const getInitialRoute = () => {
+    if (!isAuthenticated) return 'Splash';
+    return 'Home';
+  };
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -363,7 +541,7 @@ const AppNavigator: React.FC = () => {
         translucent={true}
       />
       <Stack.Navigator
-        initialRouteName={isAuthenticated ? "Home" : "Splash"}
+        initialRouteName={getInitialRoute()}
         screenOptions={{
           headerShown: true,
           cardStyle: { backgroundColor: '#F5F5F5' },
@@ -482,20 +660,104 @@ const AppNavigator: React.FC = () => {
               })}
             />
             
-            <Stack.Screen 
-              name="AdminReplies" 
+            <Stack.Screen
+              name="AdminReplies"
               component={AdminRepliesSection}
               options={({ navigation }) => ({
                 headerShown: true,
                 header: () => (
-                  <GradientHeader 
-                    title="Admin Replies" 
+                  <GradientHeader
+                    title="Admin Replies"
                     navigation={navigation}
                     canGoBack={true}
                   />
                 ),
                 gestureEnabled: true,
               })}
+            />
+
+            {/* Admin Screens */}
+            <Stack.Screen
+              name="AdminDashboard"
+              component={AdminDashboard}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="RfidTagList"
+              component={RfidTagListScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="RfidTagDetail"
+              component={RfidTagDetailScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="RfidTagForm"
+              component={RfidTagFormScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="RfidReaderStatus"
+              component={RfidReaderStatusScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+
+            {/* Security Screens */}
+            <Stack.Screen
+              name="SecurityDashboard"
+              component={SecurityDashboard}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="ScanMonitor"
+              component={ScanMonitorScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="AlertsScreen"
+              component={AlertsScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="GuestManagement"
+              component={GuestManagementScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="ScanHistory"
+              component={ScanHistoryScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
             />
           </>
         )}
