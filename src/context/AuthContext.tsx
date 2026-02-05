@@ -60,6 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await NotificationManager.onUserLogin();
         await NotificationService.initialize();
         await NotificationService.getNotificationSettings();
+
+        // Sync push token with backend for push notifications (RFID alerts, etc.)
+        await NotificationService.syncPushTokenWithBackend();
       } else {
         await NotificationManager.onUserLogout();
         await NotificationService.clearUserSettings();
@@ -77,14 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const token = TokenManager.getToken();
       
      if (token && storedUser) {
-      const role = storedUser.role.toLowerCase();
-      if (['sdd'].includes(role)) {
-        await TokenManager.removeFromStorage();
-        setUser(null);
-        setIsAuthenticated(false);
-        setLoading(false);
-        return;
-      }
+        // Allow all valid roles: user, security, admin, ssd
         setUser(storedUser);
         setIsAuthenticated(true);
         await syncNotificationServices(storedUser);
@@ -112,13 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await apiLogin(credentials);
 
         if (response.success && response.user) {
-        const role = response.user.role.toLowerCase();
-        if (['admin', 'ssd'].includes(role)) {
-          await TokenManager.removeFromStorage();
-          const accessDenied = 'Access denied. Only users and security personnel can login.';
-          setError(accessDenied);
-          return { success: false, message: accessDenied };
-        }
+        // Allow all valid roles: user, security, admin, ssd
         setUser(response.user);
         setIsAuthenticated(true);
         await syncNotificationServices(response.user);
@@ -158,6 +148,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Clear notification data for current user
       if (currentUser) {
+        // Remove push token from backend first (before token is revoked)
+        await NotificationService.removePushTokenFromBackend();
         await NotificationManager.onUserLogout();
         await NotificationService.clearUserSettings();
       }
