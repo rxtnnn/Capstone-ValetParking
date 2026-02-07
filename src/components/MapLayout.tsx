@@ -172,23 +172,18 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'J5_turn', position: { x: 240, y: 290 } },
 ];
 
-// Destination offsets - customize where the line ends for each spot
-// offsetX: horizontal offset from spot position, offsetY: vertical offset from spot position
+// offsetX: horizontal offset, offsetY: vertical offset
 export const DESTINATION_OFFSETS: { [key: string]: { offsetX: number; offsetY: number } } = {
-  // Section A
   'A1': { offsetX: -5, offsetY: 30 },
 
-  // Section B
   'B1': { offsetX: 20, offsetY: 50 },
   'B2': { offsetX: 20, offsetY: 50 },
   'B3': { offsetX: 15, offsetY: 55 },
   'B4': { offsetX: 25, offsetY: 55 },
 
-  // Section C
   'C1': { offsetX: 50, offsetY: 30 },
   'C2': { offsetX: 50, offsetY: 30 },
 
-  // Section D
   'D1': { offsetX: 20, offsetY: 60 },
   'D2': { offsetX: 20, offsetY: 60 },
   'D3': { offsetX: 20, offsetY: 60 },
@@ -197,12 +192,10 @@ export const DESTINATION_OFFSETS: { [key: string]: { offsetX: number; offsetY: n
   'D6': { offsetX: 20, offsetY: 60 },
   'D7': { offsetX: 20, offsetY: 60 },
 
-  // Section E
   'E3': { offsetX: 60, offsetY: 30 },
   'E2': { offsetX: 60, offsetY: 30 },
   'E1': { offsetX: 60, offsetY: 30 },
 
-  // Section F
   'F1': { offsetX: 20, offsetY: 5 },
   'F2': { offsetX: 20, offsetY: 5 },
   'F3': { offsetX: 20, offsetY: 5 },
@@ -211,26 +204,22 @@ export const DESTINATION_OFFSETS: { [key: string]: { offsetX: number; offsetY: n
   'F6': { offsetX: 20, offsetY: 5 },
   'F7': { offsetX: 20, offsetY: 5 },
 
-  // Section G
   'G1': { offsetX: 60, offsetY: 30 },
   'G2': { offsetX: 60, offsetY: 30 },
   'G3': { offsetX: 60, offsetY: 30 },
   'G4': { offsetX: 60, offsetY: 30 },
   'G5': { offsetX: 60, offsetY: 30 },
 
-  // Section H
   'H1': { offsetX: 20, offsetY: -10 },
   'H2': { offsetX: 20, offsetY: -10 },
   'H3': { offsetX: 20, offsetY: -10 },
 
-  // Section I
   'I1': { offsetX: -20, offsetY: 30 },
   'I2': { offsetX: -20, offsetY: 30 },
   'I3': { offsetX: -20, offsetY: 30 },
   'I4': { offsetX: -20, offsetY: 30 },
   'I5': { offsetX: -20, offsetY: 30 },
 
-  // Section J
   'J1': { offsetX: 20, offsetY: -5 },
   'J2': { offsetX: 20, offsetY: -5 },
   'J3': { offsetX: 20, offsetY: -5 },
@@ -238,7 +227,7 @@ export const DESTINATION_OFFSETS: { [key: string]: { offsetX: number; offsetY: n
   'J5': { offsetX: 20, offsetY: 5 },
 };
 
-// Navigation routes - path from entrance to each slot (customizable per index)
+// path from entrance route
 export const NAVIGATION_ROUTES = [
   // Section A
   { section: 'A', index: 1, waypoints: ['entrance', 'intersectionA', 'destination'] },

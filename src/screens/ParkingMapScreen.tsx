@@ -170,8 +170,7 @@ const ParkingMapScreen: React.FC = () => {
     setHighlightedSpots([]);
   }, [floorNumber]);
 
-  // Monitor when the spot user is navigating to becomes occupied
-  useEffect(() => {
+  useEffect(() => { //runs when parking data changes
     if (!navigatingToSpot || !showNavigation) return;
 
     const targetSpot = parkingData.find(spot => spot.id === navigatingToSpot);
@@ -582,10 +581,7 @@ const ParkingMapScreen: React.FC = () => {
     const rotation = spot.rotation || '0deg';
     const w = spot.width || 30;
     const h = spot.height || 30;
-
-    // Determine background color based on sensor status
-    // Gray for no sensor, Green for available (with sensor), Red for occupied (with sensor)
-    let backgroundColor = '#CCCCCC'; // Gray for spots without sensors
+    let backgroundColor = '#CCCCCC';
     let borderWidth = 0;
 
     if (spot.hasSensor) {
@@ -1124,15 +1120,16 @@ const ParkingMapScreen: React.FC = () => {
               >
                 <Text style={styles.navigationCancelText}>CANCEL</Text>
               </TouchableOpacity>
+              {/* For Navigation */}
               <TouchableOpacity
                 style={styles.navigationGuideButton}
                 onPress={() => {
                   if (selectedSpotForNav) {
                     const path = generateNavigationPath(selectedSpotForNav);
                     setNavigationPath(path);
-                    setShowNavigation(true);
-                    setNavigatingToSpot(selectedSpotForNav); // Track which spot user is heading to
-                    previousParkingDataRef.current = parkingData; // Store current state to detect changes
+                    setShowNavigation(true); // activate the navigation overlay with path
+                    setNavigatingToSpot(selectedSpotForNav); // stores the spot to navigate e.g. '4A1'
+                    previousParkingDataRef.current = parkingData; // Store current state of spot to detect changes
                     setShowNavigationModal(false);
                   }
                 }}
