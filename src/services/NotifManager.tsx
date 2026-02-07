@@ -1,4 +1,3 @@
-// src/services/NotifManager.ts - FIXED VERSION
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
@@ -606,12 +605,12 @@ class NotificationManagerClass {
     this.notifyListeners();
   }
 
-  // Pause spot notifications (when user has parked)
+  // Pause spot notifications when user has parked
   pauseSpotNotifications(): void {
     this.spotNotificationsPaused = true;
   }
 
-  // Resume spot notifications (when user leaves or wants notifications again)
+  // Resume spot notifications when user leaves or wants notifications again
   resumeSpotNotifications(): void {
     this.spotNotificationsPaused = false;
   }

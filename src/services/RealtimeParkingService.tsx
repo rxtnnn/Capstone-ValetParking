@@ -86,7 +86,7 @@ class RealTimeParkingServiceClass {
 
     this.updateInterval = setInterval(() => {
       if (!this.shouldStop && this.isRunning && !this.isFetching) {
-        this.fetchAndUpdate();
+        this.fetchAndUpdate(); //fetch every 3secs
       }
     }, this.updateIntervalMs);
   }
@@ -94,7 +94,7 @@ class RealTimeParkingServiceClass {
 
 
   stop(): void {
-    console.log('Stopping RealTimeParkingService completely');
+    console.log('Stopping RealTimeParkingService');
     
     this.shouldStop = true;
     this.isRunning = false;
