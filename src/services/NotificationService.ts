@@ -189,6 +189,7 @@ class NotificationServiceClass {
       });
       
       this.expoPushToken = tokenData.data;
+      console.log('=== EXPO PUSH TOKEN ===', tokenData.data);
       return tokenData.data;
     } catch (error) {
       console.log('Error getting push token:', error);
@@ -728,25 +729,28 @@ class NotificationServiceClass {
       }
 
       if (!token) {
-        console.log('No push token available to sync');
+        console.log('=== PUSH TOKEN SYNC: No token available ===');
         return false;
       }
+
+      console.log('=== PUSH TOKEN SYNC: Sending to backend ===', token);
 
       // Send to backend
       const response = await apiClient.post('/user/push-token', {
         expo_push_token: token,
       });
 
+      console.log('=== PUSH TOKEN SYNC RESPONSE ===', JSON.stringify(response.data));
+
       if (response.data?.success) {
-        console.log('Push token synced with backend successfully');
+        console.log('=== PUSH TOKEN SYNCED SUCCESSFULLY ===');
         return true;
       }
 
       console.log('Failed to sync push token:', response.data?.message);
       return false;
     } catch (error: any) {
-      // Don't fail silently - log the error but don't crash
-      console.log('Error syncing push token with backend:', error?.message || error);
+      console.log('=== PUSH TOKEN SYNC ERROR ===', error?.response?.status, error?.response?.data || error?.message);
       return false;
     }
   }
