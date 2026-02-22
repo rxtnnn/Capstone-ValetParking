@@ -29,6 +29,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import NotificationService from './src/services/NotificationService';
+import { RfidSecurityService } from './src/services/RfidSecurityService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
 
@@ -486,13 +487,18 @@ const AppNavigator: React.FC = () => {
     initializeApp();
     
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data;
+      // Handle incoming RFID alerts from backend push notifications
+      if (data?.type === 'rfid_alert') {
+        RfidSecurityService.handleIncomingRfidAlert(data);
+      }
     });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
       const notificationData = response.notification.request.content.data;
       if (notificationData?.type === 'spot-available') {
         Alert.alert(
-          'Parking Spot Available!', 
+          'Parking Spot Available!',
           'Tap OK to view the parking map.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -506,6 +512,14 @@ const AppNavigator: React.FC = () => {
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'View Reply', onPress: () => console.log('Navigate to feedback replies') }
+          ]
+        );
+      } else if (notificationData?.type === 'rfid_alert') {
+        Alert.alert(
+          notificationData?.title || 'RFID Security Alert',
+          `${notificationData?.rfid_uid || 'Unknown'} detected at ${notificationData?.reader_location || 'Unknown location'}`,
+          [
+            { text: 'OK', style: 'default' },
           ]
         );
       } else {
