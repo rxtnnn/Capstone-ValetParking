@@ -20,6 +20,7 @@ import {
 } from '../types/rfid';
 import apiClient from '../config/api';
 import NotificationService from './NotificationService';
+import { NotificationManager } from './NotifManager';
 
 // Invalid statuses that should trigger alerts/notifications
 const INVALID_STATUSES = new Set(['invalid', 'expired', 'suspended', 'lost', 'unknown']);
@@ -212,6 +213,17 @@ class RfidSecurityServiceClass {
       // Add to recent scans (newest first)
       this.recentScans.unshift(scan);
 
+      // Start or stop spot notifications based on RFID scan type
+      // Entry = user is inside the parking, send spot availability notifications
+      // Exit = user left the parking, stop spot notifications
+      if (scan.status === 'valid') {
+        if (scan.scan_type === 'entry') {
+          NotificationManager.resumeSpotNotifications();
+        } else if (scan.scan_type === 'exit') {
+          NotificationManager.pauseSpotNotifications();
+        }
+      }
+
       // If invalid, create alert and queue for notification
       if (INVALID_STATUSES.has(scan.status)) {
         const alert = this.createAlertFromScan(scan);
@@ -263,7 +275,7 @@ class RfidSecurityServiceClass {
       await NotificationService.showRfidAlertNotification(
         alertType,
         scan.rfid_uid,
-        scan.reader_name,
+        scan.reader_name ?? 'Unknown',
         {
           userName: scan.user_name || undefined,
           vehiclePlate: scan.vehicle_plate || undefined,

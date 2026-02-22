@@ -29,7 +29,6 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import NotificationService from './src/services/NotificationService';
-import { RfidSecurityService } from './src/services/RfidSecurityService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
 
@@ -465,8 +464,7 @@ const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ childre
 };
 
 const AppNavigator: React.FC = () => {
-  const { isAuthenticated, loading, user } = useAuth();
-  const userRole = user?.role?.toLowerCase();
+  const { isAuthenticated, loading } = useAuth();
 
   // Determine initial route - all authenticated users start at Home
   const getInitialRoute = () => {
@@ -490,7 +488,8 @@ const AppNavigator: React.FC = () => {
       const data = notification.request.content.data;
       // Handle incoming RFID alerts from backend push notifications
       if (data?.type === 'rfid_alert') {
-        RfidSecurityService.handleIncomingRfidAlert(data);
+        // RFID alert received via push notification - handled by RfidSecurityService polling
+        console.log('RFID alert received via push:', data);
       }
     });
 
@@ -516,7 +515,7 @@ const AppNavigator: React.FC = () => {
         );
       } else if (notificationData?.type === 'rfid_alert') {
         Alert.alert(
-          notificationData?.title || 'RFID Security Alert',
+          String(notificationData?.title || 'RFID Security Alert'),
           `${notificationData?.rfid_uid || 'Unknown'} detected at ${notificationData?.reader_location || 'Unknown location'}`,
           [
             { text: 'OK', style: 'default' },

@@ -94,8 +94,16 @@ class ApiService {
   }
 
   private async getFeedbackList(params: Record<string, any>): Promise<FeedbackData[]> {
-    const response = await apiClient.get<APIResponse<FeedbackData[]>>('/feedbacks', { params });
-    return response.data.data || [];
+    try {
+      const response = await apiClient.get<APIResponse<FeedbackData[]>>('/feedbacks', { params });
+      return response.data.data || [];
+    } catch (error: any) {
+      // 404 means the feedbacks endpoint is not yet available on the backend
+      if (error?.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   async getUserFeedback(userId?: number, perPage: number = 50): Promise<FeedbackData[]> {
@@ -221,10 +229,7 @@ class ApiService {
       if (axios.isAxiosError(error) && error.response) {
         const status = error.response.status;
         if (status === 401) {
-          console.log('Authentication issue - check token');
-          TokenManager.clearToken(); // Clear invalid token
-        } else if (status === 404) {
-          console.log('Endpoint not found - check backend deployment');
+          TokenManager.clearToken();
         } else if (error.code === 'ECONNABORTED') {
           console.log('Connection timeout');
         }
