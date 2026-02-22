@@ -32,12 +32,15 @@
       }
     },
     "owner": "rxtnrzh",
-     "runtimeVersion": "1.0.0",
-    "updates": {
-      "url": "https://u.expo.dev/229d1c74-d45d-4ab1-9ce6-023350a92123"
-    },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#B71C1C"
+        }
+      ]
     ]
   }
 }

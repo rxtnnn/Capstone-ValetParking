@@ -1,5 +1,6 @@
-// RFID Security Service - Real-time scan monitoring and alert management
-// Follows the polling pattern from RealtimeParkingService
+// RFID Security Service - Real-time monitoring using backend API
+// Polls /public/rfid/scans for scan events and triggers local notifications
+// Follows the same pattern as RealtimeParkingService
 
 import {
   RfidScanEvent,
@@ -17,156 +18,38 @@ import {
   RfidApiResponse,
   PaginatedResponse,
 } from '../types/rfid';
+import apiClient from '../config/api';
 import NotificationService from './NotificationService';
 
-// ============================================
-// Mock Data Generators
-// ============================================
+// Invalid statuses that should trigger alerts/notifications
+const INVALID_STATUSES = new Set(['invalid', 'expired', 'suspended', 'lost', 'unknown']);
 
-const MOCK_USER_NAMES = [
-  'John Doe', 'Jane Smith', 'Bob Wilson', 'Alice Brown', 'Charlie Davis',
-  'Diana Evans', 'Frank Garcia', 'Grace Hill', 'Henry Irving', 'Ivy Johnson',
-];
-
-const MOCK_PLATES = [
-  'ABC 1234', 'XYZ 5678', 'DEF 9012', 'GHI 3456', 'JKL 7890',
-  'MNO 1234', 'PQR 5678', 'STU 9012', 'VWX 3456', 'YZA 7890',
-];
-
-const MOCK_READER_NAMES = ['Main Entrance', 'Main Exit', 'VIP Entrance', 'Side Gate'];
-const MOCK_READER_LOCATIONS = ['Building A', 'Building A', 'Building A - VIP', 'Building B'];
-
-const generateMockScan = (index: number = 0): RfidScanEvent => {
-  const isValid = Math.random() > 0.2; // 80% valid scans
-  const statuses: RfidScanEvent['status'][] = isValid
-    ? ['valid']
-    : ['invalid', 'expired', 'unknown'];
-  const status = statuses[Math.floor(Math.random() * statuses.length)];
-  const scanType = Math.random() > 0.5 ? 'entry' : 'exit';
-  const readerIndex = Math.floor(Math.random() * MOCK_READER_NAMES.length);
-
-  const messages: Record<RfidScanEvent['status'], string> = {
-    valid: 'Access granted',
-    invalid: 'RFID not registered. Please go to office.',
-    expired: 'RFID expired. Please go to office.',
-    unknown: 'Unknown card detected',
-  };
-
-  return {
-    id: `scan-${Date.now()}-${index}`,
-    timestamp: new Date(Date.now() - index * 30000).toISOString(), // Each scan 30s apart
-    reader_id: `reader-00${readerIndex + 1}`,
-    reader_name: MOCK_READER_NAMES[readerIndex],
-    reader_location: MOCK_READER_LOCATIONS[readerIndex],
-    rfid_uid: generateRandomUID(),
-    scan_type: scanType,
-    status: status,
-    message: messages[status],
-    duration: isValid ? 7 : 10,
-    user_name: isValid ? MOCK_USER_NAMES[Math.floor(Math.random() * MOCK_USER_NAMES.length)] : undefined,
-    vehicle_plate: isValid ? MOCK_PLATES[Math.floor(Math.random() * MOCK_PLATES.length)] : undefined,
-  };
+// Map scan status to alert type
+const STATUS_TO_ALERT_TYPE: Record<string, RfidAlert['alert_type']> = {
+  invalid: 'invalid_rfid',
+  expired: 'expired_rfid',
+  suspended: 'suspended_rfid',
+  lost: 'suspended_rfid',
+  unknown: 'unknown_rfid',
 };
 
-const generateRandomUID = (): string => {
-  const chars = 'ABCDEF0123456789';
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+// Map scan status to notification alert type
+const STATUS_TO_NOTIF_TYPE: Record<string, 'invalid' | 'expired' | 'suspended' | 'unknown'> = {
+  invalid: 'invalid',
+  expired: 'expired',
+  suspended: 'suspended',
+  lost: 'suspended',
+  unknown: 'unknown',
 };
 
-const generateMockAlert = (scan: RfidScanEvent): RfidAlert => {
-  const alertTypes: Record<RfidScanEvent['status'], RfidAlert['alert_type']> = {
-    invalid: 'invalid_rfid',
-    expired: 'expired_rfid',
-    unknown: 'unknown_rfid',
-    valid: 'suspicious_activity', // Shouldn't happen
-  };
-
-  const severities: Record<RfidAlert['alert_type'], RfidAlert['severity']> = {
-    invalid_rfid: 'medium',
-    expired_rfid: 'low',
-    suspended_rfid: 'high',
-    unknown_rfid: 'medium',
-    suspicious_activity: 'critical',
-  };
-
-  const alertType = alertTypes[scan.status] || 'unknown_rfid';
-
-  return {
-    id: `alert-${scan.id}`,
-    scan_event_id: scan.id,
-    scan_event: scan,
-    alert_type: alertType,
-    severity: severities[alertType],
-    acknowledged: false,
-    acknowledged_by: null,
-    acknowledged_at: null,
-    notes: null,
-    created_at: scan.timestamp,
-  };
+// Map scan status to severity
+const STATUS_TO_SEVERITY: Record<string, RfidAlert['severity']> = {
+  invalid: 'medium',
+  expired: 'low',
+  suspended: 'high',
+  lost: 'high',
+  unknown: 'medium',
 };
-
-// ============================================
-// Mock Guest Data
-// ============================================
-
-const MOCK_GUESTS: GuestAccess[] = [
-  {
-    id: 1,
-    guest_id: 'GUEST-2026-001',
-    name: 'Michael Johnson',
-    vehicle_plate: 'GUEST 001',
-    phone: '+1234567890',
-    purpose: 'Business Meeting',
-    valid_from: new Date().toISOString(),
-    valid_until: new Date(Date.now() + 86400000).toISOString(), // 24 hours
-    status: 'pending',
-    approved_by: null,
-    notes: 'Meeting with CEO',
-    created_by: 1,
-    created_by_name: 'Admin User',
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    updated_at: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: 2,
-    guest_id: 'GUEST-2026-002',
-    name: 'Sarah Williams',
-    vehicle_plate: 'GUEST 002',
-    phone: '+0987654321',
-    purpose: 'Delivery',
-    valid_from: new Date().toISOString(),
-    valid_until: new Date(Date.now() + 14400000).toISOString(), // 4 hours
-    status: 'approved',
-    approved_by: 1,
-    approved_by_name: 'Security Guard',
-    notes: 'Package delivery',
-    created_by: 1,
-    created_by_name: 'Admin User',
-    created_at: new Date(Date.now() - 7200000).toISOString(),
-    updated_at: new Date(Date.now() - 3000000).toISOString(),
-  },
-  {
-    id: 3,
-    guest_id: 'GUEST-2026-003',
-    name: 'Robert Brown',
-    vehicle_plate: 'GUEST 003',
-    phone: '+1122334455',
-    purpose: 'Interview',
-    valid_from: new Date().toISOString(),
-    valid_until: new Date(Date.now() + 43200000).toISOString(), // 12 hours
-    status: 'pending',
-    approved_by: null,
-    notes: 'Job interview - HR Department',
-    created_by: 2,
-    created_by_name: 'HR Manager',
-    created_at: new Date(Date.now() - 1800000).toISOString(),
-    updated_at: new Date(Date.now() - 1800000).toISOString(),
-  },
-];
-
-// ============================================
-// Service Class
-// ============================================
 
 class RfidSecurityServiceClass {
   // Callbacks
@@ -179,7 +62,8 @@ class RfidSecurityServiceClass {
   private updateInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private shouldStop: boolean = false;
-  private pollingIntervalMs: number = 3000;
+  private pollingIntervalMs: number = 10000; // 10 seconds like web team suggested
+  private isFetching: boolean = false;
 
   // Connection state
   private connectionStatus: 'connected' | 'disconnected' | 'error' = 'disconnected';
@@ -189,26 +73,11 @@ class RfidSecurityServiceClass {
   // Data storage
   private recentScans: RfidScanEvent[] = [];
   private alerts: RfidAlert[] = [];
-  private guests: GuestAccess[] = [...MOCK_GUESTS];
+  private guests: GuestAccess[] = [];
   private lastStats: SecurityDashboardStats | null = null;
 
-  constructor() {
-    // Initialize with some mock scan history
-    this.initializeMockData();
-  }
-
-  private initializeMockData(): void {
-    // Generate 20 mock historical scans
-    for (let i = 0; i < 20; i++) {
-      const scan = generateMockScan(i);
-      this.recentScans.push(scan);
-
-      // Create alerts for invalid scans
-      if (scan.status !== 'valid') {
-        this.alerts.push(generateMockAlert(scan));
-      }
-    }
-  }
+  // Track processed scan IDs to avoid duplicate notifications
+  private processedScanIds: Set<number> = new Set();
 
   // ----------------------------------------
   // Real-time Monitoring (Polling)
@@ -230,7 +99,7 @@ class RfidSecurityServiceClass {
 
     // Set up polling
     this.updateInterval = setInterval(() => {
-      if (!this.shouldStop && this.isRunning) {
+      if (!this.shouldStop && this.isRunning && !this.isFetching) {
         this.fetchAndUpdate();
       }
     }, this.pollingIntervalMs);
@@ -246,16 +115,17 @@ class RfidSecurityServiceClass {
       this.updateInterval = null;
     }
 
+    this.isFetching = false;
     this.setConnectionStatus('disconnected');
   }
 
   setPollingInterval(ms: number): void {
-    this.pollingIntervalMs = Math.max(1000, Math.min(60000, ms));
+    this.pollingIntervalMs = Math.max(5000, Math.min(60000, ms));
 
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = setInterval(() => {
-        if (!this.shouldStop && this.isRunning) {
+        if (!this.shouldStop && this.isRunning && !this.isFetching) {
           this.fetchAndUpdate();
         }
       }, this.pollingIntervalMs);
@@ -263,33 +133,26 @@ class RfidSecurityServiceClass {
   }
 
   private async fetchAndUpdate(): Promise<void> {
+    if (this.isFetching || this.shouldStop || !this.isRunning) return;
+
+    this.isFetching = true;
+
     try {
-      // Simulate API call - in production, this would fetch from backend
-      await this.simulateApiDelay();
+      // Fetch real RFID scan data from backend
+      const response = await apiClient.get('/public/rfid/scans', {
+        params: { minutes: 5 },
+      });
 
-      // Generate a new scan occasionally (30% chance)
-      if (Math.random() < 0.3) {
-        const newScan = generateMockScan();
-        newScan.timestamp = new Date().toISOString();
-        this.recentScans.unshift(newScan);
+      const data = response.data;
+      const scans: any[] = data?.scans || [];
 
-        // Keep only last 100 scans
-        if (this.recentScans.length > 100) {
-          this.recentScans = this.recentScans.slice(0, 100);
-        }
+      if (this.shouldStop || !this.isRunning) return;
 
-        // Create alert for invalid scans and trigger push notification
-        if (newScan.status !== 'valid') {
-          const alert = generateMockAlert(newScan);
-          this.alerts.unshift(alert);
+      // Process new scans and detect changes
+      this.processNewScans(scans);
 
-          // Trigger push notification for security personnel
-          this.triggerInvalidScanNotification(newScan, alert);
-        }
-      }
-
-      // Update stats
-      this.updateStats();
+      // Update stats from scan data
+      this.updateStatsFromScans(scans);
 
       // Notify callbacks
       this.notifyScanUpdate();
@@ -300,38 +163,134 @@ class RfidSecurityServiceClass {
       this.consecutiveErrors = 0;
       this.setConnectionStatus('connected');
 
-    } catch (error) {
-      console.log('Error in RfidSecurityService fetch:', error);
+    } catch (error: any) {
+      if (this.shouldStop) return;
+      console.log('Error in RfidSecurityService fetch:', error?.message);
       this.consecutiveErrors++;
 
       if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
         this.setConnectionStatus('error');
       }
+    } finally {
+      this.isFetching = false;
     }
   }
 
-  private updateStats(): void {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // ----------------------------------------
+  // Scan Processing & Change Detection
+  // (Same pattern as RealtimeParkingService.checkForChanges)
+  // ----------------------------------------
 
-    const todayScans = this.recentScans.filter(s =>
-      new Date(s.timestamp) >= todayStart
-    );
+  private processNewScans(apiScans: any[]): void {
+    const newInvalidScans: RfidScanEvent[] = [];
+
+    for (const raw of apiScans) {
+      const scanId = raw.id;
+
+      // Skip already processed scans
+      if (this.processedScanIds.has(scanId)) continue;
+
+      // Mark as processed
+      this.processedScanIds.add(scanId);
+
+      // Map API response to RfidScanEvent
+      const scan: RfidScanEvent = {
+        id: `scan-${scanId}`,
+        timestamp: raw.timestamp || new Date().toISOString(),
+        reader_id: raw.gate_mac || 'unknown',
+        reader_name: raw.gate_mac || 'Gate',
+        reader_location: raw.gate_mac || 'Unknown Location',
+        rfid_uid: raw.uid || 'Unknown',
+        scan_type: raw.scan_type || 'entry',
+        status: raw.status || 'unknown',
+        message: raw.message || '',
+        duration: raw.status === 'valid' ? 7 : 10,
+        user_name: raw.user_name || undefined,
+        vehicle_plate: raw.vehicle_plate || undefined,
+      };
+
+      // Add to recent scans (newest first)
+      this.recentScans.unshift(scan);
+
+      // If invalid, create alert and queue for notification
+      if (INVALID_STATUSES.has(scan.status)) {
+        const alert = this.createAlertFromScan(scan);
+        this.alerts.unshift(alert);
+        newInvalidScans.push(scan);
+      }
+    }
+
+    // Keep only last 100 scans and 100 alerts
+    if (this.recentScans.length > 100) {
+      this.recentScans = this.recentScans.slice(0, 100);
+    }
+    if (this.alerts.length > 100) {
+      this.alerts = this.alerts.slice(0, 100);
+    }
+
+    // Keep processedScanIds from growing too large
+    if (this.processedScanIds.size > 500) {
+      const idsArray = Array.from(this.processedScanIds);
+      this.processedScanIds = new Set(idsArray.slice(-200));
+    }
+
+    // Trigger local notifications for new invalid scans
+    // (Same pattern as RealtimeParkingService triggering NotificationService)
+    for (const scan of newInvalidScans) {
+      this.triggerLocalNotification(scan);
+    }
+  }
+
+  private createAlertFromScan(scan: RfidScanEvent): RfidAlert {
+    return {
+      id: `alert-${scan.id}`,
+      scan_event_id: scan.id,
+      scan_event: scan,
+      alert_type: STATUS_TO_ALERT_TYPE[scan.status] || 'unknown_rfid',
+      severity: STATUS_TO_SEVERITY[scan.status] || 'medium',
+      acknowledged: false,
+      acknowledged_by: null,
+      acknowledged_at: null,
+      notes: null,
+      created_at: scan.timestamp,
+    };
+  }
+
+  private async triggerLocalNotification(scan: RfidScanEvent): Promise<void> {
+    try {
+      const alertType = STATUS_TO_NOTIF_TYPE[scan.status] || 'unknown';
+
+      await NotificationService.showRfidAlertNotification(
+        alertType,
+        scan.rfid_uid,
+        scan.reader_name,
+        {
+          userName: scan.user_name || undefined,
+          vehiclePlate: scan.vehicle_plate || undefined,
+          message: scan.message || undefined,
+        }
+      );
+
+      console.log(`RFID local notification triggered: ${alertType} - ${scan.rfid_uid}`);
+    } catch (error) {
+      console.log('Error triggering RFID local notification:', error);
+    }
+  }
+
+  private updateStatsFromScans(apiScans: any[]): void {
+    const validEntries = apiScans.filter(s => s.status === 'valid' && s.scan_type === 'entry').length;
+    const validExits = apiScans.filter(s => s.status === 'valid' && s.scan_type === 'exit').length;
+    const invalidScans = apiScans.filter(s => INVALID_STATUSES.has(s.status)).length;
 
     this.lastStats = {
-      today_entries: todayScans.filter(s => s.scan_type === 'entry').length,
-      today_exits: todayScans.filter(s => s.scan_type === 'exit').length,
-      current_parked: Math.max(0,
-        todayScans.filter(s => s.scan_type === 'entry' && s.status === 'valid').length -
-        todayScans.filter(s => s.scan_type === 'exit' && s.status === 'valid').length
-      ) + 15, // Base count
+      today_entries: validEntries,
+      today_exits: validExits,
+      current_parked: Math.max(0, validEntries - validExits),
       active_alerts: this.alerts.filter(a => !a.acknowledged).length,
       pending_guests: this.guests.filter(g => g.status === 'pending').length,
-      approved_guests_today: this.guests.filter(g =>
-        g.status === 'approved' && new Date(g.updated_at) >= todayStart
-      ).length,
-      invalid_scans_today: todayScans.filter(s => s.status !== 'valid').length,
-      last_scan: this.recentScans[0],
+      approved_guests_today: this.guests.filter(g => g.status === 'approved').length,
+      invalid_scans_today: invalidScans,
+      last_scan: this.recentScans.length > 0 ? this.recentScans[0] : undefined,
     };
   }
 
@@ -342,7 +301,6 @@ class RfidSecurityServiceClass {
   onScanUpdate(callback: ScanUpdateCallback): () => void {
     this.scanCallbacks.push(callback);
 
-    // Send current data immediately
     if (this.recentScans.length > 0) {
       try {
         callback([...this.recentScans]);
@@ -358,16 +316,13 @@ class RfidSecurityServiceClass {
 
     return () => {
       const index = this.scanCallbacks.indexOf(callback);
-      if (index > -1) {
-        this.scanCallbacks.splice(index, 1);
-      }
+      if (index > -1) this.scanCallbacks.splice(index, 1);
     };
   }
 
   onAlertUpdate(callback: AlertCallback): () => void {
     this.alertCallbacks.push(callback);
 
-    // Send current alerts immediately
     if (this.alerts.length > 0) {
       try {
         callback([...this.alerts]);
@@ -378,16 +333,13 @@ class RfidSecurityServiceClass {
 
     return () => {
       const index = this.alertCallbacks.indexOf(callback);
-      if (index > -1) {
-        this.alertCallbacks.splice(index, 1);
-      }
+      if (index > -1) this.alertCallbacks.splice(index, 1);
     };
   }
 
   onConnectionStatus(callback: ConnectionStatusCallback): () => void {
     this.connectionCallbacks.push(callback);
 
-    // Send current status immediately
     try {
       callback(this.connectionStatus);
     } catch (error) {
@@ -396,49 +348,34 @@ class RfidSecurityServiceClass {
 
     return () => {
       const index = this.connectionCallbacks.indexOf(callback);
-      if (index > -1) {
-        this.connectionCallbacks.splice(index, 1);
-      }
+      if (index > -1) this.connectionCallbacks.splice(index, 1);
     };
   }
 
   onStatsUpdate(callback: StatsUpdateCallback): () => void {
     this.statsCallbacks.push(callback);
 
-    // Send current stats immediately if available
     if (this.lastStats) {
       try {
         callback({ ...this.lastStats });
       } catch (error) {
         console.log('Error in stats callback:', error);
       }
-    } else {
-      // If no stats yet, generate them now and send
-      this.updateStats();
-      if (this.lastStats) {
-        try {
-          callback({ ...this.lastStats });
-        } catch (error) {
-          console.log('Error in stats callback:', error);
-        }
-      }
     }
 
-    // Auto-start if not running (same as onScanUpdate)
+    // Auto-start if not running
     if (!this.updateInterval) {
       this.start();
     }
 
     return () => {
       const index = this.statsCallbacks.indexOf(callback);
-      if (index > -1) {
-        this.statsCallbacks.splice(index, 1);
-      }
+      if (index > -1) this.statsCallbacks.splice(index, 1);
     };
   }
 
   // ----------------------------------------
-  // Notification Methods
+  // Callback Notification Methods
   // ----------------------------------------
 
   private notifyScanUpdate(): void {
@@ -488,51 +425,16 @@ class RfidSecurityServiceClass {
   }
 
   // ----------------------------------------
-  // Push Notification for Invalid Scans
+  // Guest Notification
   // ----------------------------------------
 
-  private async triggerInvalidScanNotification(scan: RfidScanEvent, alert: RfidAlert): Promise<void> {
-    try {
-      // Map scan status to notification alert type
-      const alertTypeMap: Record<string, 'invalid' | 'expired' | 'suspended' | 'unknown'> = {
-        invalid: 'invalid',
-        expired: 'expired',
-        suspended: 'suspended',
-        unknown: 'unknown',
-      };
-
-      const alertType = alertTypeMap[scan.status] || 'unknown';
-
-      // Build additional info for the notification
-      const additionalInfo: Record<string, string> = {
-        'Scan Type': scan.scan_type === 'entry' ? 'Entry Attempt' : 'Exit Attempt',
-        'Time': new Date(scan.timestamp).toLocaleTimeString(),
-        'Alert ID': alert.id,
-        'Severity': alert.severity.toUpperCase(),
-      };
-
-      // Trigger the push notification
-      await NotificationService.showRfidAlertNotification(
-        alertType,
-        scan.rfid_uid,
-        `${scan.reader_name} (${scan.reader_location})`,
-        additionalInfo
-      );
-
-      console.log(`RFID Alert notification sent for ${alertType} scan: ${scan.rfid_uid}`);
-    } catch (error) {
-      console.log('Error sending RFID alert notification:', error);
-    }
-  }
-
-  // Public method to trigger guest request notification (can be called when guest is created)
   async notifyNewGuestRequest(guest: GuestAccess): Promise<void> {
     try {
       await NotificationService.showGuestRequestNotification(
         guest.name,
         guest.vehicle_plate,
         guest.purpose,
-        guest.id
+        String(guest.id)
       );
       console.log(`Guest request notification sent for: ${guest.name}`);
     } catch (error) {
@@ -545,8 +447,6 @@ class RfidSecurityServiceClass {
   // ----------------------------------------
 
   async getRecentScans(filters?: ScanHistoryFilters): Promise<PaginatedResponse<RfidScanEvent>> {
-    await this.simulateApiDelay();
-
     let filteredScans = [...this.recentScans];
 
     if (filters) {
@@ -590,8 +490,6 @@ class RfidSecurityServiceClass {
   }
 
   async getActiveAlerts(filters?: AlertFilters): Promise<RfidAlert[]> {
-    await this.simulateApiDelay();
-
     let filteredAlerts = [...this.alerts];
 
     if (filters) {
@@ -610,8 +508,6 @@ class RfidSecurityServiceClass {
   }
 
   async acknowledgeAlert(alertId: string, notes?: string): Promise<RfidApiResponse<void>> {
-    await this.simulateApiDelay();
-
     const alertIndex = this.alerts.findIndex(a => a.id === alertId);
     if (alertIndex === -1) {
       return { success: false, message: 'Alert not found' };
@@ -620,15 +516,17 @@ class RfidSecurityServiceClass {
     this.alerts[alertIndex] = {
       ...this.alerts[alertIndex],
       acknowledged: true,
-      acknowledged_by: 1, // Mock security user ID
+      acknowledged_by: 1,
       acknowledged_by_name: 'Security Guard',
       acknowledged_at: new Date().toISOString(),
       notes: notes || null,
     };
 
     this.notifyAlertUpdate();
-    this.updateStats();
-    this.notifyStatsUpdate();
+    if (this.lastStats) {
+      this.lastStats.active_alerts = this.alerts.filter(a => !a.acknowledged).length;
+      this.notifyStatsUpdate();
+    }
 
     return { success: true, message: 'Alert acknowledged' };
   }
@@ -638,13 +536,10 @@ class RfidSecurityServiceClass {
   // ----------------------------------------
 
   async getPendingGuests(): Promise<GuestAccess[]> {
-    await this.simulateApiDelay();
     return this.guests.filter(g => g.status === 'pending');
   }
 
   async getAllGuests(filters?: GuestFilters): Promise<PaginatedResponse<GuestAccess>> {
-    await this.simulateApiDelay();
-
     let filteredGuests = [...this.guests];
 
     if (filters) {
@@ -674,8 +569,6 @@ class RfidSecurityServiceClass {
   }
 
   async approveGuest(guestId: number): Promise<RfidApiResponse<void>> {
-    await this.simulateApiDelay();
-
     const guestIndex = this.guests.findIndex(g => g.id === guestId);
     if (guestIndex === -1) {
       return { success: false, message: 'Guest not found' };
@@ -684,20 +577,21 @@ class RfidSecurityServiceClass {
     this.guests[guestIndex] = {
       ...this.guests[guestIndex],
       status: 'approved',
-      approved_by: 1, // Mock security user ID
+      approved_by: 1,
       approved_by_name: 'Security Guard',
       updated_at: new Date().toISOString(),
     };
 
-    this.updateStats();
-    this.notifyStatsUpdate();
+    if (this.lastStats) {
+      this.lastStats.pending_guests = this.guests.filter(g => g.status === 'pending').length;
+      this.lastStats.approved_guests_today = this.guests.filter(g => g.status === 'approved').length;
+      this.notifyStatsUpdate();
+    }
 
     return { success: true, message: 'Guest approved successfully' };
   }
 
   async denyGuest(guestId: number, reason?: string): Promise<RfidApiResponse<void>> {
-    await this.simulateApiDelay();
-
     const guestIndex = this.guests.findIndex(g => g.id === guestId);
     if (guestIndex === -1) {
       return { success: false, message: 'Guest not found' };
@@ -710,47 +604,62 @@ class RfidSecurityServiceClass {
       updated_at: new Date().toISOString(),
     };
 
-    this.updateStats();
-    this.notifyStatsUpdate();
+    if (this.lastStats) {
+      this.lastStats.pending_guests = this.guests.filter(g => g.status === 'pending').length;
+      this.notifyStatsUpdate();
+    }
 
     return { success: true, message: 'Guest denied' };
   }
 
   // ----------------------------------------
-  // Manual Verification
+  // Manual Verification - Uses real API
   // ----------------------------------------
 
   async verifyRfidManually(uid: string): Promise<VerificationResult> {
-    await this.simulateApiDelay();
+    try {
+      const response = await apiClient.post('/public/rfid/verify', { uid: uid.toUpperCase() });
+      const data = response.data;
 
-    // Simulate verification - in production would call /rfid/verify
-    const isValid = Math.random() > 0.3;
+      const scan: RfidScanEvent = {
+        id: `scan-manual-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        reader_id: 'manual',
+        reader_name: 'Manual Verification',
+        reader_location: 'Security App',
+        rfid_uid: uid.toUpperCase(),
+        scan_type: 'entry',
+        status: data.valid ? 'valid' : 'invalid',
+        message: data.message || (data.valid ? 'Access granted' : 'RFID not registered'),
+        duration: data.duration || (data.valid ? 7 : 10),
+        user_name: data.user_name || data.user?.name,
+        vehicle_plate: data.vehicle_plate || data.user?.vehicle_plate,
+      };
 
-    if (isValid) {
+      this.recentScans.unshift(scan);
+      this.notifyScanUpdate();
+
       return {
-        valid: true,
-        message: 'Access granted',
-        duration: 7,
+        valid: data.valid,
+        message: data.message,
+        duration: data.duration,
         uid: uid.toUpperCase(),
-        user_name: MOCK_USER_NAMES[Math.floor(Math.random() * MOCK_USER_NAMES.length)],
-        vehicle_plate: MOCK_PLATES[Math.floor(Math.random() * MOCK_PLATES.length)],
+        user_name: data.user_name || data.user?.name,
+        vehicle_plate: data.vehicle_plate || data.user?.vehicle_plate,
+        scan_time: data.scan_time || Date.now().toString(),
+        user: data.user,
+      };
+    } catch (error: any) {
+      console.log('Error verifying RFID:', error);
+      return {
+        valid: false,
+        message: error?.response?.data?.message || 'Verification failed. Check connection.',
+        duration: 10,
+        user_name: 'N/A',
+        vehicle_plate: 'N/A',
         scan_time: Date.now().toString(),
-        user: {
-          name: 'John Doe',
-          vehicle_plate: 'ABC 1234',
-          entry_time: new Date().toISOString(),
-        },
       };
     }
-
-    return {
-      valid: false,
-      message: 'RFID not registered. Please go to office.',
-      duration: 10,
-      user_name: 'N/A',
-      vehicle_plate: 'N/A',
-      scan_time: Date.now().toString(),
-    };
   }
 
   // ----------------------------------------
@@ -758,9 +667,20 @@ class RfidSecurityServiceClass {
   // ----------------------------------------
 
   async getDashboardStats(): Promise<SecurityDashboardStats> {
-    await this.simulateApiDelay();
-    this.updateStats();
-    return this.lastStats!;
+    // Trigger a fresh fetch if we have no stats
+    if (!this.lastStats) {
+      await this.fetchAndUpdate();
+    }
+
+    return this.lastStats || {
+      today_entries: 0,
+      today_exits: 0,
+      current_parked: 0,
+      active_alerts: 0,
+      pending_guests: 0,
+      approved_guests_today: 0,
+      invalid_scans_today: 0,
+    };
   }
 
   getLastStats(): SecurityDashboardStats | null {
@@ -779,24 +699,16 @@ class RfidSecurityServiceClass {
       scansCount: this.recentScans.length,
       alertsCount: this.alerts.filter(a => !a.acknowledged).length,
       pendingGuests: this.guests.filter(g => g.status === 'pending').length,
+      processedIds: this.processedScanIds.size,
     };
   }
 
-  // ----------------------------------------
-  // Utility Methods
-  // ----------------------------------------
-
-  private async simulateApiDelay(ms: number = 300): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  // Reset mock data (useful for testing)
-  resetMockData(): void {
+  clearData(): void {
     this.recentScans = [];
     this.alerts = [];
-    this.guests = [...MOCK_GUESTS];
+    this.guests = [];
     this.lastStats = null;
-    this.initializeMockData();
+    this.processedScanIds.clear();
   }
 }
 
