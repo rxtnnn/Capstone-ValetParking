@@ -85,7 +85,7 @@ export const NAVIGATION_WAYPOINTS = [
   { id: 'entranceB', position: { x: 650, y: 250 } },
   { id: 'entranceC', position: { x: 650, y: 250 } },
   { id: 'entranceD', position: { x: 620, y: 280 } },
-  { id: 'entranceE', position: { x: 610, y: 290 } },
+  { id: 'entranceE', position: { x: 610, y: 295 } },
   { id: 'entranceF', position: { x: 650, y: 250 } },
   { id: 'entranceG', position: { x: 650, y: 250 } },
   { id: 'entranceH', position: { x: 650, y: 250 } },
