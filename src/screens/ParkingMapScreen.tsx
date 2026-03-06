@@ -13,9 +13,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { NavigationProp, useNavigation, useFocusEffect, RouteProp, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { PanGestureHandler, PinchGestureHandler } from 'react-native-gesture-handler';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -43,7 +42,7 @@ interface ParkingSpot {
   height?: number;
   section?: string;
   rotation?: string;
-  hasSensor?: boolean; // Track if spot has a sensor configured
+  hasSensor?: boolean; 
 }
 interface ParkingSection {
   id: string;
@@ -96,9 +95,6 @@ const ParkingMapScreen: React.FC = () => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const bottomPanelY = useSharedValue(0);
-  const bottomPanelPanRef = useRef<PanGestureHandler>(null);
-  const panRef = useRef<PanGestureHandler>(null);
-  const pinchRef = useRef<PinchGestureHandler>(null);
 
   // Load parking configuration on mount
   useEffect(() => {
@@ -394,62 +390,57 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, []);
   
-  const panGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context: any) => {
-      context.startX = translateX.value;
-      context.startY = translateY.value;
-    },
-    onActive: (event: any, context: any) => {
-      translateX.value = context.startX + event.translationX;
-      translateY.value = context.startY + event.translationY;
-    },
-    onEnd: () => {
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  const startScale = useSharedValue(1);
+  const startPanelY = useSharedValue(0);
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      startX.value = translateX.value;
+      startY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = startX.value + event.translationX;
+      translateY.value = startY.value + event.translationY;
+    })
+    .onEnd(() => {
       const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = gestureLimits;
+      if (translateX.value > maxTranslateX) translateX.value = maxTranslateX;
+      else if (translateX.value < minTranslateX) translateX.value = minTranslateX;
+      if (translateY.value > maxTranslateY) translateY.value = maxTranslateY;
+      else if (translateY.value < minTranslateY) translateY.value = minTranslateY;
+    })
+    .minPointers(1)
+    .maxPointers(1);
 
-      if (translateX.value > maxTranslateX) {
-        translateX.value = maxTranslateX;
-      } else if (translateX.value < minTranslateX) {
-        translateX.value = minTranslateX;
-      }
-
-      if (translateY.value > maxTranslateY) {
-        translateY.value = maxTranslateY;
-      } else if (translateY.value < minTranslateY) {
-        translateY.value = minTranslateY;
-      }
-    },
-  });
-
-  const pinchGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context: any) => {
-      context.startScale = scale.value;
-    },
-    onActive: (event: any, context: any) => {
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      startScale.value = scale.value;
+    })
+    .onUpdate((event) => {
       const { minScale, maxScale } = gestureLimits;
-      scale.value = Math.max(minScale, Math.min(maxScale, context.startScale * event.scale));
-    },
-    onEnd: () => {
+      scale.value = Math.max(minScale, Math.min(maxScale, startScale.value * event.scale));
+    })
+    .onEnd(() => {
       const { clampMinScale, clampMaxScale } = gestureLimits;
-      if (scale.value < clampMinScale) {
-        scale.value = clampMinScale;
-      } else if (scale.value > clampMaxScale) {
-        scale.value = clampMaxScale;
-      }
-    },
-  });
+      if (scale.value < clampMinScale) scale.value = clampMinScale;
+      else if (scale.value > clampMaxScale) scale.value = clampMaxScale;
+    });
 
-  const bottomPanelGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context: any) => {
-      context.startY = bottomPanelY.value;
-    },
-    onActive: (event: any, context: any) => {
-      const newY = context.startY + event.translationY;
+  const mapGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+  const bottomPanelGesture = Gesture.Pan()
+    .onStart(() => {
+      startPanelY.value = bottomPanelY.value;
+    })
+    .onUpdate((event) => {
+      const newY = startPanelY.value + event.translationY;
       bottomPanelY.value = Math.max(-50, Math.min(150, newY));
-    },
-    onEnd: (event: any) => {
+    })
+    .onEnd((event) => {
       const velocity = event.velocityY;
       const currentY = bottomPanelY.value;
-      
       if (velocity > 500 || currentY > 75) {
         bottomPanelY.value = withSpring(120);
       } else if (velocity < -500 || currentY < 25) {
@@ -457,8 +448,7 @@ const ParkingMapScreen: React.FC = () => {
       } else {
         bottomPanelY.value = withSpring(currentY > 50 ? 120 : 0);
       }
-    },
-  });
+    });
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -863,31 +853,19 @@ const ParkingMapScreen: React.FC = () => {
 
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
-          <PinchGestureHandler
-            ref={pinchRef}
-            onGestureEvent={pinchGestureHandler}
-            simultaneousHandlers={panRef}
-          >
+          <GestureDetector gesture={mapGesture}>
             <Animated.View style={styles.mapWrapper}>
-              <PanGestureHandler
-                ref={panRef}
-                onGestureEvent={panGestureHandler}
-                simultaneousHandlers={pinchRef}
-                minPointers={1}
-                maxPointers={1}
-              >
-                <Animated.View style={[styles.parkingLayout, animatedStyle]}>
-                  <MapLayout styles={styles} />
-                  {parkingData.map(renderParkingSpot)}
-                  {renderNavigationPath()}
-                </Animated.View>
-              </PanGestureHandler>
+              <Animated.View style={[styles.parkingLayout, animatedStyle]}>
+                <MapLayout styles={styles} />
+                {parkingData.map(renderParkingSpot)}
+                {renderNavigationPath()}
+              </Animated.View>
             </Animated.View>
-          </PinchGestureHandler>
+          </GestureDetector>
         </View>
       </View>
 
-      <PanGestureHandler ref={bottomPanelPanRef} onGestureEvent={bottomPanelGestureHandler}>
+      <GestureDetector gesture={bottomPanelGesture}>
         <Animated.View style={[bottomPanelAnimatedStyle]}>
           <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.bottomPanel}>
             <View style={styles.dragHandle} />
@@ -931,7 +909,7 @@ const ParkingMapScreen: React.FC = () => {
             </TouchableOpacity>
           </LinearGradient>
         </Animated.View>
-      </PanGestureHandler>
+      </GestureDetector>
 
       {showNavigation && (
         <View style={{ position: 'absolute', top: 150, right: 20, gap: 10, zIndex: 2000 }}>
