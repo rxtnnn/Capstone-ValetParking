@@ -531,8 +531,8 @@ const AppNavigator: React.FC = () => {
     });
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationListener);
-      Notifications.removeNotificationSubscription(responseListener);
+      notificationListener.remove();
+      responseListener.remove();
       backHandler.remove();
     };
   }, []);
