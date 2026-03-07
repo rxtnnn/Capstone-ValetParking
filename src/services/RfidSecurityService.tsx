@@ -214,8 +214,8 @@ class RfidSecurityServiceClass {
       this.recentScans.unshift(scan);
 
       // Start or stop spot notifications based on RFID scan type
-      // Entry = user is inside the parking, send spot availability notifications
-      // Exit = user left the parking, stop spot notifications
+      // Entry = user arriving at parking (looking for spot), resume spot notifications
+      // Exit = user leaving parking (already parked/done), pause spot notifications
       if (scan.status === 'valid') {
         if (scan.scan_type === 'entry') {
           NotificationManager.resumeSpotNotifications();

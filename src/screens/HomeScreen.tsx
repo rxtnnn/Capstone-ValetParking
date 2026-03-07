@@ -13,6 +13,7 @@ import { NotificationManager } from '../services/NotifManager';
 import NotificationOverlay from '../components/NotifOverlay';
 import { useFeedback } from '../hooks/useFeedback';
 import {COLORS} from '../constants/AppConst';
+import { TokenManager } from '../config/api';
 
 
 type RootStackParamList = {
@@ -208,7 +209,10 @@ const HomeScreen: React.FC = () => {
           prev.available > current.available ? prev : current
         );
 
-        NotificationManager.addSpotAvailableNotification(increase, bestFloor.floor);
+        const userRole = TokenManager.getUser()?.role;
+        if (userRole === 'user') {
+          NotificationManager.addSpotAvailableNotification(increase, bestFloor.floor);
+        }
       }
       setLastParkingData(newData);
     } catch (error) {

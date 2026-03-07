@@ -153,6 +153,10 @@ class NotificationServiceClass {
     }
   }
 
+  private isRunningInExpoGo(): boolean {
+    return Constants.appOwnership === 'expo';
+  }
+
   private async registerPushNotif(): Promise<string | null> {
     if (!Device.isDevice) {
       console.warn('Must use physical device for Push Notifications');
@@ -161,33 +165,39 @@ class NotificationServiceClass {
 
     if (Platform.OS === 'android') {
       const settings = await this.getNotificationSettings();
-      
+
       await Notifications.setNotificationChannelAsync(CHANNELS.DEFAULT, {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         lightColor: '#B71C1C',
         enableVibrate: settings.vibration,
-        sound: settings.sound ? 'default' : undefined, // FIX: Proper sound setting
+        sound: settings.sound ? 'default' : undefined,
         enableLights: true,
       });
     }
 
+    // Remote push tokens are not supported in Expo Go SDK 53+
+    if (this.isRunningInExpoGo()) {
+      console.log('Running in Expo Go: skipping remote push token registration. Local notifications will still work.');
+      return null;
+    }
+
     try {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      const finalStatus = existingStatus !== 'granted' 
-        ? (await Notifications.requestPermissionsAsync()).status 
+      const finalStatus = existingStatus !== 'granted'
+        ? (await Notifications.requestPermissionsAsync()).status
         : existingStatus;
-      
+
       if (finalStatus !== 'granted') {
         console.warn('Push notification permissions not granted');
         return null;
       }
-      
+
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig?.extra?.eas?.projectId,
       });
-      
+
       this.expoPushToken = tokenData.data;
       console.log('=== EXPO PUSH TOKEN ===', tokenData.data);
       return tokenData.data;
@@ -383,6 +393,10 @@ class NotificationServiceClass {
     adminName?: string
   ): Promise<void> {
     try {
+      const userRole = TokenManager.getUser()?.role;
+      const allowedRoles = ['user', 'admin', 'ssd', 'security'];
+      if (!userRole || !allowedRoles.includes(userRole)) return;
+
       const settings = await this.getNotificationSettings();
       const title = 'Admin Reply Received';
       const message = `Your feedback has been responded to by ${adminName || 'Admin'}`;
