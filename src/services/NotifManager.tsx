@@ -7,7 +7,8 @@ import { FeedbackData } from '../types/feedback';
 const STORAGE_KEYS = {
   NOTIFICATIONS: '@valet_notifications',
   FEEDBACK_CHECK: '@valet_last_feedback_check',
-  PROCESSED_REPLIES: '@valet_processed_replies' 
+  PROCESSED_REPLIES: '@valet_processed_replies',
+  SPOT_NOTIFS_PAUSED: '@valet_spot_notifs_paused',
 } as const;
 
 const MAX_NOTIFICATIONS = 100;
@@ -32,11 +33,33 @@ class NotificationManagerClass {
 
   private async init(): Promise<void> {
     this.currentUserId = this.getCurrentUserId();
-    
+
     await Promise.all([
       this.loadNotifications(),
-      this.loadProcessedReplies()
+      this.loadProcessedReplies(),
+      this.loadSpotNotificationsPaused(),
     ]);
+  }
+
+  private async loadSpotNotificationsPaused(): Promise<void> {
+    try {
+      const userId = this.currentUserId;
+      const key = `${STORAGE_KEYS.SPOT_NOTIFS_PAUSED}_${userId}`;
+      const stored = await AsyncStorage.getItem(key);
+      this.spotNotificationsPaused = stored === 'true';
+    } catch {
+      this.spotNotificationsPaused = false;
+    }
+  }
+
+  private async saveSpotNotificationsPaused(): Promise<void> {
+    try {
+      const userId = this.currentUserId;
+      const key = `${STORAGE_KEYS.SPOT_NOTIFS_PAUSED}_${userId}`;
+      await AsyncStorage.setItem(key, String(this.spotNotificationsPaused));
+    } catch {
+      // ignore
+    }
   }
 
   private setupUserChangeMonitoring(): void {
@@ -608,11 +631,13 @@ class NotificationManagerClass {
   // Pause spot notifications when user has parked
   pauseSpotNotifications(): void {
     this.spotNotificationsPaused = true;
+    this.saveSpotNotificationsPaused();
   }
 
   // Resume spot notifications when user leaves or wants notifications again
   resumeSpotNotifications(): void {
     this.spotNotificationsPaused = false;
+    this.saveSpotNotificationsPaused();
   }
 
   // Check if spot notifications are paused

@@ -1,10 +1,16 @@
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
+import { TokenManager } from '../config/api';
 
 export interface ParkingSpace {
   id: number;
   sensor_id: number | null;
   is_occupied: boolean;
+  effective_status?: 'available' | 'occupied' | 'blocked';
+  manual_override?: boolean;
+  manual_status?: string | null;
+  manual_override_expires?: string | null;
+  manual_override_by?: string | null;
   distance_cm: number | null;
   created_at: string;
   updated_at: string;
@@ -320,7 +326,10 @@ class RealTimeParkingServiceClass {
 
     for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
-      const isAvailable = !space.is_occupied;
+      // Prefer effective_status from API (reflects manual overrides); fall back to is_occupied
+      const isAvailable = space.effective_status
+        ? space.effective_status === 'available'
+        : !space.is_occupied;
 
       if (isAvailable) availableSpots++;
 
@@ -393,41 +402,47 @@ class RealTimeParkingServiceClass {
         (floorGrouped[floor] = floorGrouped[floor] || []).push(label);
       }
 
-      for (const floorStr in floorGrouped) {
-        const floor = parseInt(floorStr, 10);
-        const spotIds = floorGrouped[floor];
+      NotificationService.getNotificationSettings()
+        .then(settings => {
+          const userRole = TokenManager.getUser()?.role;
+          const isUser = userRole === 'user';
 
-        NotificationService.showSpotAvailableNotification(
-          spotIds.length,
-          floor,
-          spotIds
-        );
+          for (const floorStr in floorGrouped) {
+            const floor = parseInt(floorStr, 10);
+            const spotIds = floorGrouped[floor];
 
-        NotificationService.getNotificationSettings()
-          .then(settings => {
-            if (settings.spotAvailable) {
+            if (settings.spotAvailable && isUser && !NotificationManager.isSpotNotificationsPaused()) {
+              NotificationService.showSpotAvailableNotification(
+                spotIds.length,
+                floor,
+                spotIds
+              );
               NotificationManager.addSpotAvailableNotification(
                 spotIds.length,
                 floor,
                 spotIds
               );
             }
-          })
-          .catch(err => console.log('Error fetching settings:', err));
-      }
+          }
+        })
+        .catch(err => console.log('Error fetching settings:', err));
     }
 
-    for (const newFloor of newData.floors) {
-      const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-      if (oldFloor && newFloor.available > oldFloor.available) {
-        NotificationService.showFloorUpdateNotification(
-          newFloor.floor,
-          newFloor.available,
-          newFloor.total,
-          oldFloor.available
-        );
-      }
-    }
+    NotificationService.getNotificationSettings()
+      .then(settings => {
+        for (const newFloor of newData.floors) {
+          const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
+          if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates) {
+            NotificationService.showFloorUpdateNotification(
+              newFloor.floor,
+              newFloor.available,
+              newFloor.total,
+              oldFloor.available
+            );
+          }
+        }
+      })
+      .catch(err => console.log('Error fetching settings:', err));
   }
 
   private notifyParkingUpdate(data: ParkingStats): void {
@@ -451,6 +466,39 @@ class RealTimeParkingServiceClass {
           console.log('Error in connection status callback:', error);
         }
       }
+    }
+  }
+
+  async overrideSpot(spaceId: number, status: 'available' | 'occupied' | 'blocked', pin: string, token: string): Promise<{ success: boolean; message: string }> {
+    const url = `https://valet.up.railway.app/api/parking/${spaceId}/override`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status, pin }),
+      });
+
+      let data: any = {};
+      const text = await response.text();
+      console.log('[Override] HTTP status:', response.status, 'body:', text);
+      try { data = JSON.parse(text); } catch { /* non-JSON response */ }
+
+      // Backend may use data.success (bool) or HTTP 2xx as success signal
+      const isSuccess = data.success === true || (data.success === undefined && response.ok);
+      if (isSuccess) {
+        // Trigger immediate refresh so effective_status updates on the map
+        this.consecErrors = 0;
+        this.retryCount = 0;
+        setTimeout(() => this.fetchAndUpdate(), 300);
+      }
+      const message = data.message || (isSuccess ? 'Override applied successfully.' : `Request failed (${response.status})`);
+      return { success: isSuccess, message };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Network error. Please try again.' };
     }
   }
 
