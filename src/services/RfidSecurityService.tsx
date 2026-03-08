@@ -18,7 +18,7 @@ import {
   RfidApiResponse,
   PaginatedResponse,
 } from '../types/rfid';
-import apiClient from '../config/api';
+import apiClient, { TokenManager } from '../config/api';
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
 
@@ -177,18 +177,13 @@ class RfidSecurityServiceClass {
     }
   }
 
-  // ----------------------------------------
-  // Scan Processing & Change Detection
-  // (Same pattern as RealtimeParkingService.checkForChanges)
-  // ----------------------------------------
-
   private processNewScans(apiScans: any[]): void {
     const newInvalidScans: RfidScanEvent[] = [];
 
     for (const raw of apiScans) {
       const scanId = raw.id;
 
-      // Skip already processed scans
+      // Skip processed scans
       if (this.processedScanIds.has(scanId)) continue;
 
       // Mark as processed
@@ -213,14 +208,25 @@ class RfidSecurityServiceClass {
       // Add to recent scans (newest first)
       this.recentScans.unshift(scan);
 
-      // Start or stop spot notifications based on RFID scan type
-      // Entry = user is inside the parking, send spot availability notifications
-      // Exit = user left the parking, stop spot notifications
+      // for notification logic 
       if (scan.status === 'valid') {
-        if (scan.scan_type === 'entry') {
-          NotificationManager.resumeSpotNotifications();
-        } else if (scan.scan_type === 'exit') {
-          NotificationManager.pauseSpotNotifications();
+        const currentUser = TokenManager.getUser();
+        const matchesUser = currentUser && ( //check if rfid userid belongs to current user
+          (raw.user_id && raw.user_id === currentUser.id) ||
+          (raw.user_name && currentUser.name && raw.user_name.toLowerCase() === currentUser.name.toLowerCase())
+        );
+
+        if (matchesUser) {
+          if (scan.scan_type === 'entry') {
+            NotificationManager.resumeSpotNotifications().then(() => {
+              NotificationManager.setRfidEntryDetected(true);
+            });
+          } else if (scan.scan_type === 'exit') {
+            NotificationManager.setRfidEntryDetected(true); 
+            NotificationManager.pauseSpotNotifications().then(() => {
+              NotificationManager.setRfidEntryDetected(false); 
+            });
+          }
         }
       }
 

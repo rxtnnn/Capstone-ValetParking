@@ -5,6 +5,7 @@ import { Platform, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TokenManager } from '../config/api';
 import apiClient from '../config/api';
+import { NotificationManager } from './NotifManager';
 
 export interface NotificationSettings {
   spotAvailable: boolean;
@@ -153,6 +154,10 @@ class NotificationServiceClass {
     }
   }
 
+  private isRunningInExpoGo(): boolean {
+    return Constants.appOwnership === 'expo';
+  }
+
   private async registerPushNotif(): Promise<string | null> {
     if (!Device.isDevice) {
       console.warn('Must use physical device for Push Notifications');
@@ -161,33 +166,39 @@ class NotificationServiceClass {
 
     if (Platform.OS === 'android') {
       const settings = await this.getNotificationSettings();
-      
+
       await Notifications.setNotificationChannelAsync(CHANNELS.DEFAULT, {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         lightColor: '#B71C1C',
         enableVibrate: settings.vibration,
-        sound: settings.sound ? 'default' : undefined, // FIX: Proper sound setting
+        sound: settings.sound ? 'default' : undefined,
         enableLights: true,
       });
     }
 
+    // Remote push tokens are not supported in Expo Go SDK 53+
+    if (this.isRunningInExpoGo()) {
+      console.log('Running in Expo Go: skipping remote push token registration. Local notifications will still work.');
+      return null;
+    }
+
     try {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      const finalStatus = existingStatus !== 'granted' 
-        ? (await Notifications.requestPermissionsAsync()).status 
+      const finalStatus = existingStatus !== 'granted'
+        ? (await Notifications.requestPermissionsAsync()).status
         : existingStatus;
-      
+
       if (finalStatus !== 'granted') {
         console.warn('Push notification permissions not granted');
         return null;
       }
-      
+
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig?.extra?.eas?.projectId,
       });
-      
+
       this.expoPushToken = tokenData.data;
       console.log('=== EXPO PUSH TOKEN ===', tokenData.data);
       return tokenData.data;
@@ -264,12 +275,24 @@ class NotificationServiceClass {
   }
 
   async showSpotAvailableNotificationSmart(
-    spotsAvailable: number, 
-    floor?: number, 
+    spotsAvailable: number,
+    floor?: number,
     spotIds?: string[],
     forceShow: boolean = false
   ): Promise<void> {
     if (spotsAvailable <= 0) return;
+    if (!forceShow && NotificationManager.isSpotNotificationsPaused()) return;
+
+    // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
+    if (!forceShow) {
+      try {
+        const userId = TokenManager.getUser()?.id;
+        if (userId) {
+          const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
+          if (stored === 'true') return;
+        }
+      } catch { /* ignore */ }
+    }
 
     try {
       const settings = await this.getNotificationSettings();
@@ -328,12 +351,24 @@ class NotificationServiceClass {
   }
 
   async showFloorUpdateNotification(
-    floor: number, 
+    floor: number,
     availableSpots: number,
     totalSpots: number,
     previousAvailable?: number
   ): Promise<void> {
     if (availableSpots <= 0) return;
+
+    // Check in-memory flag (fast path)
+    if (NotificationManager.isSpotNotificationsPaused()) return;
+
+    // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
+    try {
+      const userId = TokenManager.getUser()?.id;
+      if (userId) {
+        const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
+        if (stored === 'true') return;
+      }
+    } catch { /* ignore */ }
 
     try {
       const settings = await this.getNotificationSettings();
@@ -383,6 +418,10 @@ class NotificationServiceClass {
     adminName?: string
   ): Promise<void> {
     try {
+      const userRole = TokenManager.getUser()?.role;
+      const allowedRoles = ['user', 'admin', 'ssd', 'security'];
+      if (!userRole || !allowedRoles.includes(userRole)) return;
+
       const settings = await this.getNotificationSettings();
       const title = 'Admin Reply Received';
       const message = `Your feedback has been responded to by ${adminName || 'Admin'}`;
@@ -603,12 +642,6 @@ class NotificationServiceClass {
     return this.showSpotAvailableNotificationSmart(spotsAvailable, floor, spotIds, false);
   }
   
-  async simulateParkingNotifications(): Promise<void> {
-    await this.showSpotAvailableNotification(1, 4, ['4B1']);
-    setTimeout(() => this.showSpotAvailableNotification(3, 4, ['4B2', '4B3', '4C1']), 2000);
-    setTimeout(() => this.showFloorUpdateNotification(4, 5, 42, 2), 4000);
-  }
-
   getStatus() {
     const user = TokenManager.getUser();
     return {

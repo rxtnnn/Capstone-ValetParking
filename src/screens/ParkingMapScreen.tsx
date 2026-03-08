@@ -6,16 +6,15 @@ import {
   Alert,
   StatusBar,
   ScrollView,
-  Image,
   ActivityIndicator,
-  Modal
+  Modal,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NavigationProp, useNavigation, useFocusEffect, RouteProp, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { PanGestureHandler, PinchGestureHandler } from 'react-native-gesture-handler';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -27,6 +26,7 @@ import { MapLayout, DESTINATION_OFFSETS } from '../components/MapLayout';
 import { ParkingConfigService } from '../services/ParkingConfigService';
 import { FloorConfig, Position } from '../types/parkingConfig';
 import { NotificationManager } from '../services/NotifManager';
+import { TokenManager } from '../config/api';
 
 
 type RootStackParamList = {
@@ -37,13 +37,16 @@ type ParkingMapScreenNavigationProp = NavigationProp<RootStackParamList>;
 type ParkingMapScreenRouteProp = RouteProp<RootStackParamList, 'ParkingMap'>;
 interface ParkingSpot {
   id: string;
+  spaceId?: number; // numeric DB id used for override API calls
   isOccupied: boolean;
+  effectiveStatus?: 'available' | 'occupied' | 'blocked' | 'inactive';
+  manualOverride?: boolean;
   position: { x: number; y: number };
   width?: number;
   height?: number;
   section?: string;
   rotation?: string;
-  hasSensor?: boolean; // Track if spot has a sensor configured
+  hasSensor?: boolean;
 }
 interface ParkingSection {
   id: string;
@@ -86,6 +89,19 @@ const ParkingMapScreen: React.FC = () => {
   const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); // Highlight specific spots
   const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
 
+  // Security spot actions modal
+  const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
+  const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
+  const [spotActionsTab, setSpotActionsTab] = useState<'override' | 'report'>('override');
+  const [overrideStatus, setOverrideStatus] = useState<'available' | 'occupied' | 'blocked'>('available');
+  const [overridePin, setOverridePin] = useState('');
+  const [reportIssue, setReportIssue] = useState('');
+  const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const isSecurityRole = TokenManager.getUser()?.role === 'security';
+  const [spotActionsResult, setSpotActionsResult] = useState<{ type: 'success' | 'warning' | 'error'; title: string; message: string } | null>(null);
+
+
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
     parkingUpdates?: () => void;
@@ -96,9 +112,6 @@ const ParkingMapScreen: React.FC = () => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const bottomPanelY = useSharedValue(0);
-  const bottomPanelPanRef = useRef<PanGestureHandler>(null);
-  const panRef = useRef<PanGestureHandler>(null);
-  const pinchRef = useRef<PinchGestureHandler>(null);
 
   // Load parking configuration on mount
   useEffect(() => {
@@ -295,17 +308,22 @@ const ParkingMapScreen: React.FC = () => {
     // Build maps from API data using slot_name directly
     const spotOccupancyMap: { [key: string]: boolean } = {};
     const spotHasSensorMap: { [key: string]: boolean } = {};
+    const spotEffectiveStatusMap: { [key: string]: 'available' | 'occupied' | 'blocked' | 'inactive' } = {};
+    const spotManualOverrideMap: { [key: string]: boolean } = {};
+    const spotSpaceIdMap: { [key: string]: number } = {};
 
     if (stats.sensorData && Array.isArray(stats.sensorData)) {
       stats.sensorData.forEach((sensor: any) => {
         if (sensor.slot_name) {
-          // Mark spot as having sensor if it has sensor_id assigned (from sensor_assignments)
-          // This syncs with backend sensor management
+          spotSpaceIdMap[sensor.slot_name] = sensor.id;
           spotHasSensorMap[sensor.slot_name] = sensor.sensor_id !== null && sensor.sensor_id !== undefined;
-          // Get occupancy status directly from API
-          // is_occupied = true means car detected (occupied/red)
-          // is_occupied = false means no car detected (available/green)
-          spotOccupancyMap[sensor.slot_name] = sensor.is_occupied === true || sensor.is_occupied === 1;
+          if (sensor.effective_status) {
+            spotEffectiveStatusMap[sensor.slot_name] = sensor.effective_status;
+            spotOccupancyMap[sensor.slot_name] = sensor.effective_status !== 'available';
+          } else {
+            spotOccupancyMap[sensor.slot_name] = sensor.is_occupied === true || sensor.is_occupied === 1;
+          }
+          spotManualOverrideMap[sensor.slot_name] = sensor.manual_override === true;
         }
       });
     }
@@ -315,12 +333,11 @@ const ParkingMapScreen: React.FC = () => {
 
       return prevSpots.map(spot => ({
         ...spot,
-        hasSensor: spotHasSensorMap.hasOwnProperty(spot.id)
-          ? spotHasSensorMap[spot.id]
-          : spot.hasSensor,
-        isOccupied: spotOccupancyMap.hasOwnProperty(spot.id)
-          ? spotOccupancyMap[spot.id]
-          : spot.isOccupied,
+        spaceId: spotSpaceIdMap.hasOwnProperty(spot.id) ? spotSpaceIdMap[spot.id] : spot.spaceId,
+        hasSensor: spotHasSensorMap.hasOwnProperty(spot.id) ? spotHasSensorMap[spot.id] : spot.hasSensor,
+        effectiveStatus: spotEffectiveStatusMap.hasOwnProperty(spot.id) ? spotEffectiveStatusMap[spot.id] : spot.effectiveStatus,
+        manualOverride: spotManualOverrideMap.hasOwnProperty(spot.id) ? spotManualOverrideMap[spot.id] : spot.manualOverride,
+        isOccupied: spotOccupancyMap.hasOwnProperty(spot.id) ? spotOccupancyMap[spot.id] : spot.isOccupied,
       }));
     });
 
@@ -394,62 +411,57 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, []);
   
-  const panGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context: any) => {
-      context.startX = translateX.value;
-      context.startY = translateY.value;
-    },
-    onActive: (event: any, context: any) => {
-      translateX.value = context.startX + event.translationX;
-      translateY.value = context.startY + event.translationY;
-    },
-    onEnd: () => {
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  const startScale = useSharedValue(1);
+  const startPanelY = useSharedValue(0);
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      startX.value = translateX.value;
+      startY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = startX.value + event.translationX;
+      translateY.value = startY.value + event.translationY;
+    })
+    .onEnd(() => {
       const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = gestureLimits;
+      if (translateX.value > maxTranslateX) translateX.value = maxTranslateX;
+      else if (translateX.value < minTranslateX) translateX.value = minTranslateX;
+      if (translateY.value > maxTranslateY) translateY.value = maxTranslateY;
+      else if (translateY.value < minTranslateY) translateY.value = minTranslateY;
+    })
+    .minPointers(1)
+    .maxPointers(1);
 
-      if (translateX.value > maxTranslateX) {
-        translateX.value = maxTranslateX;
-      } else if (translateX.value < minTranslateX) {
-        translateX.value = minTranslateX;
-      }
-
-      if (translateY.value > maxTranslateY) {
-        translateY.value = maxTranslateY;
-      } else if (translateY.value < minTranslateY) {
-        translateY.value = minTranslateY;
-      }
-    },
-  });
-
-  const pinchGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context: any) => {
-      context.startScale = scale.value;
-    },
-    onActive: (event: any, context: any) => {
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      startScale.value = scale.value;
+    })
+    .onUpdate((event) => {
       const { minScale, maxScale } = gestureLimits;
-      scale.value = Math.max(minScale, Math.min(maxScale, context.startScale * event.scale));
-    },
-    onEnd: () => {
+      scale.value = Math.max(minScale, Math.min(maxScale, startScale.value * event.scale));
+    })
+    .onEnd(() => {
       const { clampMinScale, clampMaxScale } = gestureLimits;
-      if (scale.value < clampMinScale) {
-        scale.value = clampMinScale;
-      } else if (scale.value > clampMaxScale) {
-        scale.value = clampMaxScale;
-      }
-    },
-  });
+      if (scale.value < clampMinScale) scale.value = clampMinScale;
+      else if (scale.value > clampMaxScale) scale.value = clampMaxScale;
+    });
 
-  const bottomPanelGestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context: any) => {
-      context.startY = bottomPanelY.value;
-    },
-    onActive: (event: any, context: any) => {
-      const newY = context.startY + event.translationY;
+  const mapGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+  const bottomPanelGesture = Gesture.Pan()
+    .onStart(() => {
+      startPanelY.value = bottomPanelY.value;
+    })
+    .onUpdate((event) => {
+      const newY = startPanelY.value + event.translationY;
       bottomPanelY.value = Math.max(-50, Math.min(150, newY));
-    },
-    onEnd: (event: any) => {
+    })
+    .onEnd((event) => {
       const velocity = event.velocityY;
       const currentY = bottomPanelY.value;
-      
       if (velocity > 500 || currentY > 75) {
         bottomPanelY.value = withSpring(120);
       } else if (velocity < -500 || currentY < 25) {
@@ -457,8 +469,7 @@ const ParkingMapScreen: React.FC = () => {
       } else {
         bottomPanelY.value = withSpring(currentY > 50 ? 120 : 0);
       }
-    },
-  });
+    });
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -493,9 +504,10 @@ const ParkingMapScreen: React.FC = () => {
     setHighlightedSpots([]);
   }, []);
 
-  const handleParkingConfirm = useCallback(() => {
-    // Pause spot notifications when user confirms they've parked
-    NotificationManager.pauseSpotNotifications();
+  const handleParkingConfirm = useCallback(async () => {
+    // TODO: remove setRfidEntryDetected(true) when RFID hardware is available for testing
+    NotificationManager.setRfidEntryDetected(true);
+    await NotificationManager.pauseSpotNotifications();
     setShowParkingConfirmModal(false);
     setNavigatingToSpot(null);
     clearNavigation();
@@ -543,10 +555,16 @@ const ParkingMapScreen: React.FC = () => {
   }, []);
 
   const handleSpotPress = useCallback((spot: ParkingSpot) => {
-    
-    // Only allow interaction with spots that have sensors
-    if (!spot.hasSensor) {
-      // unclickable unassigned spots
+    if (!spot.hasSensor) return;
+
+    // Security can tap any sensor-assigned spot to get override/report modal
+    if (isSecurityRole) {
+      setSpotActionsTarget(spot);
+      setOverrideStatus(spot.isOccupied ? 'occupied' : 'available');
+      setOverridePin('');
+      setReportIssue('');
+      setSpotActionsTab('override');
+      setShowSpotActionsModal(true);
       return;
     }
 
@@ -555,12 +573,11 @@ const ParkingMapScreen: React.FC = () => {
       return;
     }
 
-    // with assigned sensor and available
     setSelectedSpot(spot.id);
     setSelectedSpotForNav(spot.id);
-    setHighlightedSpots([]); // Clear any highlighted spots when selecting a new one
+    setHighlightedSpots([]);
     setShowNavigationModal(true);
-  }, []);
+  }, [isSecurityRole]);
 
   const navigateHome = useCallback(() => {
     navigation.navigate('Home');
@@ -573,7 +590,6 @@ const ParkingMapScreen: React.FC = () => {
   }, [parkingStats, floorNumber]);
 
   const renderParkingSpot = useCallback((spot: ParkingSpot) => {
-    const carImage = require('../../assets/car_top.png');
     const isSelected = selectedSpot === spot.id;
     const spotSection = spot.id.charAt(1); // Extract section from '4A1' -> 'A'
     const isSectionHighlighted = highlightedSection === spotSection;
@@ -585,11 +601,18 @@ const ParkingMapScreen: React.FC = () => {
     let borderWidth = 0;
 
     if (spot.hasSensor) {
-      backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green; // Red if occupied, Green if available
+      const status = spot.effectiveStatus;
+      if (status === 'blocked') {
+        backgroundColor = '#FF9800';
+      } else if (status === 'inactive') {
+        backgroundColor = '#9E9E9E';
+      } else {
+        backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green;
+      }
     }
 
-    // Only spots with sensors and available (not occupied) are clickable
-    const isClickable = spot.hasSensor && !spot.isOccupied;
+    // Security can interact with any sensor-assigned spot; others only available ones
+    const isClickable = spot.hasSensor && (isSecurityRole || !spot.isOccupied);
 
     return (
       <TouchableOpacity
@@ -609,15 +632,28 @@ const ParkingMapScreen: React.FC = () => {
         activeOpacity={isClickable ? 0.7 : 1}
       >
         {spot.hasSensor && spot.isOccupied ? (
-          <Image
-            source={carImage}
+          <View
             style={{
               width: w,
               height: h,
-              transform: [{rotate: rotation }],
+              backgroundColor: COLORS.primary,
+              borderRadius: 4,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [{ rotate: rotation }],
             }}
-            resizeMode="contain"
-          />
+          >
+            <Text
+              style={{
+                color: '#FFF',
+                fontWeight: '700',
+                fontSize: 18,
+                fontFamily: FONTS.semiBold,
+              }}
+            >
+              {spot.id}
+            </Text>
+          </View>
         ) : (
           <View
             style={{
@@ -633,7 +669,7 @@ const ParkingMapScreen: React.FC = () => {
           >
             <Text
               style={{
-                color: spot.hasSensor ? '#FFF' : '#666',
+                color: spot.hasSensor ? '#FFF' : '#FFF',
                 fontWeight: '700',
                 fontSize: 18,
                 fontFamily: FONTS.semiBold,
@@ -656,9 +692,25 @@ const ParkingMapScreen: React.FC = () => {
             }}
           />
         )}
+        {spot.manualOverride && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: '#FF9800',
+              borderWidth: 1,
+              borderColor: '#fff',
+            }}
+          />
+        )}
       </TouchableOpacity>
     );
-  }, [selectedSpot, highlightedSection, highlightedSpots, handleSpotPress]);
+  }, [selectedSpot, highlightedSection, highlightedSpots, handleSpotPress, isSecurityRole]);
 
   const renderSectionIndicator = useCallback((section: ParkingSection) => (
     <TouchableOpacity
@@ -863,31 +915,19 @@ const ParkingMapScreen: React.FC = () => {
 
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
-          <PinchGestureHandler
-            ref={pinchRef}
-            onGestureEvent={pinchGestureHandler}
-            simultaneousHandlers={panRef}
-          >
+          <GestureDetector gesture={mapGesture}>
             <Animated.View style={styles.mapWrapper}>
-              <PanGestureHandler
-                ref={panRef}
-                onGestureEvent={panGestureHandler}
-                simultaneousHandlers={pinchRef}
-                minPointers={1}
-                maxPointers={1}
-              >
-                <Animated.View style={[styles.parkingLayout, animatedStyle]}>
-                  <MapLayout styles={styles} />
-                  {parkingData.map(renderParkingSpot)}
-                  {renderNavigationPath()}
-                </Animated.View>
-              </PanGestureHandler>
+              <Animated.View style={[styles.parkingLayout, animatedStyle]}>
+                <MapLayout styles={styles} />
+                {parkingData.map(renderParkingSpot)}
+                {renderNavigationPath()}
+              </Animated.View>
             </Animated.View>
-          </PinchGestureHandler>
+          </GestureDetector>
         </View>
       </View>
 
-      <PanGestureHandler ref={bottomPanelPanRef} onGestureEvent={bottomPanelGestureHandler}>
+      <GestureDetector gesture={bottomPanelGesture}>
         <Animated.View style={[bottomPanelAnimatedStyle]}>
           <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.bottomPanel}>
             <View style={styles.dragHandle} />
@@ -931,7 +971,7 @@ const ParkingMapScreen: React.FC = () => {
             </TouchableOpacity>
           </LinearGradient>
         </Animated.View>
-      </PanGestureHandler>
+      </GestureDetector>
 
       {showNavigation && (
         <View style={{ position: 'absolute', top: 150, right: 20, gap: 10, zIndex: 2000 }}>
@@ -1275,6 +1315,261 @@ const ParkingMapScreen: React.FC = () => {
         </View>
       </View>
     </Modal>
+      {/* Security: Spot Actions Modal */}
+      <Modal
+        visible={showSpotActionsModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSpotActionsModal(false)}
+      >
+        <View style={styles.parkingConfirmOverlay}>
+          <View style={styles.spotActionsModalContainer}>
+
+            {/* Icon + Title */}
+            <View style={styles.spotActionsIconContainer}>
+              <Ionicons name="shield-checkmark" size={36} color="#fff" />
+            </View>
+            <Text style={styles.parkingConfirmTitle}>Spot Actions</Text>
+
+            {/* Spot ID + Status badge */}
+            <View style={styles.spotActionsSpotInfo}>
+              <Text style={styles.spotActionsSpotId}>{spotActionsTarget?.id}</Text>
+              <View style={[styles.spotActionsStatusBadge, { backgroundColor: spotActionsTarget?.isOccupied ? COLORS.primary : COLORS.green }]}>
+                <Text style={styles.spotActionsStatusText}>
+                  {spotActionsTarget?.isOccupied ? 'Occupied' : 'Available'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Close button */}
+            <TouchableOpacity style={styles.spotActionsCloseButton} onPress={() => setShowSpotActionsModal(false)}>
+              <Ionicons name="close" size={20} color="#999" />
+            </TouchableOpacity>
+
+            {/* Tabs */}
+            <View style={styles.spotActionsTabs}>
+              <TouchableOpacity
+                style={[styles.spotActionsTab, spotActionsTab === 'override' ? styles.spotActionsTabActive : styles.spotActionsTabInactive]}
+                onPress={() => setSpotActionsTab('override')}
+              >
+                <Text style={[styles.spotActionsTabText, spotActionsTab === 'override' ? styles.spotActionsTabTextActive : styles.spotActionsTabTextInactive]}>
+                  Override Status
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.spotActionsTab, spotActionsTab === 'report' ? styles.spotActionsTabActive : styles.spotActionsTabInactive]}
+                onPress={() => setSpotActionsTab('report')}
+              >
+                <Text style={[styles.spotActionsTabText, spotActionsTab === 'report' ? styles.spotActionsTabTextActive : styles.spotActionsTabTextInactive]}>
+                  Report Issue
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {spotActionsTab === 'override' ? (
+              <View style={styles.spotActionsContent}>
+                <Text style={styles.spotActionsLabel}>Set Status:</Text>
+                <View style={styles.spotActionsStatusRow}>
+                  {(['available', 'occupied', 'blocked'] as const).map((s) => {
+                    const icons = { available: 'checkmark-circle', occupied: 'car', blocked: 'ban' } as const;
+                    const colors = { available: COLORS.green, occupied: COLORS.primary, blocked: '#FF9800' };
+                    const isSelected = overrideStatus === s;
+                    return (
+                      <TouchableOpacity
+                        key={s}
+                        onPress={() => setOverrideStatus(s)}
+                        style={[
+                          styles.spotActionsStatusOption,
+                          { borderColor: isSelected ? colors[s] : '#e0e0e0', backgroundColor: isSelected ? colors[s] + '18' : '#fafafa' },
+                        ]}
+                      >
+                        <Ionicons name={icons[s]} size={24} color={isSelected ? colors[s] : '#aaa'} />
+                        <Text style={[styles.spotActionsStatusOptionText, { color: isSelected ? colors[s] : '#aaa' }]}>
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.spotActionsHint}>
+                  Override will automatically expire in 1 hour or when sensor detects a change.
+                </Text>
+
+                <View style={styles.spotActionsDivider} />
+
+                <Text style={styles.spotActionsPinLabel}>Enter PIN to confirm:</Text>
+                <TextInput
+                  style={styles.spotActionsPinInput}
+                  placeholder="* * * *"
+                  placeholderTextColor="#bbb"
+                  keyboardType="numeric"
+                  secureTextEntry
+                  maxLength={4}
+                  value={overridePin}
+                  onChangeText={setOverridePin}
+                />
+
+                <View style={styles.parkingConfirmButtonsContainer}>
+                  <TouchableOpacity
+                    style={styles.parkingConfirmYesButton}
+                    disabled={isSubmittingOverride}
+                    activeOpacity={0.8}
+                    onPress={async () => {
+                      if (overridePin.length < 4) {
+                        setSpotActionsResult({ type: 'warning', title: 'PIN Required', message: 'Please enter a 4-digit PIN to confirm the override.' });
+                        return;
+                      }
+                      const currentStatus = spotActionsTarget?.isOccupied ? 'occupied' : 'available';
+                      if (overrideStatus === currentStatus) {
+                        setSpotActionsResult({ type: 'warning', title: 'No Changes Made', message: `Spot ${spotActionsTarget?.id} is already set to ${overrideStatus}.` });
+                        return;
+                      }
+                      setIsSubmittingOverride(true);
+                      try {
+                        const token = TokenManager.getToken();
+                        const spaceId = spotActionsTarget?.spaceId;
+                        console.log('[Override] spaceId:', spaceId, 'spot:', spotActionsTarget?.id, 'status:', overrideStatus, 'token:', token ? 'present' : 'missing');
+                        if (!spaceId) {
+                          setSpotActionsResult({ type: 'error', title: 'Error', message: `Spot ID not found for ${spotActionsTarget?.id}. Please wait for data to load and try again.` });
+                          return;
+                        }
+                        const result = await RealTimeParkingService.overrideSpot(
+                          spaceId,
+                          overrideStatus,
+                          overridePin,
+                          token ?? ''
+                        );
+                        console.log('[Override] result:', result);
+                        if (!result.success) {
+                          setSpotActionsResult({ type: 'error', title: 'Override Failed', message: result.message });
+                          return;
+                        }
+                        // Optimistic update — next poll will confirm from effective_status
+                        setParkingData(prev => prev.map(s =>
+                          s.id === spotActionsTarget?.id
+                            ? { ...s, isOccupied: overrideStatus === 'occupied', effectiveStatus: overrideStatus, manualOverride: true }
+                            : s
+                        ));
+                        setShowSpotActionsModal(false);
+                        setSpotActionsResult({ type: 'success', title: 'Override Applied', message: result.message });
+                      } catch {
+                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to apply override. Please try again.' });
+                      } finally {
+                        setIsSubmittingOverride(false);
+                      }
+                    }}
+                  >
+                    {isSubmittingOverride
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={styles.parkingConfirmYesButtonText}>Apply Override</Text>}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.parkingConfirmNoButton}
+                    onPress={() => setShowSpotActionsModal(false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.spotActionsContent}>
+                <Text style={styles.spotActionsLabel}>Describe the issue:</Text>
+
+                {/* Quick issue chips */}
+                <View style={styles.spotActionsChipsRow}>
+                  {['Sensor malfunction', 'Spot blocked', 'Unauthorized vehicle', 'Damaged spot', 'Other'].map(issue => (
+                    <TouchableOpacity
+                      key={issue}
+                      onPress={() => setReportIssue(issue)}
+                      style={[
+                        styles.spotActionsChip,
+                        { backgroundColor: reportIssue === issue ? COLORS.primary : '#f0f0f0', borderColor: reportIssue === issue ? COLORS.primary : '#ddd' },
+                      ]}
+                    >
+                      <Text style={[styles.spotActionsChipText, { color: reportIssue === issue ? '#fff' : '#555' }]}>
+                        {issue}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={styles.spotActionsTextArea}
+                  placeholder="Tap a quick issue above or describe the problem..."
+                  placeholderTextColor="#bbb"
+                  multiline
+                  value={reportIssue}
+                  onChangeText={setReportIssue}
+                />
+
+                <View style={styles.parkingConfirmButtonsContainer}>
+                  <TouchableOpacity
+                    style={styles.parkingConfirmYesButton}
+                    disabled={isSubmittingReport}
+                    activeOpacity={0.8}
+                    onPress={async () => {
+                      if (!reportIssue.trim()) {
+                        setSpotActionsResult({ type: 'warning', title: 'Issue Required', message: 'Please describe or select an issue before submitting.' });
+                        return;
+                      }
+                      setIsSubmittingReport(true);
+                      try {
+                        await new Promise(r => setTimeout(r, 800));
+                        setShowSpotActionsModal(false);
+                        setSpotActionsResult({ type: 'success', title: 'Report Submitted', message: `Issue reported for spot ${spotActionsTarget?.id}.` });
+                      } catch {
+                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to submit report. Please try again.' });
+                      } finally {
+                        setIsSubmittingReport(false);
+                      }
+                    }}
+                  >
+                    {isSubmittingReport
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={styles.parkingConfirmYesButtonText}>Submit Report</Text>}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.parkingConfirmNoButton}
+                    onPress={() => setShowSpotActionsModal(false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Spot Actions Result Modal */}
+      <Modal
+        visible={spotActionsResult !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSpotActionsResult(null)}
+      >
+        <View style={styles.parkingConfirmOverlay}>
+          <View style={styles.parkingConfirmContainer}>
+            <Text style={styles.parkingConfirmTitle}>{spotActionsResult?.title}</Text>
+            <Text style={styles.parkingConfirmMessage}>{spotActionsResult?.message}</Text>
+            <View style={styles.parkingConfirmYesButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.parkingConfirmYesButton, { flex: 1, backgroundColor:
+                  spotActionsResult?.type === 'success' ? COLORS.green :
+                  spotActionsResult?.type === 'warning' ? '#FF9800' : COLORS.primary,
+                }]}
+                onPress={() => setSpotActionsResult(null)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.parkingConfirmYesButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

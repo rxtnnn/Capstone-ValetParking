@@ -431,7 +431,8 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 };
 
 const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRoute, setCurrentRoute] = useState('Home');
+  const { isAuthenticated } = useAuth();
+  const [currentRoute, setCurrentRoute] = useState(() => isAuthenticated ? 'Home' : 'Splash');
   const [navReady, setNavReady] = useState(false);
   const navigationRef = React.useRef<any>(null);
   const { user } = useAuth();
@@ -473,9 +474,13 @@ const AppNavigator: React.FC = () => {
   };
 
   useEffect(() => {
+    const isExpoGo = Constants.appOwnership === 'expo';
+
     const initializeApp = async () => {
       try {
-        await registerForPushNotificationsAsync();
+        if (!isExpoGo) {
+          await registerForPushNotificationsAsync();
+        }
         await NotificationService.initialize();
       } catch (error) {
         console.error('Error during app initialization:', error);
@@ -483,56 +488,57 @@ const AppNavigator: React.FC = () => {
     };
 
     initializeApp();
-    
-    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      const data = notification.request.content.data;
-      // Handle incoming RFID alerts from backend push notifications
-      if (data?.type === 'rfid_alert') {
-        // RFID alert received via push notification - handled by RfidSecurityService polling
-        console.log('RFID alert received via push:', data);
-      }
-    });
 
-    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      const notificationData = response.notification.request.content.data;
-      if (notificationData?.type === 'spot-available') {
-        Alert.alert(
-          'Parking Spot Available!',
-          'Tap OK to view the parking map.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'View Map', onPress: () => console.log('Navigate to parking map') }
-          ]
-        );
-      } else if (notificationData?.type === 'feedback-reply') {
-        Alert.alert(
-          'Admin Reply Received',
-          'You have a new reply to your feedback.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'View Reply', onPress: () => console.log('Navigate to feedback replies') }
-          ]
-        );
-      } else if (notificationData?.type === 'rfid_alert') {
-        Alert.alert(
-          String(notificationData?.title || 'RFID Security Alert'),
-          `${notificationData?.rfid_uid || 'Unknown'} detected at ${notificationData?.reader_location || 'Unknown location'}`,
-          [
-            { text: 'OK', style: 'default' },
-          ]
-        );
-      } else {
-        Alert.alert('VALET Notification', 'Notification received!');
-      }
-    });
+    let notificationListener: Notifications.EventSubscription | null = null;
+    let responseListener: Notifications.EventSubscription | null = null;
+
+    if (!isExpoGo) {
+      notificationListener = Notifications.addNotificationReceivedListener(notification => {
+        const data = notification.request.content.data;
+        if (data?.type === 'rfid_alert') {
+          console.log('RFID alert received via push:', data);
+        }
+      });
+
+      responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+        const notificationData = response.notification.request.content.data;
+        if (notificationData?.type === 'spot-available') {
+          Alert.alert(
+            'Parking Spot Available!',
+            'Tap OK to view the parking map.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'View Map', onPress: () => console.log('Navigate to parking map') }
+            ]
+          );
+        } else if (notificationData?.type === 'feedback-reply') {
+          Alert.alert(
+            'Admin Reply Received',
+            'You have a new reply to your feedback.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'View Reply', onPress: () => console.log('Navigate to feedback replies') }
+            ]
+          );
+        } else if (notificationData?.type === 'rfid_alert') {
+          Alert.alert(
+            String(notificationData?.title || 'RFID Security Alert'),
+            `${notificationData?.rfid_uid || 'Unknown'} detected at ${notificationData?.reader_location || 'Unknown location'}`,
+            [{ text: 'OK', style: 'default' }]
+          );
+        } else {
+          Alert.alert('VALET Notification', 'Notification received!');
+        }
+      });
+    }
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      return false; 
+      return false;
     });
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationListener);
-      Notifications.removeNotificationSubscription(responseListener);
+      notificationListener?.remove();
+      responseListener?.remove();
       backHandler.remove();
     };
   }, []);
@@ -804,20 +810,23 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
     });
   }
 
-  if (Device.isDevice) {
+  // Remote push tokens are not supported in Expo Go SDK 53+
+  const isExpoGo = Constants.appOwnership === 'expo';
+
+  if (Device.isDevice && !isExpoGo) {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
-    
+
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
-    
+
     if (finalStatus !== 'granted') {
       console.warn('Push notification permissions not granted');
       return;
     }
-    
+
     try {
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig?.extra?.eas?.projectId,
@@ -827,6 +836,8 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
     } catch (error) {
       console.error('Error getting push token:', error);
     }
+  } else if (isExpoGo) {
+    console.log('Running in Expo Go: skipping remote push token. Local notifications work normally.');
   } else {
     console.warn('Must use physical device for Push Notifications');
   }
