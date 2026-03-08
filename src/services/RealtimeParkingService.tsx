@@ -432,7 +432,7 @@ class RealTimeParkingServiceClass {
       .then(settings => {
         for (const newFloor of newData.floors) {
           const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-          if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates) {
+          if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && !NotificationManager.isSpotNotificationsPaused()) {
             NotificationService.showFloorUpdateNotification(
               newFloor.floor,
               newFloor.available,

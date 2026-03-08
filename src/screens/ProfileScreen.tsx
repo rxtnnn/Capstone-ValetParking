@@ -334,22 +334,10 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, [authUser]);
 
-  const loadUserStats = useCallback(async (userId: number) => {
-    if (!isMountedRef.current) return;
-    
-    try {
-      const mockStats: UserStats = {
-        totalParkingSessions: Math.floor(Math.random() * 50) + 10,
-        hoursParked: Math.floor(Math.random() * 200) + 50,
-        favoriteFloor: Math.floor(Math.random() * 4) + 1,
-        lastParked: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-      
-      if (isMountedRef.current) {
-        setUserStats(mockStats);
-      }
-    } catch (error) {
-      console.log('Error loading user stats:', error);
+  const loadUserStats = useCallback(async (_userId: number) => {
+    // Stats not yet available from API
+    if (isMountedRef.current) {
+      setUserStats(null);
     }
   }, []);
 

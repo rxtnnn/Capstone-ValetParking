@@ -16,6 +16,7 @@ import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation
 import { useAuth } from '../context/AuthContext';
 import { NotificationSettings } from '../services/NotificationService';
 import { NotificationManager } from '../services/NotifManager';
+import * as Notifications from 'expo-notifications';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { styles } from './styles/SettingsScreen.style';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -305,6 +306,11 @@ const SettingsScreen: React.FC = () => {
     if (savingSettings.has(key)) return;
     const updated = { ...notificationSettings, [key]: value };
     saveNotificationSettings(updated, key);
+    // Dismiss existing device notifications when turning off spot or floor toggles
+    if (!value && (key === 'spotAvailable' || key === 'floorUpdates')) {
+      Notifications.dismissAllNotificationsAsync();
+      Notifications.cancelAllScheduledNotificationsAsync();
+    }
   }, [notificationSettings, saveNotificationSettings, savingSettings]);
 
   const performLogout = useCallback(async () => {

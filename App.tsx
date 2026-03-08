@@ -431,7 +431,8 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 };
 
 const NavigationWithTabBar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRoute, setCurrentRoute] = useState('Home');
+  const { isAuthenticated } = useAuth();
+  const [currentRoute, setCurrentRoute] = useState(() => isAuthenticated ? 'Home' : 'Splash');
   const [navReady, setNavReady] = useState(false);
   const navigationRef = React.useRef<any>(null);
   const { user } = useAuth();
