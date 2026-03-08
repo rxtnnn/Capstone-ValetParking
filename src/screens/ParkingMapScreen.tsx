@@ -504,9 +504,10 @@ const ParkingMapScreen: React.FC = () => {
     setHighlightedSpots([]);
   }, []);
 
-  const handleParkingConfirm = useCallback(() => {
-    // Pause spot notifications when user confirms they've parked
-    NotificationManager.pauseSpotNotifications();
+  const handleParkingConfirm = useCallback(async () => {
+    // TODO: remove setRfidEntryDetected(true) when RFID hardware is available for testing
+    NotificationManager.setRfidEntryDetected(true);
+    await NotificationManager.pauseSpotNotifications();
     setShowParkingConfirmModal(false);
     setNavigatingToSpot(null);
     clearNavigation();

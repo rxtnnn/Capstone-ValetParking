@@ -5,6 +5,7 @@ import { Platform, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TokenManager } from '../config/api';
 import apiClient from '../config/api';
+import { NotificationManager } from './NotifManager';
 
 export interface NotificationSettings {
   spotAvailable: boolean;
@@ -274,12 +275,24 @@ class NotificationServiceClass {
   }
 
   async showSpotAvailableNotificationSmart(
-    spotsAvailable: number, 
-    floor?: number, 
+    spotsAvailable: number,
+    floor?: number,
     spotIds?: string[],
     forceShow: boolean = false
   ): Promise<void> {
     if (spotsAvailable <= 0) return;
+    if (!forceShow && NotificationManager.isSpotNotificationsPaused()) return;
+
+    // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
+    if (!forceShow) {
+      try {
+        const userId = TokenManager.getUser()?.id;
+        if (userId) {
+          const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
+          if (stored === 'true') return;
+        }
+      } catch { /* ignore */ }
+    }
 
     try {
       const settings = await this.getNotificationSettings();
@@ -338,12 +351,24 @@ class NotificationServiceClass {
   }
 
   async showFloorUpdateNotification(
-    floor: number, 
+    floor: number,
     availableSpots: number,
     totalSpots: number,
     previousAvailable?: number
   ): Promise<void> {
     if (availableSpots <= 0) return;
+
+    // Check in-memory flag (fast path)
+    if (NotificationManager.isSpotNotificationsPaused()) return;
+
+    // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
+    try {
+      const userId = TokenManager.getUser()?.id;
+      if (userId) {
+        const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
+        if (stored === 'true') return;
+      }
+    } catch { /* ignore */ }
 
     try {
       const settings = await this.getNotificationSettings();
@@ -617,12 +642,6 @@ class NotificationServiceClass {
     return this.showSpotAvailableNotificationSmart(spotsAvailable, floor, spotIds, false);
   }
   
-  async simulateParkingNotifications(): Promise<void> {
-    await this.showSpotAvailableNotification(1, 4, ['4B1']);
-    setTimeout(() => this.showSpotAvailableNotification(3, 4, ['4B2', '4B3', '4C1']), 2000);
-    setTimeout(() => this.showFloorUpdateNotification(4, 5, 42, 2), 4000);
-  }
-
   getStatus() {
     const user = TokenManager.getUser();
     return {

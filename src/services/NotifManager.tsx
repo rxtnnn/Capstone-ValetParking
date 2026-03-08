@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
   getNotificationUserId, setNotificationUserId } from '../types/NotifTypes';
@@ -23,8 +24,9 @@ class NotificationManagerClass {
   private processedReplies = new Set<string>();
   private currentUserId: number | null = null;
   private userChangeListeners: (() => void)[] = [];
-  private isInitializing = false; // FIX: Prevent race conditions
-  private spotNotificationsPaused = false; // Flag to pause spot notifications when user has parked
+  private isInitializing = false;
+  private spotNotificationsPaused = false; 
+  private rfidEntryDetected = false; 
 
   constructor() {
     this.init();
@@ -43,7 +45,8 @@ class NotificationManagerClass {
 
   private async loadSpotNotificationsPaused(): Promise<void> {
     try {
-      const userId = this.currentUserId;
+      const userId = this.currentUserId ?? TokenManager.getUser()?.id;
+      if (!userId) return;
       const key = `${STORAGE_KEYS.SPOT_NOTIFS_PAUSED}_${userId}`;
       const stored = await AsyncStorage.getItem(key);
       this.spotNotificationsPaused = stored === 'true';
@@ -54,11 +57,12 @@ class NotificationManagerClass {
 
   private async saveSpotNotificationsPaused(): Promise<void> {
     try {
-      const userId = this.currentUserId;
+      const userId = this.currentUserId ?? TokenManager.getUser()?.id;
+      if (!userId) return;
       const key = `${STORAGE_KEYS.SPOT_NOTIFS_PAUSED}_${userId}`;
       await AsyncStorage.setItem(key, String(this.spotNotificationsPaused));
     } catch {
-      // ignore
+     
     }
   }
 
@@ -71,12 +75,10 @@ class NotificationManagerClass {
     }, 1000);
   }
 
-  // FIX: Improved user change handling
   private async handleUserChange(newUserId: number | null): Promise<void> {
     if (this.isInitializing) return; // Prevent multiple simultaneous changes
     
     this.isInitializing = true;
-    const oldUserId = this.currentUserId;
     
     try {
       // Update current user immediately to prevent mismatch warnings
@@ -90,9 +92,10 @@ class NotificationManagerClass {
       if (newUserId) {
         await Promise.all([
           this.loadNotifications(),
-          this.loadProcessedReplies()
+          this.loadProcessedReplies(),
+          this.loadSpotNotificationsPaused(),
         ]);
-      } 
+      }
 
       // Notify all listeners about the change
       this.notifyListeners();
@@ -119,7 +122,6 @@ class NotificationManagerClass {
     };
   }
 
-  // FIX: Better user ID setting with immediate update
   async setCurrentUserId(userId: number | null): Promise<void> {
     if (userId !== this.currentUserId && !this.isInitializing) {
       await this.handleUserChange(userId);
@@ -628,20 +630,37 @@ class NotificationManagerClass {
     this.notifyListeners();
   }
 
-  // Pause spot notifications when user has parked
-  pauseSpotNotifications(): void {
+  setRfidEntryDetected(detected: boolean): void {
+    this.rfidEntryDetected = detected;
+  }
+
+  isRfidEntryDetected(): boolean {
+    return this.rfidEntryDetected;
+  }
+
+  // Pause spot notifications when user has parked — only takes effect if RFID entry was detected
+  async pauseSpotNotifications(): Promise<void> {
+    if (!this.rfidEntryDetected) {
+      return;
+    }
     this.spotNotificationsPaused = true;
-    this.saveSpotNotificationsPaused();
+    await this.saveSpotNotificationsPaused(); 
+    Notifications.dismissAllNotificationsAsync();
+    Notifications.cancelAllScheduledNotificationsAsync();
   }
 
-  // Resume spot notifications when user leaves or wants notifications again
-  resumeSpotNotifications(): void {
+  async resumeSpotNotifications(): Promise<void> {
     this.spotNotificationsPaused = false;
-    this.saveSpotNotificationsPaused();
+    this.rfidEntryDetected = false;
+    await this.saveSpotNotificationsPaused();
   }
 
-  // Check if spot notifications are paused
   isSpotNotificationsPaused(): boolean {
+    return this.spotNotificationsPaused;
+  }
+
+  async syncPausedStateFromStorage(): Promise<boolean> {
+    await this.loadSpotNotificationsPaused();
     return this.spotNotificationsPaused;
   }
 }
