@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
+import { RfidSecurityService } from '../services/RfidSecurityService';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,6 +14,7 @@ import { NotificationManager } from '../services/NotifManager';
 import NotificationOverlay from '../components/NotifOverlay';
 import { useFeedback } from '../hooks/useFeedback';
 import {COLORS} from '../constants/AppConst';
+import { TokenManager } from '../config/api';
 
 
 type RootStackParamList = {
@@ -144,6 +146,7 @@ const HomeScreen: React.FC = () => {
     parkingUpdates?: () => void;
     connectionStatus?: () => void;
     notifications?: () => void;
+    rfidScans?: () => void;
   }>({});
 
   const getFloorName = (floorNum: number) => {
@@ -208,7 +211,10 @@ const HomeScreen: React.FC = () => {
           prev.available > current.available ? prev : current
         );
 
-        NotificationManager.addSpotAvailableNotification(increase, bestFloor.floor);
+        const userRole = TokenManager.getUser()?.role;
+        if (userRole === 'user' && !NotificationManager.isSpotNotificationsPaused()) {
+          NotificationManager.addSpotAvailableNotification(increase, bestFloor.floor);
+        }
       }
       setLastParkingData(newData);
     } catch (error) {
@@ -265,6 +271,13 @@ const HomeScreen: React.FC = () => {
 
     unsubscribeFunctionsRef.current.parkingUpdates = unsubscribeParkingUpdates;
     unsubscribeFunctionsRef.current.connectionStatus = unsubscribeConnectionStatus;
+
+    if (!unsubscribeFunctionsRef.current.rfidScans) {
+      const unsubscribeRfid = RfidSecurityService.onScanUpdate(() => {
+        // entry/exit detection for current user happens inside RfidSecurityService
+      });
+      unsubscribeFunctionsRef.current.rfidScans = unsubscribeRfid;
+    }
 
     setTimeout(() => {
       if (isMountedRef.current && loading) {

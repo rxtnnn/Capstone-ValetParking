@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { FONTS } from '../../constants/AppConst';
+import { COLORS, FONTS } from '../../constants/AppConst';
 
 export const mapLayoutStyles = StyleSheet.create({
   // Elevators
@@ -46,8 +46,6 @@ export const mapLayoutStyles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: FONTS.semiBold,
   },
-  
-  // Stairs
   stairs: {
     position: 'absolute',
     left: 30,
@@ -67,8 +65,6 @@ export const mapLayoutStyles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: FONTS.regular,
   },
-  
-  // Entrance
   entrance: {
     position: 'absolute',
     right: 90,
@@ -83,7 +79,7 @@ export const mapLayoutStyles = StyleSheet.create({
   },
   entranceText: {
     color: 'black',
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: FONTS.semiBold,
     textAlign: 'center',
   },
@@ -93,7 +89,7 @@ export const mapLayoutStyles = StyleSheet.create({
     position: 'absolute',
     right: 120,
     top: 400,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.primary,
     padding: 8,
     borderRadius: 4,
     width: 100,
@@ -108,7 +104,6 @@ export const mapLayoutStyles = StyleSheet.create({
     fontFamily: FONTS.semiBold,
   },
   
-  // Arrows
   arrow1: { position: 'absolute', right: 140, top: 170 },
   arrow2: { position: 'absolute', right: 160, top: 120 },
   arrow3: { position: 'absolute', right: 230, top: 120 },
