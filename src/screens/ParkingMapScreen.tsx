@@ -913,6 +913,20 @@ const ParkingMapScreen: React.FC = () => {
         <Text style={styles.refreshText}>Refresh</Text>
       </TouchableOpacity>
 
+      {/* Legend */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 6, gap: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+        {[
+          { color: '#48D666', label: 'Available' },
+          { color: '#B22020', label: 'Occupied' },
+          { color: '#CCCCCC', label: 'No Sensor' },
+        ].map(({ color, label }) => (
+          <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: color }} />
+            <Text style={{ fontSize: 11, color: '#444', fontFamily: FONTS.regular }}>{label}</Text>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
           <GestureDetector gesture={mapGesture}>
@@ -975,10 +989,6 @@ const ParkingMapScreen: React.FC = () => {
 
       {showNavigation && (
         <View style={{ position: 'absolute', top: 150, right: 20, gap: 10, zIndex: 2000 }}>
-          <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.green }]} onPress={() => setShowParkingConfirmModal(true)}>
-            <Ionicons name="checkmark-circle" size={20} color="white" />
-            <Text style={styles.clearRouteText}>I've Parked</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.primary }]} onPress={clearNavigation}>
             <Ionicons name="close-circle" size={20} color="white" />
             <Text style={styles.clearRouteText}>Clear Route</Text>
