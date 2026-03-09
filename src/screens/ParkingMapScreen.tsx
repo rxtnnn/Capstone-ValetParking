@@ -93,10 +93,13 @@ const ParkingMapScreen: React.FC = () => {
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
   const [spotActionsTab, setSpotActionsTab] = useState<'override' | 'report'>('override');
-  const [overrideStatus, setOverrideStatus] = useState<'available' | 'occupied' | 'blocked'>('available');
+  const [overrideStatus, setOverrideStatus] = useState<'available' | 'occupied'>('available');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overrideCustomReason, setOverrideCustomReason] = useState('');
   const [overridePin, setOverridePin] = useState('');
   const [reportIssue, setReportIssue] = useState('');
   const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
+  const [isClearingOverride, setIsClearingOverride] = useState(false);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const isSecurityRole = TokenManager.getUser()?.role === 'security';
   const [spotActionsResult, setSpotActionsResult] = useState<{ type: 'success' | 'warning' | 'error'; title: string; message: string } | null>(null);
@@ -562,6 +565,8 @@ const ParkingMapScreen: React.FC = () => {
       setSpotActionsTarget(spot);
       setOverrideStatus(spot.isOccupied ? 'occupied' : 'available');
       setOverridePin('');
+      setOverrideReason('');
+      setOverrideCustomReason('');
       setReportIssue('');
       setSpotActionsTab('override');
       setShowSpotActionsModal(true);
@@ -1368,11 +1373,43 @@ const ParkingMapScreen: React.FC = () => {
 
             {spotActionsTab === 'override' ? (
               <View style={styles.spotActionsContent}>
+                {/* Clear Override button — shown only when spot has active override */}
+                {spotActionsTarget?.manualOverride && (
+                  <TouchableOpacity
+                    disabled={isClearingOverride}
+                    activeOpacity={0.8}
+                    style={{ backgroundColor: '#FF9800', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginBottom: 14 }}
+                    onPress={async () => {
+                      const spaceId = spotActionsTarget?.spaceId;
+                      if (!spaceId) return;
+                      setIsClearingOverride(true);
+                      try {
+                        const result = await RealTimeParkingService.clearOverride(spaceId, TokenManager.getToken() ?? '');
+                        setParkingData(prev => prev.map(s =>
+                          s.id === spotActionsTarget?.id
+                            ? { ...s, manualOverride: false, effectiveStatus: s.isOccupied ? 'occupied' : 'available' }
+                            : s
+                        ));
+                        setShowSpotActionsModal(false);
+                        setSpotActionsResult({ type: 'success', title: 'Override Cleared', message: result.message });
+                      } catch {
+                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to clear override.' });
+                      } finally {
+                        setIsClearingOverride(false);
+                      }
+                    }}
+                  >
+                    {isClearingOverride
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Clear Override</Text>}
+                  </TouchableOpacity>
+                )}
+
                 <Text style={styles.spotActionsLabel}>Set Status:</Text>
                 <View style={styles.spotActionsStatusRow}>
-                  {(['available', 'occupied', 'blocked'] as const).map((s) => {
-                    const icons = { available: 'checkmark-circle', occupied: 'car', blocked: 'ban' } as const;
-                    const colors = { available: COLORS.green, occupied: COLORS.primary, blocked: '#FF9800' };
+                  {(['available', 'occupied'] as const).map((s) => {
+                    const icons = { available: 'checkmark-circle', occupied: 'car' } as const;
+                    const colors = { available: COLORS.green, occupied: COLORS.primary };
                     const isSelected = overrideStatus === s;
                     return (
                       <TouchableOpacity
@@ -1385,16 +1422,38 @@ const ParkingMapScreen: React.FC = () => {
                       >
                         <Ionicons name={icons[s]} size={24} color={isSelected ? colors[s] : '#aaa'} />
                         <Text style={[styles.spotActionsStatusOptionText, { color: isSelected ? colors[s] : '#aaa' }]}>
-                          {s}
+                          {s.charAt(0).toUpperCase() + s.slice(1)}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
 
-                <Text style={styles.spotActionsHint}>
-                  Override will automatically expire in 1 hour or when sensor detects a change.
-                </Text>
+                <Text style={[styles.spotActionsLabel, { marginTop: 12 }]}>Reason:</Text>
+                <View style={styles.spotActionsChipsRow}>
+                  {['Sensor not detecting vehicle', 'Hardware malfunction', 'Spot under maintenance', 'Other'].map(r => (
+                    <TouchableOpacity
+                      key={r}
+                      onPress={() => { setOverrideReason(r); if (r !== 'Other') setOverrideCustomReason(''); }}
+                      style={[
+                        styles.spotActionsChip,
+                        { backgroundColor: overrideReason === r ? COLORS.primary : '#f0f0f0', borderColor: overrideReason === r ? COLORS.primary : '#ddd' },
+                      ]}
+                    >
+                      <Text style={[styles.spotActionsChipText, { color: overrideReason === r ? '#fff' : '#555' }]}>{r}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {overrideReason === 'Other' && (
+                  <TextInput
+                    style={[styles.spotActionsTextArea, { marginTop: 6, minHeight: 56 }]}
+                    placeholder="Describe the reason..."
+                    placeholderTextColor="#bbb"
+                    multiline
+                    value={overrideCustomReason}
+                    onChangeText={setOverrideCustomReason}
+                  />
+                )}
 
                 <View style={styles.spotActionsDivider} />
 
@@ -1420,8 +1479,13 @@ const ParkingMapScreen: React.FC = () => {
                         setSpotActionsResult({ type: 'warning', title: 'PIN Required', message: 'Please enter a 4-digit PIN to confirm the override.' });
                         return;
                       }
-                      const currentStatus = spotActionsTarget?.isOccupied ? 'occupied' : 'available';
-                      if (overrideStatus === currentStatus) {
+                      const finalReason = overrideReason === 'Other' ? overrideCustomReason.trim() : overrideReason;
+                      if (!finalReason) {
+                        setSpotActionsResult({ type: 'warning', title: 'Reason Required', message: 'Please select or enter a reason for the override.' });
+                        return;
+                      }
+                      const currentEffective = spotActionsTarget?.effectiveStatus ?? (spotActionsTarget?.isOccupied ? 'occupied' : 'available');
+                      if (overrideStatus === currentEffective) {
                         setSpotActionsResult({ type: 'warning', title: 'No Changes Made', message: `Spot ${spotActionsTarget?.id} is already set to ${overrideStatus}.` });
                         return;
                       }
@@ -1429,7 +1493,6 @@ const ParkingMapScreen: React.FC = () => {
                       try {
                         const token = TokenManager.getToken();
                         const spaceId = spotActionsTarget?.spaceId;
-                        console.log('[Override] spaceId:', spaceId, 'spot:', spotActionsTarget?.id, 'status:', overrideStatus, 'token:', token ? 'present' : 'missing');
                         if (!spaceId) {
                           setSpotActionsResult({ type: 'error', title: 'Error', message: `Spot ID not found for ${spotActionsTarget?.id}. Please wait for data to load and try again.` });
                           return;
@@ -1438,14 +1501,23 @@ const ParkingMapScreen: React.FC = () => {
                           spaceId,
                           overrideStatus,
                           overridePin,
-                          token ?? ''
+                          token ?? '',
+                          finalReason
                         );
-                        console.log('[Override] result:', result);
                         if (!result.success) {
                           setSpotActionsResult({ type: 'error', title: 'Override Failed', message: result.message });
                           return;
                         }
-                        // Optimistic update — next poll will confirm from effective_status
+                        // Notify admin/ssd via bell
+                        const guardName = TokenManager.getUser()?.name ?? 'Guard';
+                        NotificationManager.addOverrideNotification({
+                          spotCode: spotActionsTarget?.id ?? '',
+                          newStatus: overrideStatus,
+                          guardName,
+                          floor: floorNumber,
+                          reason: finalReason,
+                        });
+                        // Optimistic update
                         setParkingData(prev => prev.map(s =>
                           s.id === spotActionsTarget?.id
                             ? { ...s, isOccupied: overrideStatus === 'occupied', effectiveStatus: overrideStatus, manualOverride: true }

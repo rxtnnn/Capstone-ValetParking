@@ -469,7 +469,7 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  async overrideSpot(spaceId: number, status: 'available' | 'occupied' | 'blocked', pin: string, token: string): Promise<{ success: boolean; message: string }> {
+  async overrideSpot(spaceId: number, status: 'available' | 'occupied', pin: string, token: string, reason?: string): Promise<{ success: boolean; message: string }> {
     const url = `https://valet.up.railway.app/api/parking/${spaceId}/override`;
     try {
       const response = await fetch(url, {
@@ -479,7 +479,7 @@ class RealTimeParkingServiceClass {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ status, pin }),
+        body: JSON.stringify({ status, pin, reason }),
       });
 
       let data: any = {};
@@ -496,6 +496,33 @@ class RealTimeParkingServiceClass {
         setTimeout(() => this.fetchAndUpdate(), 300);
       }
       const message = data.message || (isSuccess ? 'Override applied successfully.' : `Request failed (${response.status})`);
+      return { success: isSuccess, message };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Network error. Please try again.' };
+    }
+  }
+
+  async clearOverride(spaceId: number, token: string): Promise<{ success: boolean; message: string }> {
+    const url = `https://valet.up.railway.app/api/parking/${spaceId}/override`;
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      let data: any = {};
+      const text = await response.text();
+      try { data = JSON.parse(text); } catch { /* non-JSON */ }
+      const isSuccess = data.success === true || (data.success === undefined && response.ok);
+      if (isSuccess) {
+        this.consecErrors = 0;
+        this.retryCount = 0;
+        setTimeout(() => this.fetchAndUpdate(), 300);
+      }
+      const message = data.message || (isSuccess ? 'Override cleared successfully.' : `Request failed (${response.status})`);
       return { success: isSuccess, message };
     } catch (error: any) {
       return { success: false, message: error.message || 'Network error. Please try again.' };

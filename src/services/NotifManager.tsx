@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
-  getNotificationUserId, setNotificationUserId } from '../types/NotifTypes';
+  getNotificationUserId, setNotificationUserId, SpotOverrideData } from '../types/NotifTypes';
 import { FeedbackData } from '../types/feedback';
 
 const STORAGE_KEYS = {
@@ -13,7 +13,8 @@ const STORAGE_KEYS = {
 } as const;
 
 const MAX_NOTIFICATIONS = 100;
-const ALLOWED_TYPES = ['spot_available', 'feedback_reply'] as const;
+const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_override'] as const;
+const ADMIN_ROLES = ['admin', 'ssd'] as const;
 const BLOCKED_TITLES = ['VALET Connected!', 'Connection Established', 'Welcome to VALET', 'System Ready', 'App Initialized'];
 
 type NotificationListener = (notifications: AppNotification[]) => void;
@@ -344,6 +345,32 @@ class NotificationManagerClass {
     await this.addNotification(notification);
     this.processedReplies.add(replyId);
     await this.saveProcessedReplies();
+  }
+
+  async addOverrideNotification(data: SpotOverrideData): Promise<void> {
+    const role = TokenManager.getUser()?.role as string | undefined;
+    if (!role || !ADMIN_ROLES.includes(role as any)) return;
+    if (!this.currentUserId) return;
+
+    const statusLabel = data.newStatus === 'available' ? 'Available' : 'Occupied';
+    const notification: CreateNotificationInput = {
+      type: 'spot_override',
+      title: `Spot ${data.spotCode} Overridden`,
+      message: `Floor ${data.floor} • ${statusLabel} • By ${data.guardName} • ${data.reason}`,
+      priority: 'high',
+      data: { ...data, userId: this.currentUserId },
+    };
+
+    const newNotification: AppNotification = {
+      ...notification,
+      id: `override_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      timestamp: Date.now(),
+      isRead: false,
+    } as AppNotification;
+
+    this.notifications.unshift(newNotification);
+    await this.saveNotifications();
+    this.notifyListeners();
   }
 
   async processFeedbackReplies(feedbackArray: FeedbackData[]): Promise<void> {
