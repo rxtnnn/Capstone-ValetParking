@@ -846,7 +846,8 @@ export const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 15,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: Math.min(Dimensions.get('window').width - 40, 420),
+    maxHeight: Dimensions.get('window').height * 0.85,
     overflow: 'hidden',
   },
   spotActionsModalHeader: {
@@ -950,7 +951,8 @@ export const styles = StyleSheet.create({
   },
   spotActionsContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 4,
+    paddingBottom: 24,
   },
   spotActionsLabel: {
     fontSize: 14,

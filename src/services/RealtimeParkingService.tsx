@@ -6,11 +6,7 @@ export interface ParkingSpace {
   id: number;
   sensor_id: number | null;
   is_occupied: boolean;
-  effective_status?: 'available' | 'occupied' | 'blocked';
-  manual_override?: boolean;
-  manual_status?: string | null;
-  manual_override_expires?: string | null;
-  manual_override_by?: string | null;
+  malfunctioned?: boolean;
   distance_cm: number | null;
   created_at: string;
   updated_at: string;
@@ -326,10 +322,8 @@ class RealTimeParkingServiceClass {
 
     for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
-      // Prefer effective_status from API (reflects manual overrides); fall back to is_occupied
-      const isAvailable = space.effective_status
-        ? space.effective_status === 'available'
-        : !space.is_occupied;
+      // Malfunctioned spots are excluded from available count
+      const isAvailable = !space.is_occupied && !space.malfunctioned;
 
       if (isAvailable) availableSpots++;
 
@@ -469,8 +463,8 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  async overrideSpot(spaceId: number, status: 'available' | 'occupied', pin: string, token: string, reason?: string): Promise<{ success: boolean; message: string }> {
-    const url = `https://valet.up.railway.app/api/parking/${spaceId}/override`;
+  async reportMalfunction(spaceId: number, reason: string, token: string): Promise<{ success: boolean; message: string }> {
+    const url = `https://valet.up.railway.app/api/parking/${spaceId}/malfunction`;
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -479,31 +473,25 @@ class RealTimeParkingServiceClass {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ status, pin, reason }),
+        body: JSON.stringify({ reason }),
       });
-
       let data: any = {};
       const text = await response.text();
-      console.log('[Override] HTTP status:', response.status, 'body:', text);
-      try { data = JSON.parse(text); } catch { /* non-JSON response */ }
-
-      // Backend may use data.success (bool) or HTTP 2xx as success signal
+      try { data = JSON.parse(text); } catch { /* non-JSON */ }
       const isSuccess = data.success === true || (data.success === undefined && response.ok);
       if (isSuccess) {
-        // Trigger immediate refresh so effective_status updates on the map
         this.consecErrors = 0;
         this.retryCount = 0;
         setTimeout(() => this.fetchAndUpdate(), 300);
       }
-      const message = data.message || (isSuccess ? 'Override applied successfully.' : `Request failed (${response.status})`);
-      return { success: isSuccess, message };
+      return { success: isSuccess, message: data.message || (isSuccess ? 'Malfunction reported.' : `Request failed (${response.status})`) };
     } catch (error: any) {
       return { success: false, message: error.message || 'Network error. Please try again.' };
     }
   }
 
-  async clearOverride(spaceId: number, token: string): Promise<{ success: boolean; message: string }> {
-    const url = `https://valet.up.railway.app/api/parking/${spaceId}/override`;
+  async clearMalfunction(spaceId: number, token: string): Promise<{ success: boolean; message: string }> {
+    const url = `https://valet.up.railway.app/api/parking/${spaceId}/malfunction`;
     try {
       const response = await fetch(url, {
         method: 'DELETE',
@@ -522,8 +510,7 @@ class RealTimeParkingServiceClass {
         this.retryCount = 0;
         setTimeout(() => this.fetchAndUpdate(), 300);
       }
-      const message = data.message || (isSuccess ? 'Override cleared successfully.' : `Request failed (${response.status})`);
-      return { success: isSuccess, message };
+      return { success: isSuccess, message: data.message || (isSuccess ? 'Malfunction cleared.' : `Request failed (${response.status})`) };
     } catch (error: any) {
       return { success: false, message: error.message || 'Network error. Please try again.' };
     }

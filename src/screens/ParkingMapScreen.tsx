@@ -6,6 +6,8 @@ import {
   Alert,
   StatusBar,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   ActivityIndicator,
   Modal,
   TextInput,
@@ -37,10 +39,9 @@ type ParkingMapScreenNavigationProp = NavigationProp<RootStackParamList>;
 type ParkingMapScreenRouteProp = RouteProp<RootStackParamList, 'ParkingMap'>;
 interface ParkingSpot {
   id: string;
-  spaceId?: number; // numeric DB id used for override API calls
+  spaceId?: number;
   isOccupied: boolean;
-  effectiveStatus?: 'available' | 'occupied' | 'blocked' | 'inactive';
-  manualOverride?: boolean;
+  malfunctioned?: boolean;
   position: { x: number; y: number };
   width?: number;
   height?: number;
@@ -89,19 +90,17 @@ const ParkingMapScreen: React.FC = () => {
   const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); // Highlight specific spots
   const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
 
-  // Security spot actions modal
+  // Spot actions modal
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
-  const [spotActionsTab, setSpotActionsTab] = useState<'override' | 'report'>('override');
-  const [overrideStatus, setOverrideStatus] = useState<'available' | 'occupied'>('available');
-  const [overrideReason, setOverrideReason] = useState('');
-  const [overrideCustomReason, setOverrideCustomReason] = useState('');
-  const [overridePin, setOverridePin] = useState('');
   const [reportIssue, setReportIssue] = useState('');
-  const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
-  const [isClearingOverride, setIsClearingOverride] = useState(false);
+  const [reportCustomReason, setReportCustomReason] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
-  const isSecurityRole = TokenManager.getUser()?.role === 'security';
+  const [isClearingMalfunction, setIsClearingMalfunction] = useState(false);
+  const userRole = TokenManager.getUser()?.role;
+  const isSecurityRole = userRole === 'security';
+  const isAdminRole = userRole === 'admin' || userRole === 'ssd';
+  const canAccessSpotActions = isSecurityRole || isAdminRole;
   const [spotActionsResult, setSpotActionsResult] = useState<{ type: 'success' | 'warning' | 'error'; title: string; message: string } | null>(null);
 
 
@@ -311,8 +310,7 @@ const ParkingMapScreen: React.FC = () => {
     // Build maps from API data using slot_name directly
     const spotOccupancyMap: { [key: string]: boolean } = {};
     const spotHasSensorMap: { [key: string]: boolean } = {};
-    const spotEffectiveStatusMap: { [key: string]: 'available' | 'occupied' | 'blocked' | 'inactive' } = {};
-    const spotManualOverrideMap: { [key: string]: boolean } = {};
+    const spotMalfunctionedMap: { [key: string]: boolean } = {};
     const spotSpaceIdMap: { [key: string]: number } = {};
 
     if (stats.sensorData && Array.isArray(stats.sensorData)) {
@@ -320,13 +318,8 @@ const ParkingMapScreen: React.FC = () => {
         if (sensor.slot_name) {
           spotSpaceIdMap[sensor.slot_name] = sensor.id;
           spotHasSensorMap[sensor.slot_name] = sensor.sensor_id !== null && sensor.sensor_id !== undefined;
-          if (sensor.effective_status) {
-            spotEffectiveStatusMap[sensor.slot_name] = sensor.effective_status;
-            spotOccupancyMap[sensor.slot_name] = sensor.effective_status !== 'available';
-          } else {
-            spotOccupancyMap[sensor.slot_name] = sensor.is_occupied === true || sensor.is_occupied === 1;
-          }
-          spotManualOverrideMap[sensor.slot_name] = sensor.manual_override === true;
+          spotOccupancyMap[sensor.slot_name] = sensor.is_occupied === true || sensor.is_occupied === 1;
+          spotMalfunctionedMap[sensor.slot_name] = sensor.malfunctioned === true;
         }
       });
     }
@@ -338,9 +331,8 @@ const ParkingMapScreen: React.FC = () => {
         ...spot,
         spaceId: spotSpaceIdMap.hasOwnProperty(spot.id) ? spotSpaceIdMap[spot.id] : spot.spaceId,
         hasSensor: spotHasSensorMap.hasOwnProperty(spot.id) ? spotHasSensorMap[spot.id] : spot.hasSensor,
-        effectiveStatus: spotEffectiveStatusMap.hasOwnProperty(spot.id) ? spotEffectiveStatusMap[spot.id] : spot.effectiveStatus,
-        manualOverride: spotManualOverrideMap.hasOwnProperty(spot.id) ? spotManualOverrideMap[spot.id] : spot.manualOverride,
         isOccupied: spotOccupancyMap.hasOwnProperty(spot.id) ? spotOccupancyMap[spot.id] : spot.isOccupied,
+        malfunctioned: spotMalfunctionedMap.hasOwnProperty(spot.id) ? spotMalfunctionedMap[spot.id] : spot.malfunctioned,
       }));
     });
 
@@ -560,15 +552,11 @@ const ParkingMapScreen: React.FC = () => {
   const handleSpotPress = useCallback((spot: ParkingSpot) => {
     if (!spot.hasSensor) return;
 
-    // Security can tap any sensor-assigned spot to get override/report modal
-    if (isSecurityRole) {
+    // Security and admin can tap any sensor-assigned spot
+    if (canAccessSpotActions) {
       setSpotActionsTarget(spot);
-      setOverrideStatus(spot.isOccupied ? 'occupied' : 'available');
-      setOverridePin('');
-      setOverrideReason('');
-      setOverrideCustomReason('');
       setReportIssue('');
-      setSpotActionsTab('override');
+      setReportCustomReason('');
       setShowSpotActionsModal(true);
       return;
     }
@@ -606,18 +594,15 @@ const ParkingMapScreen: React.FC = () => {
     let borderWidth = 0;
 
     if (spot.hasSensor) {
-      const status = spot.effectiveStatus;
-      if (status === 'blocked') {
+      if (spot.malfunctioned) {
         backgroundColor = '#FF9800';
-      } else if (status === 'inactive') {
-        backgroundColor = '#9E9E9E';
       } else {
         backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green;
       }
     }
 
-    // Security can interact with any sensor-assigned spot; others only available ones
-    const isClickable = spot.hasSensor && (isSecurityRole || !spot.isOccupied);
+    // Security and admin can interact with any sensor-assigned spot; others only available ones
+    const isClickable = spot.hasSensor && (canAccessSpotActions || !spot.isOccupied);
 
     return (
       <TouchableOpacity
@@ -636,7 +621,7 @@ const ParkingMapScreen: React.FC = () => {
         }}
         activeOpacity={isClickable ? 0.7 : 1}
       >
-        {spot.hasSensor && spot.isOccupied ? (
+        {spot.hasSensor && !spot.malfunctioned && spot.isOccupied ? (
           <View
             style={{
               width: w,
@@ -697,7 +682,7 @@ const ParkingMapScreen: React.FC = () => {
             }}
           />
         )}
-        {spot.manualOverride && (
+        {spot.malfunctioned && (
           <View
             pointerEvents="none"
             style={{
@@ -1320,300 +1305,194 @@ const ParkingMapScreen: React.FC = () => {
         </View>
       </View>
     </Modal>
-      {/* Security: Spot Actions Modal */}
+      {/* Spot Actions Modal — Flag as Malfunctioned */}
       <Modal
         visible={showSpotActionsModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowSpotActionsModal(false)}
       >
-        <View style={styles.parkingConfirmOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}
+        >
           <View style={styles.spotActionsModalContainer}>
 
-            {/* Icon + Title */}
-            <View style={styles.spotActionsIconContainer}>
-              <Ionicons name="shield-checkmark" size={36} color="#fff" />
+            {/* Red header */}
+            <View style={styles.spotActionsModalHeader}>
+              <View style={styles.spotActionsIconContainer}>
+                <Ionicons name="warning" size={28} color="#fff" />
+              </View>
+              <View style={styles.spotActionsHeaderText}>
+                <Text style={styles.spotActionsModalTitle} numberOfLines={1}>Flag as Malfunctioned</Text>
+                <Text style={styles.spotActionsModalSubtitle}>Spot {spotActionsTarget?.id}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowSpotActionsModal(false)}
+                style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+              >
+                <Ionicons name="close" size={18} color="#fff" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.parkingConfirmTitle}>Spot Actions</Text>
 
-            {/* Spot ID + Status badge */}
+            {/* Status badge */}
             <View style={styles.spotActionsSpotInfo}>
-              <Text style={styles.spotActionsSpotId}>{spotActionsTarget?.id}</Text>
-              <View style={[styles.spotActionsStatusBadge, { backgroundColor: spotActionsTarget?.isOccupied ? COLORS.primary : COLORS.green }]}>
+              <View style={[styles.spotActionsStatusBadge, {
+                backgroundColor: spotActionsTarget?.malfunctioned
+                  ? '#FF9800'
+                  : spotActionsTarget?.isOccupied ? COLORS.primary : COLORS.green,
+              }]}>
                 <Text style={styles.spotActionsStatusText}>
-                  {spotActionsTarget?.isOccupied ? 'Occupied' : 'Available'}
+                  {spotActionsTarget?.malfunctioned ? 'Malfunctioned'
+                    : spotActionsTarget?.isOccupied ? 'Occupied' : 'Available'}
                 </Text>
               </View>
             </View>
 
-            {/* Close button */}
-            <TouchableOpacity style={styles.spotActionsCloseButton} onPress={() => setShowSpotActionsModal(false)}>
-              <Ionicons name="close" size={20} color="#999" />
-            </TouchableOpacity>
-
-            {/* Tabs */}
-            <View style={styles.spotActionsTabs}>
-              <TouchableOpacity
-                style={[styles.spotActionsTab, spotActionsTab === 'override' ? styles.spotActionsTabActive : styles.spotActionsTabInactive]}
-                onPress={() => setSpotActionsTab('override')}
-              >
-                <Text style={[styles.spotActionsTabText, spotActionsTab === 'override' ? styles.spotActionsTabTextActive : styles.spotActionsTabTextInactive]}>
-                  Override Status
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.spotActionsTab, spotActionsTab === 'report' ? styles.spotActionsTabActive : styles.spotActionsTabInactive]}
-                onPress={() => setSpotActionsTab('report')}
-              >
-                <Text style={[styles.spotActionsTabText, spotActionsTab === 'report' ? styles.spotActionsTabTextActive : styles.spotActionsTabTextInactive]}>
-                  Report Issue
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {spotActionsTab === 'override' ? (
-              <View style={styles.spotActionsContent}>
-                {/* Clear Override button — shown only when spot has active override */}
-                {spotActionsTarget?.manualOverride && (
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.spotActionsContent}
+            >
+              {spotActionsTarget?.malfunctioned ? (
+                /* ── Already malfunctioned: show info + clear button ── */
+                <>
+                  <View style={{ backgroundColor: '#fff3cd', borderWidth: 1, borderColor: '#ffc107', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                    <Text style={{ fontSize: 13, color: '#856404', fontFamily: FONTS.semiBold }}>
+                      Already flagged as malfunctioned.
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#666', marginTop: 4, fontFamily: FONTS.regular }}>
+                      Tap "Clear Malfunction" to restore normal status.
+                    </Text>
+                  </View>
                   <TouchableOpacity
-                    disabled={isClearingOverride}
+                    disabled={isClearingMalfunction}
                     activeOpacity={0.8}
-                    style={{ backgroundColor: '#FF9800', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginBottom: 14 }}
+                    style={{ backgroundColor: COLORS.green, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 10 }}
                     onPress={async () => {
                       const spaceId = spotActionsTarget?.spaceId;
                       if (!spaceId) return;
-                      setIsClearingOverride(true);
+                      setIsClearingMalfunction(true);
                       try {
-                        const result = await RealTimeParkingService.clearOverride(spaceId, TokenManager.getToken() ?? '');
-                        setParkingData(prev => prev.map(s =>
-                          s.id === spotActionsTarget?.id
-                            ? { ...s, manualOverride: false, effectiveStatus: s.isOccupied ? 'occupied' : 'available' }
-                            : s
-                        ));
-                        setShowSpotActionsModal(false);
-                        setSpotActionsResult({ type: 'success', title: 'Override Cleared', message: result.message });
+                        const result = await RealTimeParkingService.clearMalfunction(spaceId, TokenManager.getToken() ?? '');
+                        if (result.success) {
+                          setParkingData(prev => prev.map(s =>
+                            s.id === spotActionsTarget?.id ? { ...s, malfunctioned: false } : s
+                          ));
+                          setShowSpotActionsModal(false);
+                          setSpotActionsResult({ type: 'success', title: 'Cleared', message: `Malfunction cleared for spot ${spotActionsTarget?.id}.` });
+                        } else {
+                          setSpotActionsResult({ type: 'error', title: 'Error', message: result.message });
+                        }
                       } catch {
-                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to clear override.' });
+                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to clear malfunction.' });
                       } finally {
-                        setIsClearingOverride(false);
+                        setIsClearingMalfunction(false);
                       }
                     }}
                   >
-                    {isClearingOverride
+                    {isClearingMalfunction
                       ? <ActivityIndicator color="#fff" size="small" />
-                      : <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Clear Override</Text>}
+                      : <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Clear Malfunction</Text>}
                   </TouchableOpacity>
-                )}
-
-                <Text style={styles.spotActionsLabel}>Set Status:</Text>
-                <View style={styles.spotActionsStatusRow}>
-                  {(['available', 'occupied'] as const).map((s) => {
-                    const icons = { available: 'checkmark-circle', occupied: 'car' } as const;
-                    const colors = { available: COLORS.green, occupied: COLORS.primary };
-                    const isSelected = overrideStatus === s;
-                    return (
+                  <TouchableOpacity style={styles.parkingConfirmNoButton} onPress={() => setShowSpotActionsModal(false)} activeOpacity={0.8}>
+                    <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                /* ── Report form ── */
+                <>
+                  <Text style={styles.spotActionsLabel}>
+                    Issue type <Text style={{ color: COLORS.primary }}>*</Text>
+                  </Text>
+                  <View style={styles.spotActionsChipsRow}>
+                    {['Sensor not detecting vehicles', 'Sensor hardware malfunction', 'Sensor offline / no data', 'Spot under maintenance or repair', 'Other'].map(issue => (
                       <TouchableOpacity
-                        key={s}
-                        onPress={() => setOverrideStatus(s)}
+                        key={issue}
+                        onPress={() => { setReportIssue(issue); if (issue !== 'Other') setReportCustomReason(''); }}
                         style={[
-                          styles.spotActionsStatusOption,
-                          { borderColor: isSelected ? colors[s] : '#e0e0e0', backgroundColor: isSelected ? colors[s] + '18' : '#fafafa' },
+                          styles.spotActionsChip,
+                          { backgroundColor: reportIssue === issue ? COLORS.primary : '#f0f0f0', borderColor: reportIssue === issue ? COLORS.primary : '#ddd' },
                         ]}
                       >
-                        <Ionicons name={icons[s]} size={24} color={isSelected ? colors[s] : '#aaa'} />
-                        <Text style={[styles.spotActionsStatusOptionText, { color: isSelected ? colors[s] : '#aaa' }]}>
-                          {s.charAt(0).toUpperCase() + s.slice(1)}
-                        </Text>
+                        <Text style={[styles.spotActionsChipText, { color: reportIssue === issue ? '#fff' : '#555' }]}>{issue}</Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                    ))}
+                  </View>
+                  {reportIssue === 'Other' && (
+                    <TextInput
+                      style={[styles.spotActionsTextArea, { marginTop: 6, minHeight: 56 }]}
+                      placeholder="Please describe the issue..."
+                      placeholderTextColor="#bbb"
+                      multiline
+                      value={reportCustomReason}
+                      onChangeText={setReportCustomReason}
+                    />
+                  )}
 
-                <Text style={[styles.spotActionsLabel, { marginTop: 12 }]}>Reason:</Text>
-                <View style={styles.spotActionsChipsRow}>
-                  {['Sensor not detecting vehicle', 'Hardware malfunction', 'Spot under maintenance', 'Other'].map(r => (
+                  <View style={styles.parkingConfirmButtonsContainer}>
                     <TouchableOpacity
-                      key={r}
-                      onPress={() => { setOverrideReason(r); if (r !== 'Other') setOverrideCustomReason(''); }}
-                      style={[
-                        styles.spotActionsChip,
-                        { backgroundColor: overrideReason === r ? COLORS.primary : '#f0f0f0', borderColor: overrideReason === r ? COLORS.primary : '#ddd' },
-                      ]}
+                      style={styles.parkingConfirmNoButton}
+                      onPress={() => setShowSpotActionsModal(false)}
+                      activeOpacity={0.8}
                     >
-                      <Text style={[styles.spotActionsChipText, { color: overrideReason === r ? '#fff' : '#555' }]}>{r}</Text>
+                      <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-                {overrideReason === 'Other' && (
-                  <TextInput
-                    style={[styles.spotActionsTextArea, { marginTop: 6, minHeight: 56 }]}
-                    placeholder="Describe the reason..."
-                    placeholderTextColor="#bbb"
-                    multiline
-                    value={overrideCustomReason}
-                    onChangeText={setOverrideCustomReason}
-                  />
-                )}
-
-                <View style={styles.spotActionsDivider} />
-
-                <Text style={styles.spotActionsPinLabel}>Enter PIN to confirm:</Text>
-                <TextInput
-                  style={styles.spotActionsPinInput}
-                  placeholder="* * * *"
-                  placeholderTextColor="#bbb"
-                  keyboardType="numeric"
-                  secureTextEntry
-                  maxLength={4}
-                  value={overridePin}
-                  onChangeText={setOverridePin}
-                />
-
-                <View style={styles.parkingConfirmButtonsContainer}>
-                  <TouchableOpacity
-                    style={styles.parkingConfirmYesButton}
-                    disabled={isSubmittingOverride}
-                    activeOpacity={0.8}
-                    onPress={async () => {
-                      if (overridePin.length < 4) {
-                        setSpotActionsResult({ type: 'warning', title: 'PIN Required', message: 'Please enter a 4-digit PIN to confirm the override.' });
-                        return;
-                      }
-                      const finalReason = overrideReason === 'Other' ? overrideCustomReason.trim() : overrideReason;
-                      if (!finalReason) {
-                        setSpotActionsResult({ type: 'warning', title: 'Reason Required', message: 'Please select or enter a reason for the override.' });
-                        return;
-                      }
-                      const currentEffective = spotActionsTarget?.effectiveStatus ?? (spotActionsTarget?.isOccupied ? 'occupied' : 'available');
-                      if (overrideStatus === currentEffective) {
-                        setSpotActionsResult({ type: 'warning', title: 'No Changes Made', message: `Spot ${spotActionsTarget?.id} is already set to ${overrideStatus}.` });
-                        return;
-                      }
-                      setIsSubmittingOverride(true);
-                      try {
-                        const token = TokenManager.getToken();
-                        const spaceId = spotActionsTarget?.spaceId;
-                        if (!spaceId) {
-                          setSpotActionsResult({ type: 'error', title: 'Error', message: `Spot ID not found for ${spotActionsTarget?.id}. Please wait for data to load and try again.` });
+                    <TouchableOpacity
+                      style={[styles.parkingConfirmYesButton, { backgroundColor: COLORS.primary }]}
+                      disabled={isSubmittingReport}
+                      activeOpacity={0.8}
+                      onPress={async () => {
+                        const finalReason = reportIssue === 'Other' ? reportCustomReason.trim() : reportIssue;
+                        if (!finalReason) {
+                          setSpotActionsResult({ type: 'warning', title: 'Issue Required', message: 'Please select or describe the sensor issue.' });
                           return;
                         }
-                        const result = await RealTimeParkingService.overrideSpot(
-                          spaceId,
-                          overrideStatus,
-                          overridePin,
-                          token ?? '',
-                          finalReason
-                        );
-                        if (!result.success) {
-                          setSpotActionsResult({ type: 'error', title: 'Override Failed', message: result.message });
-                          return;
+                        setIsSubmittingReport(true);
+                        try {
+                          const spaceId = spotActionsTarget?.spaceId;
+                          if (!spaceId) {
+                            setSpotActionsResult({ type: 'error', title: 'Error', message: `Spot ID not found for ${spotActionsTarget?.id}.` });
+                            return;
+                          }
+                          const result = await RealTimeParkingService.reportMalfunction(spaceId, finalReason, TokenManager.getToken() ?? '');
+                          if (!result.success) {
+                            setSpotActionsResult({ type: 'error', title: 'Report Failed', message: result.message });
+                            return;
+                          }
+                          // Optimistic: turn yellow immediately
+                          setParkingData(prev => prev.map(s =>
+                            s.id === spotActionsTarget?.id ? { ...s, malfunctioned: true } : s
+                          ));
+                          // Notify admin bell (only if security reported, not admin themselves)
+                          if (isSecurityRole) {
+                            NotificationManager.addOverrideNotification({
+                              spotCode: spotActionsTarget?.id ?? '',
+                              newStatus: 'available',
+                              guardName: TokenManager.getUser()?.name ?? 'Guard',
+                              floor: floorNumber,
+                              reason: `Malfunction report: ${finalReason}`,
+                            });
+                          }
+                          setShowSpotActionsModal(false);
+                          setSpotActionsResult({ type: 'success', title: 'Reported', message: `Spot ${spotActionsTarget?.id} flagged as malfunctioned. LED will turn yellow.` });
+                        } catch {
+                          setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to submit report. Please try again.' });
+                        } finally {
+                          setIsSubmittingReport(false);
                         }
-                        // Notify admin/ssd via bell
-                        const guardName = TokenManager.getUser()?.name ?? 'Guard';
-                        NotificationManager.addOverrideNotification({
-                          spotCode: spotActionsTarget?.id ?? '',
-                          newStatus: overrideStatus,
-                          guardName,
-                          floor: floorNumber,
-                          reason: finalReason,
-                        });
-                        // Optimistic update
-                        setParkingData(prev => prev.map(s =>
-                          s.id === spotActionsTarget?.id
-                            ? { ...s, isOccupied: overrideStatus === 'occupied', effectiveStatus: overrideStatus, manualOverride: true }
-                            : s
-                        ));
-                        setShowSpotActionsModal(false);
-                        setSpotActionsResult({ type: 'success', title: 'Override Applied', message: result.message });
-                      } catch {
-                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to apply override. Please try again.' });
-                      } finally {
-                        setIsSubmittingOverride(false);
-                      }
-                    }}
-                  >
-                    {isSubmittingOverride
-                      ? <ActivityIndicator color="#fff" size="small" />
-                      : <Text style={styles.parkingConfirmYesButtonText}>Apply Override</Text>}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.parkingConfirmNoButton}
-                    onPress={() => setShowSpotActionsModal(false)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.spotActionsContent}>
-                <Text style={styles.spotActionsLabel}>Describe the issue:</Text>
-
-                {/* Quick issue chips */}
-                <View style={styles.spotActionsChipsRow}>
-                  {['Sensor malfunction', 'Spot blocked', 'Unauthorized vehicle', 'Damaged spot', 'Other'].map(issue => (
-                    <TouchableOpacity
-                      key={issue}
-                      onPress={() => setReportIssue(issue)}
-                      style={[
-                        styles.spotActionsChip,
-                        { backgroundColor: reportIssue === issue ? COLORS.primary : '#f0f0f0', borderColor: reportIssue === issue ? COLORS.primary : '#ddd' },
-                      ]}
+                      }}
                     >
-                      <Text style={[styles.spotActionsChipText, { color: reportIssue === issue ? '#fff' : '#555' }]}>
-                        {issue}
-                      </Text>
+                      {isSubmittingReport
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={styles.parkingConfirmYesButtonText}>Flag Spot</Text>}
                     </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TextInput
-                  style={styles.spotActionsTextArea}
-                  placeholder="Tap a quick issue above or describe the problem..."
-                  placeholderTextColor="#bbb"
-                  multiline
-                  value={reportIssue}
-                  onChangeText={setReportIssue}
-                />
-
-                <View style={styles.parkingConfirmButtonsContainer}>
-                  <TouchableOpacity
-                    style={styles.parkingConfirmYesButton}
-                    disabled={isSubmittingReport}
-                    activeOpacity={0.8}
-                    onPress={async () => {
-                      if (!reportIssue.trim()) {
-                        setSpotActionsResult({ type: 'warning', title: 'Issue Required', message: 'Please describe or select an issue before submitting.' });
-                        return;
-                      }
-                      setIsSubmittingReport(true);
-                      try {
-                        await new Promise(r => setTimeout(r, 800));
-                        setShowSpotActionsModal(false);
-                        setSpotActionsResult({ type: 'success', title: 'Report Submitted', message: `Issue reported for spot ${spotActionsTarget?.id}.` });
-                      } catch {
-                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to submit report. Please try again.' });
-                      } finally {
-                        setIsSubmittingReport(false);
-                      }
-                    }}
-                  >
-                    {isSubmittingReport
-                      ? <ActivityIndicator color="#fff" size="small" />
-                      : <Text style={styles.parkingConfirmYesButtonText}>Submit Report</Text>}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.parkingConfirmNoButton}
-                    onPress={() => setShowSpotActionsModal(false)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+                  </View>
+                </>
+              )}
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Spot Actions Result Modal */}
