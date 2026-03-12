@@ -7,6 +7,8 @@ export interface ParkingSpace {
   sensor_id: number | null;
   is_occupied: boolean;
   malfunctioned?: boolean;
+  malfunction_reason?: string | null;
+  malfunction_reported_by?: string | null;
   distance_cm: number | null;
   created_at: string;
   updated_at: string;
@@ -53,6 +55,7 @@ class RealTimeParkingServiceClass {
   private consecErrors = 0;
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
+  private selfFlaggedSpots = new Set<string>(); // spots flagged by current user, suppress bell
 
   constructor() {
     this.initializeService();
@@ -360,10 +363,13 @@ class RealTimeParkingServiceClass {
     console.log('Processed floors:', floors);
     console.log('Total:', totalSpots, 'Available:', availableSpots);
 
+    const malfunctionedSpots = activeSpots.filter(s => s.malfunctioned).length;
+    const occupiedSpots = activeSpots.filter(s => s.is_occupied && !s.malfunctioned).length;
+
     return {
       totalSpots,
       availableSpots,
-      occupiedSpots: totalSpots - availableSpots,
+      occupiedSpots,
       floors,
       lastUpdated: new Date().toLocaleTimeString(),
       isLive: true,
@@ -422,21 +428,60 @@ class RealTimeParkingServiceClass {
         .catch(err => console.log('Error fetching settings:', err));
     }
 
-    NotificationService.getNotificationSettings()
-      .then(settings => {
-        for (const newFloor of newData.floors) {
-          const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-          if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && !NotificationManager.isSpotNotificationsPaused()) {
-            NotificationService.showFloorUpdateNotification(
-              newFloor.floor,
-              newFloor.available,
-              newFloor.total,
-              oldFloor.available
-            );
+    // Detect spots that just became malfunctioned — notify only opposite role
+    const oldMalfunctionedSet = new Set(
+      (oldData.sensorData ?? []).filter(s => s.malfunctioned && s.slot_name).map(s => s.slot_name)
+    );
+    const newlyMalfunctioned = (newData.sensorData ?? []).filter(
+      s => s.malfunctioned && s.slot_name && !oldMalfunctionedSet.has(s.slot_name)
+    );
+    if (newlyMalfunctioned.length > 0) {
+      const currentUser = TokenManager.getUser();
+      const userRole = currentUser?.role;
+      const userName = currentUser?.name;
+      const isAdminOrSsd = userRole === 'admin' || userRole === 'ssd';
+      const isSecurity = userRole === 'security';
+
+      if (isAdminOrSsd || isSecurity) {
+        for (const spot of newlyMalfunctioned) {
+          const reporter = spot.malfunction_reported_by ?? 'Unknown';
+          // Skip if flagged by the current user (tracked by slot name or name match)
+          if (spot.slot_name && this.selfFlaggedSpots.has(spot.slot_name)) {
+            this.selfFlaggedSpots.delete(spot.slot_name);
+            continue;
           }
+          if (userName && reporter === userName) continue;
+          const floor = this.extractFloorFromLocation(spot.floor_level);
+          const reason = spot.malfunction_reason ?? 'No reason provided';
+          NotificationManager.addMalfunctionNotification({
+            spotCode: spot.slot_name!,
+            reportedBy: reporter,
+            floor,
+            reason,
+          });
         }
-      })
-      .catch(err => console.log('Error fetching settings:', err));
+      }
+    }
+
+    const role = TokenManager.getUser()?.role;
+    const isStaff = role === 'admin' || role === 'ssd' || role === 'security';
+    if (!isStaff) {
+      NotificationService.getNotificationSettings()
+        .then(settings => {
+          for (const newFloor of newData.floors) {
+            const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
+            if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && !NotificationManager.isSpotNotificationsPaused()) {
+              NotificationService.showFloorUpdateNotification(
+                newFloor.floor,
+                newFloor.available,
+                newFloor.total,
+                oldFloor.available
+              );
+            }
+          }
+        })
+        .catch(err => console.log('Error fetching settings:', err));
+    }
   }
 
   private notifyParkingUpdate(data: ParkingStats): void {
@@ -463,7 +508,7 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  async reportMalfunction(spaceId: number, reason: string, token: string): Promise<{ success: boolean; message: string }> {
+  async reportMalfunction(spaceId: number, reason: string, token: string, slotName?: string): Promise<{ success: boolean; message: string }> {
     const url = `https://valet.up.railway.app/api/parking/${spaceId}/malfunction`;
     try {
       const response = await fetch(url, {
@@ -482,7 +527,9 @@ class RealTimeParkingServiceClass {
       if (isSuccess) {
         this.consecErrors = 0;
         this.retryCount = 0;
-        setTimeout(() => this.fetchAndUpdate(), 300);
+        // Track self-flagged spot so poll won't notify the reporter
+        if (slotName) this.selfFlaggedSpots.add(slotName);
+        setTimeout(() => this.fetchAndUpdate(), 1500);
       }
       return { success: isSuccess, message: data.message || (isSuccess ? 'Malfunction reported.' : `Request failed (${response.status})`) };
     } catch (error: any) {

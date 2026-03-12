@@ -241,7 +241,7 @@ export const createResponsiveStyles = (width: number, height: number) => {
       color: '#64748B',
     },
     selectedChipText: {
-      color: 'white',
+      color: '#1F2937',
     },
 
     textInput: {

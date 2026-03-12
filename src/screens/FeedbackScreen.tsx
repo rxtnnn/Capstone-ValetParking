@@ -396,20 +396,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const validateForm = useCallback((): boolean => {
-    if (!message.trim()) {
-      showCustomAlert('Required Field', 'Please share your feedback with us to help improve VALET.', [
-        { text: 'Understood', style: 'default' }
-      ]);
-      return false;
-    }
-
-    if (message.trim().length < 10) {
-      showCustomAlert('More Details Needed', 'Please provide more detailed feedback (at least 10 characters) so we can better understand your experience.', [
-        { text: 'Understood', style: 'default' }
-      ]);
-      return false;
-    }
-
     if (feedbackType === 'general' && rating === 0) {
       showCustomAlert('Rating Required', 'Please rate your experience with VALET to help us understand how we\'re doing.', [
         { text: 'Understood', style: 'default' }
@@ -453,7 +439,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
       const deviceInfo = submissionCache.current.deviceInfo || DEFAULT_DEVICE_INFO;
       const feedbackData: Omit<FeedbackData, 'id' | 'status' | 'created_at' | 'user_id'> = {
         type: feedbackType,
-        message: message.trim(),
+        ...(message.trim() && { message: message.trim() }),
         ...(feedbackType === 'general' && rating > 0 && { rating }),
         ...(email.trim() && { email: email.trim() }),
         ...(selectedIssues.length > 0 && { issues: selectedIssues }),
@@ -509,6 +495,8 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
           };
         } else if (error.message.includes('Network') || error.message.includes('connection')) {
           errorMessage = 'Please check your internet connection and try again.';
+        } else {
+          errorMessage = error.message;
         }
       }
       
@@ -660,10 +648,10 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   ));
 
-  const SubmitButton = useMemo(() => (
+  const renderSubmitButton = () => (
     <TouchableOpacity
       onPress={handleSubmit}
-      disabled={loading || submissionCache.current.isSubmitting}
+      disabled={loading}
       style={[responsiveStyles.submitButton, loading && responsiveStyles.disabledButton]}
       activeOpacity={0.8}
     >
@@ -681,7 +669,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
       </LinearGradient>
     </TouchableOpacity>
-  ), [loading, handleSubmit, responsiveStyles, getResponsiveSize]);
+  );
 
   const renderAdminReplies = useMemo(() => {
     if (feedbackWithReplies.length === 0) {
@@ -916,7 +904,6 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={responsiveStyles.characterCount}>
                     {message.length}/1000
                   </Text>
-                  <Text style={responsiveStyles.requiredIndicator}>Required</Text>
                 </View>
               </View>
             </View>
@@ -945,7 +932,7 @@ const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={responsiveStyles.submitContainer}>
-              {SubmitButton}
+              {renderSubmitButton()}
             </View>
 
             <View style={responsiveStyles.section}>
