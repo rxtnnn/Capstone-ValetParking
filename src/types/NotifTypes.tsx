@@ -30,6 +30,33 @@ export interface GenericNotificationData {
   [key: string]: any;
 }
 
+export interface SpotOverrideData {
+  spotCode: string;
+  newStatus: 'available' | 'occupied';
+  guardName: string;
+  floor: string | number;
+  reason: string;
+  userId?: number;
+}
+
+export interface SpotOverrideNotification extends BaseNotification {
+  type: 'spot_override';
+  data: SpotOverrideData;
+}
+
+export interface SpotMalfunctionData {
+  spotCode: string;
+  reportedBy: string;
+  floor: string | number;
+  reason: string;
+  userId?: number;
+}
+
+export interface SpotMalfunctionNotification extends BaseNotification {
+  type: 'spot_malfunction';
+  data: SpotMalfunctionData;
+}
+
 export interface SpotAvailableNotification extends BaseNotification {
   type: 'spot_available';
   data: SpotAvailableData;
@@ -45,9 +72,11 @@ export interface GenericNotification extends BaseNotification {
   data: GenericNotificationData;
 }
 
-export type AppNotification = 
-  | SpotAvailableNotification 
+export type AppNotification =
+  | SpotAvailableNotification
   | FeedbackReplyNotification
+  | SpotOverrideNotification
+  | SpotMalfunctionNotification
   | GenericNotification;
 
 // guards for safe type checking

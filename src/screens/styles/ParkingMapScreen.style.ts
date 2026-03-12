@@ -250,6 +250,7 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+    height: 370,
   },
   buildingName: {
     color: 'white',
@@ -539,6 +540,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
+    height: 30,
     fontFamily: FONTS.semiBold,
   },
   parkingConfirmNoButton: {
@@ -557,6 +559,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
+    marginBottom: 40,
   },
   floorModalBackdrop: {
     flex: 1,
@@ -846,7 +849,8 @@ export const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 15,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: Math.min(Dimensions.get('window').width - 40, 420),
+    maxHeight: Dimensions.get('window').height * 0.85,
     overflow: 'hidden',
   },
   spotActionsModalHeader: {
@@ -950,7 +954,8 @@ export const styles = StyleSheet.create({
   },
   spotActionsContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 4,
+    paddingBottom: 24,
   },
   spotActionsLabel: {
     fontSize: 14,

@@ -4,7 +4,7 @@ export interface FeedbackData {
   id?: number;
   user_id: number;
   type: 'general' | 'parking' | 'technical' | 'suggestion';
-  message: string;
+  message?: string;
   rating?: number;
   email?: string;
   issues?: string[];
