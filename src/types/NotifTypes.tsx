@@ -44,6 +44,19 @@ export interface SpotOverrideNotification extends BaseNotification {
   data: SpotOverrideData;
 }
 
+export interface SpotMalfunctionData {
+  spotCode: string;
+  reportedBy: string;
+  floor: string | number;
+  reason: string;
+  userId?: number;
+}
+
+export interface SpotMalfunctionNotification extends BaseNotification {
+  type: 'spot_malfunction';
+  data: SpotMalfunctionData;
+}
+
 export interface SpotAvailableNotification extends BaseNotification {
   type: 'spot_available';
   data: SpotAvailableData;
@@ -63,6 +76,7 @@ export type AppNotification =
   | SpotAvailableNotification
   | FeedbackReplyNotification
   | SpotOverrideNotification
+  | SpotMalfunctionNotification
   | GenericNotification;
 
 // guards for safe type checking

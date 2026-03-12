@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
-  getNotificationUserId, setNotificationUserId, SpotOverrideData } from '../types/NotifTypes';
+  getNotificationUserId, setNotificationUserId, SpotOverrideData, SpotMalfunctionData } from '../types/NotifTypes';
 import { FeedbackData } from '../types/feedback';
 
 const STORAGE_KEYS = {
@@ -13,7 +13,7 @@ const STORAGE_KEYS = {
 } as const;
 
 const MAX_NOTIFICATIONS = 100;
-const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_override'] as const;
+const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_override', 'spot_malfunction'] as const;
 const ADMIN_ROLES = ['admin', 'ssd'] as const;
 const BLOCKED_TITLES = ['VALET Connected!', 'Connection Established', 'Welcome to VALET', 'System Ready', 'App Initialized'];
 
@@ -313,6 +313,25 @@ class NotificationManagerClass {
       title, message, spotsAvailable, floor, spotIds, this.currentUserId
     );
     await this.addNotification(notification);
+  }
+
+  async addMalfunctionNotification(data: SpotMalfunctionData): Promise<void> {
+    if (!this.currentUserId) return;
+
+    const newNotification: AppNotification = {
+      id: `malfunction_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      type: 'spot_malfunction',
+      title: `⚠️ Spot ${data.spotCode} Malfunctioned`,
+      message: `Floor ${data.floor} • Reported by ${data.reportedBy} • ${data.reason}`,
+      timestamp: Date.now(),
+      isRead: false,
+      priority: 'high',
+      data: { ...data, userId: this.currentUserId },
+    } as AppNotification;
+
+    this.notifications.unshift(newNotification);
+    await this.saveNotifications();
+    this.notifyListeners();
   }
 
   async addFeedbackReplyNotification(

@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Alert,
   StatusBar,
   ScrollView,
@@ -89,12 +90,14 @@ const ParkingMapScreen: React.FC = () => {
   const [suggestedSpots, setSuggestedSpots] = useState<string[]>([]); // Suggested spots when spot is taken
   const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); // Highlight specific spots
   const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
+  const optimisticMalfunctionRef = useRef<{ [spotId: string]: boolean }>({}); // Optimistic malfunction overrides
 
   // Spot actions modal
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
   const [reportIssue, setReportIssue] = useState('');
   const [reportCustomReason, setReportCustomReason] = useState('');
+  const [issueDropdownOpen, setIssueDropdownOpen] = useState(false);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [isClearingMalfunction, setIsClearingMalfunction] = useState(false);
   const userRole = TokenManager.getUser()?.role;
@@ -319,7 +322,12 @@ const ParkingMapScreen: React.FC = () => {
           spotSpaceIdMap[sensor.slot_name] = sensor.id;
           spotHasSensorMap[sensor.slot_name] = sensor.sensor_id !== null && sensor.sensor_id !== undefined;
           spotOccupancyMap[sensor.slot_name] = sensor.is_occupied === true || sensor.is_occupied === 1;
-          spotMalfunctionedMap[sensor.slot_name] = sensor.malfunctioned === true;
+          const apiMalfunctioned = sensor.malfunctioned === true;
+          spotMalfunctionedMap[sensor.slot_name] = apiMalfunctioned;
+          // Once API confirms the malfunction, release the optimistic lock
+          if (apiMalfunctioned && optimisticMalfunctionRef.current[sensor.slot_name] === true) {
+            delete optimisticMalfunctionRef.current[sensor.slot_name];
+          }
         }
       });
     }
@@ -332,7 +340,9 @@ const ParkingMapScreen: React.FC = () => {
         spaceId: spotSpaceIdMap.hasOwnProperty(spot.id) ? spotSpaceIdMap[spot.id] : spot.spaceId,
         hasSensor: spotHasSensorMap.hasOwnProperty(spot.id) ? spotHasSensorMap[spot.id] : spot.hasSensor,
         isOccupied: spotOccupancyMap.hasOwnProperty(spot.id) ? spotOccupancyMap[spot.id] : spot.isOccupied,
-        malfunctioned: spotMalfunctionedMap.hasOwnProperty(spot.id) ? spotMalfunctionedMap[spot.id] : spot.malfunctioned,
+        malfunctioned: optimisticMalfunctionRef.current.hasOwnProperty(spot.id)
+          ? optimisticMalfunctionRef.current[spot.id]
+          : (spotMalfunctionedMap.hasOwnProperty(spot.id) ? spotMalfunctionedMap[spot.id] : spot.malfunctioned),
       }));
     });
 
@@ -557,7 +567,13 @@ const ParkingMapScreen: React.FC = () => {
       setSpotActionsTarget(spot);
       setReportIssue('');
       setReportCustomReason('');
+      setIssueDropdownOpen(false);
       setShowSpotActionsModal(true);
+      return;
+    }
+
+    if (spot.malfunctioned) {
+      Alert.alert('Spot Unavailable', 'This spot has been flagged as malfunctioned.');
       return;
     }
 
@@ -570,7 +586,7 @@ const ParkingMapScreen: React.FC = () => {
     setSelectedSpotForNav(spot.id);
     setHighlightedSpots([]);
     setShowNavigationModal(true);
-  }, [isSecurityRole]);
+  }, [canAccessSpotActions]);
 
   const navigateHome = useCallback(() => {
     navigation.navigate('Home');
@@ -602,7 +618,7 @@ const ParkingMapScreen: React.FC = () => {
     }
 
     // Security and admin can interact with any sensor-assigned spot; others only available ones
-    const isClickable = spot.hasSensor && (canAccessSpotActions || !spot.isOccupied);
+    const isClickable = spot.hasSensor && (canAccessSpotActions || (!spot.isOccupied && !spot.malfunctioned));
 
     return (
       <TouchableOpacity
@@ -679,22 +695,6 @@ const ParkingMapScreen: React.FC = () => {
               borderWidth: 4,
               borderColor: '#FFD700', // Yellow highlight
               transform: [{ rotate: rotation }],
-            }}
-          />
-        )}
-        {spot.malfunctioned && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: -4,
-              right: -4,
-              width: 10,
-              height: 10,
-              borderRadius: 5,
-              backgroundColor: '#FF9800',
-              borderWidth: 1,
-              borderColor: '#fff',
             }}
           />
         )}
@@ -1312,11 +1312,13 @@ const ParkingMapScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowSpotActionsModal(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}
-        >
-          <View style={styles.spotActionsModalContainer}>
+        <TouchableWithoutFeedback onPress={() => setShowSpotActionsModal(false)}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}
+          >
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.spotActionsModalContainer}>
 
             {/* Red header */}
             <View style={styles.spotActionsModalHeader}>
@@ -1376,6 +1378,7 @@ const ParkingMapScreen: React.FC = () => {
                       try {
                         const result = await RealTimeParkingService.clearMalfunction(spaceId, TokenManager.getToken() ?? '');
                         if (result.success) {
+                          delete optimisticMalfunctionRef.current[spotActionsTarget?.id ?? ''];
                           setParkingData(prev => prev.map(s =>
                             s.id === spotActionsTarget?.id ? { ...s, malfunctioned: false } : s
                           ));
@@ -1405,23 +1408,74 @@ const ParkingMapScreen: React.FC = () => {
                   <Text style={styles.spotActionsLabel}>
                     Issue type <Text style={{ color: COLORS.primary }}>*</Text>
                   </Text>
-                  <View style={styles.spotActionsChipsRow}>
-                    {['Sensor not detecting vehicles', 'Sensor hardware malfunction', 'Sensor offline / no data', 'Spot under maintenance or repair', 'Other'].map(issue => (
-                      <TouchableOpacity
-                        key={issue}
-                        onPress={() => { setReportIssue(issue); if (issue !== 'Other') setReportCustomReason(''); }}
-                        style={[
-                          styles.spotActionsChip,
-                          { backgroundColor: reportIssue === issue ? COLORS.primary : '#f0f0f0', borderColor: reportIssue === issue ? COLORS.primary : '#ddd' },
-                        ]}
-                      >
-                        <Text style={[styles.spotActionsChipText, { color: reportIssue === issue ? '#fff' : '#555' }]}>{issue}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+
+                  {/* Dropdown selector */}
+                  {(() => {
+                    const ISSUE_OPTIONS = [
+                      'Sensor not detecting vehicles',
+                      'Sensor hardware malfunction',
+                      'Sensor offline / no data',
+                      'Spot under maintenance or repair',
+                      'Other',
+                    ];
+                    return (
+                      <View style={{ marginBottom: 12 }}>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => setIssueDropdownOpen(o => !o)}
+                          style={{
+                            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                            borderWidth: 1.5, borderColor: reportIssue ? COLORS.primary : '#ddd',
+                            borderRadius: issueDropdownOpen ? 8 : 8,
+                            borderBottomLeftRadius: issueDropdownOpen ? 0 : 8,
+                            borderBottomRightRadius: issueDropdownOpen ? 0 : 8,
+                            paddingHorizontal: 14, paddingVertical: 12,
+                            backgroundColor: '#fafafa',
+                          }}
+                        >
+                          <Text style={{ fontSize: 14, color: reportIssue ? '#1a1a1a' : '#aaa', fontFamily: FONTS.regular, flex: 1 }} numberOfLines={1}>
+                            {reportIssue || 'Select an issue type...'}
+                          </Text>
+                          <Ionicons name={issueDropdownOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#888" />
+                        </TouchableOpacity>
+
+                        {issueDropdownOpen && (
+                          <View style={{
+                            borderWidth: 1.5, borderColor: COLORS.primary, borderTopWidth: 0,
+                            borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
+                            backgroundColor: '#fff', overflow: 'hidden',
+                          }}>
+                            {ISSUE_OPTIONS.map((opt, idx) => (
+                              <TouchableOpacity
+                                key={opt}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                  setReportIssue(opt);
+                                  if (opt !== 'Other') setReportCustomReason('');
+                                  setIssueDropdownOpen(false);
+                                }}
+                                style={{
+                                  paddingHorizontal: 14, paddingVertical: 12,
+                                  backgroundColor: reportIssue === opt ? '#fdecea' : '#fff',
+                                  borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: '#f0f0f0',
+                                  flexDirection: 'row', alignItems: 'center',
+                                }}
+                              >
+                                <Text style={{ flex: 1, fontSize: 14, color: reportIssue === opt ? COLORS.primary : '#333', fontFamily: FONTS.regular }}>
+                                  {opt}
+                                </Text>
+                                {reportIssue === opt && <Ionicons name="checkmark" size={16} color={COLORS.primary} />}
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
+
                   {reportIssue === 'Other' && (
                     <TextInput
-                      style={[styles.spotActionsTextArea, { marginTop: 6, minHeight: 56 }]}
+                      style={[styles.spotActionsTextArea, { marginBottom: 12, minHeight: 56 }]}
                       placeholder="Please describe the issue..."
                       placeholderTextColor="#bbb"
                       multiline
@@ -1430,69 +1484,70 @@ const ParkingMapScreen: React.FC = () => {
                     />
                   )}
 
-                  <View style={styles.parkingConfirmButtonsContainer}>
-                    <TouchableOpacity
-                      style={styles.parkingConfirmNoButton}
-                      onPress={() => setShowSpotActionsModal(false)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.parkingConfirmYesButton, { backgroundColor: COLORS.primary }]}
-                      disabled={isSubmittingReport}
-                      activeOpacity={0.8}
-                      onPress={async () => {
-                        const finalReason = reportIssue === 'Other' ? reportCustomReason.trim() : reportIssue;
-                        if (!finalReason) {
-                          setSpotActionsResult({ type: 'warning', title: 'Issue Required', message: 'Please select or describe the sensor issue.' });
+                  {/* Flag Spot (primary) then Cancel */}
+                  <TouchableOpacity
+                    style={[styles.parkingConfirmYesButton, { backgroundColor: COLORS.primary, marginBottom: 10 }]}
+                    disabled={isSubmittingReport}
+                    activeOpacity={0.8}
+                    onPress={async () => {
+                      const finalReason = reportIssue === 'Other' ? reportCustomReason.trim() : reportIssue;
+                      if (!finalReason) {
+                        setSpotActionsResult({ type: 'warning', title: 'Issue Required', message: 'Please select or describe the sensor issue.' });
+                        return;
+                      }
+                      setIsSubmittingReport(true);
+                      try {
+                        const targetId = spotActionsTarget?.id;
+                        // Resolve spaceId from live parkingData in case spotActionsTarget is stale
+                        const spaceId = spotActionsTarget?.spaceId
+                          ?? parkingData.find(s => s.id === targetId)?.spaceId;
+                        if (!spaceId) {
+                          setSpotActionsResult({ type: 'error', title: 'Error', message: `Spot ID not found for ${targetId}. Try again.` });
                           return;
                         }
-                        setIsSubmittingReport(true);
-                        try {
-                          const spaceId = spotActionsTarget?.spaceId;
-                          if (!spaceId) {
-                            setSpotActionsResult({ type: 'error', title: 'Error', message: `Spot ID not found for ${spotActionsTarget?.id}.` });
-                            return;
-                          }
-                          const result = await RealTimeParkingService.reportMalfunction(spaceId, finalReason, TokenManager.getToken() ?? '');
-                          if (!result.success) {
-                            setSpotActionsResult({ type: 'error', title: 'Report Failed', message: result.message });
-                            return;
-                          }
-                          // Optimistic: turn yellow immediately
+                        // Optimistic: turn yellow immediately before API call
+                        optimisticMalfunctionRef.current[targetId!] = true;
+                        setParkingData(prev => prev.map(s =>
+                          s.id === targetId ? { ...s, malfunctioned: true } : s
+                        ));
+                        const result = await RealTimeParkingService.reportMalfunction(spaceId, finalReason, TokenManager.getToken() ?? '', targetId ?? undefined);
+                        if (!result.success) {
+                          // Revert optimistic update on failure
+                          delete optimisticMalfunctionRef.current[targetId!];
                           setParkingData(prev => prev.map(s =>
-                            s.id === spotActionsTarget?.id ? { ...s, malfunctioned: true } : s
+                            s.id === targetId ? { ...s, malfunctioned: false } : s
                           ));
-                          // Notify admin bell (only if security reported, not admin themselves)
-                          if (isSecurityRole) {
-                            NotificationManager.addOverrideNotification({
-                              spotCode: spotActionsTarget?.id ?? '',
-                              newStatus: 'available',
-                              guardName: TokenManager.getUser()?.name ?? 'Guard',
-                              floor: floorNumber,
-                              reason: `Malfunction report: ${finalReason}`,
-                            });
-                          }
-                          setShowSpotActionsModal(false);
-                          setSpotActionsResult({ type: 'success', title: 'Reported', message: `Spot ${spotActionsTarget?.id} flagged as malfunctioned. LED will turn yellow.` });
-                        } catch {
-                          setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to submit report. Please try again.' });
-                        } finally {
-                          setIsSubmittingReport(false);
+                          setSpotActionsResult({ type: 'error', title: 'Report Failed', message: result.message });
+                          return;
                         }
-                      }}
-                    >
-                      {isSubmittingReport
-                        ? <ActivityIndicator color="#fff" size="small" />
-                        : <Text style={styles.parkingConfirmYesButtonText}>Flag Spot</Text>}
-                    </TouchableOpacity>
-                  </View>
+                        setShowSpotActionsModal(false);
+                        setSpotActionsResult({ type: 'success', title: 'Reported', message: `Spot ${spotActionsTarget?.id} flagged as malfunctioned.` });
+                      } catch {
+                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to submit report. Please try again.' });
+                      } finally {
+                        setIsSubmittingReport(false);
+                      }
+                    }}
+                  >
+                    {isSubmittingReport
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={styles.parkingConfirmYesButtonText}>Flag Spot</Text>}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.parkingConfirmNoButton}
+                    onPress={() => setShowSpotActionsModal(false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.parkingConfirmNoButtonText}>Cancel</Text>
+                  </TouchableOpacity>
                 </>
               )}
             </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Spot Actions Result Modal */}

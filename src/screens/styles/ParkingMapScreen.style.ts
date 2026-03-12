@@ -250,6 +250,7 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+    height: 370,
   },
   buildingName: {
     color: 'white',
@@ -539,6 +540,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
+    height: 30,
     fontFamily: FONTS.semiBold,
   },
   parkingConfirmNoButton: {
@@ -557,6 +559,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
+    marginBottom: 40,
   },
   floorModalBackdrop: {
     flex: 1,
