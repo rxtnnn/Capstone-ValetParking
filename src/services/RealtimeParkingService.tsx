@@ -6,11 +6,9 @@ export interface ParkingSpace {
   id: number;
   sensor_id: number | null;
   is_occupied: boolean;
-  effective_status?: 'available' | 'occupied' | 'blocked';
-  manual_override?: boolean;
-  manual_status?: string | null;
-  manual_override_expires?: string | null;
-  manual_override_by?: string | null;
+  malfunctioned?: boolean;
+  malfunction_reason?: string | null;
+  malfunction_reported_by?: string | null;
   distance_cm: number | null;
   created_at: string;
   updated_at: string;
@@ -57,6 +55,7 @@ class RealTimeParkingServiceClass {
   private consecErrors = 0;
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
+  private selfFlaggedSpots = new Set<string>(); // spots flagged by current user, suppress bell
 
   constructor() {
     this.initializeService();
@@ -326,10 +325,8 @@ class RealTimeParkingServiceClass {
 
     for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
-      // Prefer effective_status from API (reflects manual overrides); fall back to is_occupied
-      const isAvailable = space.effective_status
-        ? space.effective_status === 'available'
-        : !space.is_occupied;
+      // Malfunctioned spots are excluded from available count
+      const isAvailable = !space.is_occupied && !space.malfunctioned;
 
       if (isAvailable) availableSpots++;
 
@@ -366,10 +363,13 @@ class RealTimeParkingServiceClass {
     console.log('Processed floors:', floors);
     console.log('Total:', totalSpots, 'Available:', availableSpots);
 
+    const malfunctionedSpots = activeSpots.filter(s => s.malfunctioned).length;
+    const occupiedSpots = activeSpots.filter(s => s.is_occupied && !s.malfunctioned).length;
+
     return {
       totalSpots,
       availableSpots,
-      occupiedSpots: totalSpots - availableSpots,
+      occupiedSpots,
       floors,
       lastUpdated: new Date().toLocaleTimeString(),
       isLive: true,
@@ -428,21 +428,60 @@ class RealTimeParkingServiceClass {
         .catch(err => console.log('Error fetching settings:', err));
     }
 
-    NotificationService.getNotificationSettings()
-      .then(settings => {
-        for (const newFloor of newData.floors) {
-          const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-          if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && !NotificationManager.isSpotNotificationsPaused()) {
-            NotificationService.showFloorUpdateNotification(
-              newFloor.floor,
-              newFloor.available,
-              newFloor.total,
-              oldFloor.available
-            );
+    // Detect spots that just became malfunctioned — notify only opposite role
+    const oldMalfunctionedSet = new Set(
+      (oldData.sensorData ?? []).filter(s => s.malfunctioned && s.slot_name).map(s => s.slot_name)
+    );
+    const newlyMalfunctioned = (newData.sensorData ?? []).filter(
+      s => s.malfunctioned && s.slot_name && !oldMalfunctionedSet.has(s.slot_name)
+    );
+    if (newlyMalfunctioned.length > 0) {
+      const currentUser = TokenManager.getUser();
+      const userRole = currentUser?.role;
+      const userName = currentUser?.name;
+      const isAdminOrSsd = userRole === 'admin' || userRole === 'ssd';
+      const isSecurity = userRole === 'security';
+
+      if (isAdminOrSsd || isSecurity) {
+        for (const spot of newlyMalfunctioned) {
+          const reporter = spot.malfunction_reported_by ?? 'Unknown';
+          // Skip if flagged by the current user (tracked by slot name or name match)
+          if (spot.slot_name && this.selfFlaggedSpots.has(spot.slot_name)) {
+            this.selfFlaggedSpots.delete(spot.slot_name);
+            continue;
           }
+          if (userName && reporter === userName) continue;
+          const floor = this.extractFloorFromLocation(spot.floor_level);
+          const reason = spot.malfunction_reason ?? 'No reason provided';
+          NotificationManager.addMalfunctionNotification({
+            spotCode: spot.slot_name!,
+            reportedBy: reporter,
+            floor,
+            reason,
+          });
         }
-      })
-      .catch(err => console.log('Error fetching settings:', err));
+      }
+    }
+
+    const role = TokenManager.getUser()?.role;
+    const isStaff = role === 'admin' || role === 'ssd' || role === 'security';
+    if (!isStaff) {
+      NotificationService.getNotificationSettings()
+        .then(settings => {
+          for (const newFloor of newData.floors) {
+            const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
+            if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && !NotificationManager.isSpotNotificationsPaused()) {
+              NotificationService.showFloorUpdateNotification(
+                newFloor.floor,
+                newFloor.available,
+                newFloor.total,
+                oldFloor.available
+              );
+            }
+          }
+        })
+        .catch(err => console.log('Error fetching settings:', err));
+    }
   }
 
   private notifyParkingUpdate(data: ParkingStats): void {
@@ -469,8 +508,8 @@ class RealTimeParkingServiceClass {
     }
   }
 
-  async overrideSpot(spaceId: number, status: 'available' | 'occupied' | 'blocked', pin: string, token: string): Promise<{ success: boolean; message: string }> {
-    const url = `https://valet.up.railway.app/api/parking/${spaceId}/override`;
+  async reportMalfunction(spaceId: number, reason: string, token: string, slotName?: string): Promise<{ success: boolean; message: string }> {
+    const url = `https://valet.up.railway.app/api/parking/${spaceId}/malfunction`;
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -479,24 +518,46 @@ class RealTimeParkingServiceClass {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ status, pin }),
+        body: JSON.stringify({ reason }),
       });
-
       let data: any = {};
       const text = await response.text();
-      console.log('[Override] HTTP status:', response.status, 'body:', text);
-      try { data = JSON.parse(text); } catch { /* non-JSON response */ }
-
-      // Backend may use data.success (bool) or HTTP 2xx as success signal
+      try { data = JSON.parse(text); } catch { /* non-JSON */ }
       const isSuccess = data.success === true || (data.success === undefined && response.ok);
       if (isSuccess) {
-        // Trigger immediate refresh so effective_status updates on the map
+        this.consecErrors = 0;
+        this.retryCount = 0;
+        // Track self-flagged spot so poll won't notify the reporter
+        if (slotName) this.selfFlaggedSpots.add(slotName);
+        setTimeout(() => this.fetchAndUpdate(), 1500);
+      }
+      return { success: isSuccess, message: data.message || (isSuccess ? 'Malfunction reported.' : `Request failed (${response.status})`) };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Network error. Please try again.' };
+    }
+  }
+
+  async clearMalfunction(spaceId: number, token: string): Promise<{ success: boolean; message: string }> {
+    const url = `https://valet.up.railway.app/api/parking/${spaceId}/malfunction`;
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      let data: any = {};
+      const text = await response.text();
+      try { data = JSON.parse(text); } catch { /* non-JSON */ }
+      const isSuccess = data.success === true || (data.success === undefined && response.ok);
+      if (isSuccess) {
         this.consecErrors = 0;
         this.retryCount = 0;
         setTimeout(() => this.fetchAndUpdate(), 300);
       }
-      const message = data.message || (isSuccess ? 'Override applied successfully.' : `Request failed (${response.status})`);
-      return { success: isSuccess, message };
+      return { success: isSuccess, message: data.message || (isSuccess ? 'Malfunction cleared.' : `Request failed (${response.status})`) };
     } catch (error: any) {
       return { success: false, message: error.message || 'Network error. Please try again.' };
     }
