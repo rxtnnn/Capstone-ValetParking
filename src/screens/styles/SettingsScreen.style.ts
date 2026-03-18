@@ -1,4 +1,5 @@
 import { StyleSheet, Dimensions } from 'react-native';
+import { COLORS } from '../../constants/AppConst';
 
 const { width } = Dimensions.get('window');
 
@@ -45,7 +46,7 @@ export const styles = StyleSheet.create({
   loadingProgress: {
     width: '70%',
     height: '100%',
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
     borderRadius: 2,
   },
   header: {
@@ -153,7 +154,7 @@ export const styles = StyleSheet.create({
   appInfoText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#B22020',
+    color: COLORS.primary,
     fontFamily: 'Poppins_600SemiBold',
   },
   appInfoSubtext: {
@@ -388,7 +389,7 @@ export const styles = StyleSheet.create({
   settingGroupTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#B22020',
+    color: COLORS.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
     fontFamily: 'Poppins_600SemiBold',
@@ -396,7 +397,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   badge: {
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -430,7 +431,7 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionButton: {
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -454,7 +455,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginVertical: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
+    borderLeftColor: COLORS.blue,
   },
   infoCardTitle: {
     fontSize: 14,
@@ -550,7 +551,7 @@ export const styles = StyleSheet.create({
       backgroundColor: '#E53E3E',
     },
     errorConfirmButton: {
-      backgroundColor: '#B22020',
+      backgroundColor: COLORS.primary,
     },
     cancelButtonText: {
       color: '#666666',

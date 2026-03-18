@@ -432,7 +432,7 @@ const HomeScreen: React.FC = () => {
                 size={80}
                 strokeWidth={6}
                 progress={(parkingData.totalSpots > 0) ? (parkingData.availableSpots / parkingData.totalSpots) * 100 : 0}
-                color="#48D666"
+                color={COLORS.green}
               >
                 <Text style={[styles.progressNumber, { color: COLORS.green }]}>
                   {parkingData.availableSpots}

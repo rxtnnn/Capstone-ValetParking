@@ -57,8 +57,8 @@ interface SettingItem {
 }
 
 const SETTING_ITEMS: SettingItem[] = [
-  { key: 'spotAvailable', icon: 'car', iconColor: '#48D666', title: 'Parking Spots Available', desc: 'Get notified when parking spots become available' },
-  { key: 'floorUpdates', icon: 'layers', iconColor: '#2196F3', title: 'Floor Updates', desc: 'Receive updates about floor occupancy changes' },
+  { key: 'spotAvailable', icon: 'car', iconColor: COLORS.green, title: 'Parking Spots Available', desc: 'Get notified when parking spots become available' },
+  { key: 'floorUpdates', icon: 'layers', iconColor: COLORS.blue, title: 'Floor Updates', desc: 'Receive updates about floor occupancy changes' },
   { key: 'vibration', icon: 'vibrate', iconColor: '#9C27B0', title: 'Vibration', desc: 'Enable vibration for notifications', isMatCommunity: true },
   { key: 'sound', icon: 'volume-high', iconColor: '#4CAF50', title: 'Sound', desc: 'Play sound with notifications' },
 ];
@@ -97,9 +97,9 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
       case 'logout':
         return <Ionicons name="log-out-outline" size={32} color="#E53E3E" />;
       case 'error':
-        return <Ionicons name="alert-circle-outline" size={32} color="#B22020" />;
+        return <Ionicons name="alert-circle-outline" size={32} color={COLORS.primary} />;
       default:
-        return <Ionicons name="information-circle-outline" size={32} color="#2196F3" />;
+        return <Ionicons name="information-circle-outline" size={32} color={COLORS.blue} />;
     }
   };
 
@@ -379,7 +379,7 @@ const SettingsScreen: React.FC = () => {
             {isSaving && (
               <ActivityIndicator 
                 size="small" 
-                color="#B22020" 
+                color={COLORS.primary}
                 style={{ marginRight: 8 }} 
               />
             )}
@@ -458,13 +458,13 @@ const SettingsScreen: React.FC = () => {
         <View style={styles.card}>
           {settingsLoading ? (
             <View style={styles.settingsLoading}>
-              <ActivityIndicator size="large" color="#B22020" />
+              <ActivityIndicator size="large" color={COLORS.primary} />
               <Text style={styles.loadingText}>Loading your preferences...</Text>
             </View>
           ) : (
             <>
               <View style={styles.cardHeader}>
-                <Ionicons name="notifications" size={24} color="#B22020" />
+                <Ionicons name="notifications" size={24} color={COLORS.primary} />
                 <Text style={styles.cardTitle}>Notifications</Text>
               </View>
               {SETTING_ITEMS.map(renderSettingItem)}

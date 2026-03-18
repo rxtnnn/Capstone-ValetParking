@@ -95,7 +95,7 @@ interface PasswordRules {
 }
 
 const API_CONFIG = {
-  BASE_URL: API_ENDPOINTS.userUrl,
+  BASE_URL: `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.users}`,
   TOKEN: '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad',
   HEADERS: {
     'Accept': 'application/json',
@@ -108,7 +108,7 @@ const ALERT_COLORS = {
   success: '#4CAF50',
   warning: '#FF9800',
   confirm: '#F44336',
-  info: '#2196F3'
+  info: COLORS.blue
 } as const;
 
 const USER_TYPE_ICONS = {
@@ -247,7 +247,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     setIsChangingPassword(true);
 
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/change-password`, {
+      const response = await fetch(`${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.changePassword}`, {
         method: 'POST',
         headers: {
           ...API_CONFIG.HEADERS,
@@ -939,7 +939,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             })}
           >
             <View style={styles.actionLeft}>
-              <MaterialIcons name="info" size={20} color="#2196F3" />
+              <MaterialIcons name="info" size={20} color={COLORS.blue} />
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>About VALET Mobile</Text>
                 <Text style={styles.actionDesc}>App info and version</Text>

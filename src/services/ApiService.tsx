@@ -1,6 +1,7 @@
 import axios from 'axios';
 import apiClient, { TokenManager } from '../config/api';
 import { FeedbackData, APIResponse } from '../types/feedback';
+import { API_ENDPOINTS } from '../constants/AppConst';
 
 const ERROR_MESSAGES = {
   NOT_AUTHENTICATED: 'User not authenticated. Please log in again.',
@@ -80,7 +81,7 @@ class ApiService {
         device_info: feedbackData.device_info || undefined,
       });
 
-      const response = await apiClient.post<APIResponse<FeedbackData>>('/feedbacks', requestData);
+      const response = await apiClient.post<APIResponse<FeedbackData>>(API_ENDPOINTS.feedbacks, requestData);
       
       if (response.data.success && response.data.data?.id) {
         return response.data.data.id.toString();
@@ -95,7 +96,7 @@ class ApiService {
 
   private async getFeedbackList(params: Record<string, any>): Promise<FeedbackData[]> {
     try {
-      const response = await apiClient.get<APIResponse<FeedbackData[]>>('/feedbacks', { params });
+      const response = await apiClient.get<APIResponse<FeedbackData[]>>(API_ENDPOINTS.feedbacks, { params });
       return response.data.data || [];
     } catch (error: any) {
       // 404 means the feedbacks endpoint is not yet available on the backend
@@ -194,7 +195,7 @@ class ApiService {
       const targetUserId = userId || this.getCurrentUserId();
       if (!targetUserId) return null;
 
-      const response = await apiClient.get<APIResponse<FeedbackData>>(`/feedbacks/${feedbackId}`, {
+      const response = await apiClient.get<APIResponse<FeedbackData>>(API_ENDPOINTS.feedbackById(feedbackId), {
         params: { 
           user_id: targetUserId,
           include_reply_details: true
@@ -217,7 +218,7 @@ class ApiService {
 
   async testConnection(): Promise<boolean> {
     try {
-      const response = await apiClient.get('/feedbacks', {
+      const response = await apiClient.get(API_ENDPOINTS.feedbacks, {
         params: { per_page: 1 },
         timeout: 8000
       });

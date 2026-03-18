@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidSecurityService } from '../../services/RfidSecurityService';
 import { SecurityDashboardStats, RfidScanEvent, getStatusColor } from '../../types/rfid';
-import { COLORS } from '../../constants/AppConst';
+import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
 import apiClient from '../../config/api';
 
 type RootStackParamList = {
@@ -57,7 +57,7 @@ const SecurityDashboard: React.FC = () => {
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
-      const res = await apiClient.post('/public/verify-vehicle', { mode: verifyMode, value });
+      const res = await apiClient.post(API_ENDPOINTS.publicVerifyVehicle, { mode: verifyMode, value });
       setVerifyResult(res.data);
     } catch {
       setVerifyResult({ found: false, message: 'Verification failed. Check connection.' });
@@ -201,7 +201,7 @@ const SecurityDashboard: React.FC = () => {
             <View style={styles.connectionIndicator}>
               <View style={[
                 styles.connectionDot,
-                { backgroundColor: connectionStatus === 'connected' ? '#48D666' : connectionStatus === 'error' ? '#FF6B6B' : '#9E9E9E' }
+                { backgroundColor: connectionStatus === 'connected' ? COLORS.green : connectionStatus === 'error' ? '#FF6B6B' : '#9E9E9E' }
               ]} />
               <Text style={styles.connectionText}>
                 {connectionStatus === 'connected' ? 'Live' : connectionStatus === 'error' ? 'Connection Error' : 'Disconnected'}
@@ -236,13 +236,13 @@ const SecurityDashboard: React.FC = () => {
               title="Entries"
               value={stats?.today_entries || 0}
               icon="enter-outline"
-              color="#48D666"
+              color={COLORS.green}
             />
             <StatCard
               title="Exits"
               value={stats?.today_exits || 0}
               icon="exit-outline"
-              color="#2196F3"
+              color={COLORS.blue}
             />
             <StatCard
               title="Active Alerts"
@@ -256,7 +256,7 @@ const SecurityDashboard: React.FC = () => {
               title="Pending Guests"
               value={stats?.pending_guests || 0}
               icon="people"
-              color="#FF9801"
+              color={COLORS.limited}
               badge={stats?.pending_guests}
               onPress={() => navigation.navigate('GuestManagement')}
             />
@@ -315,13 +315,13 @@ const SecurityDashboard: React.FC = () => {
             <QuickActionButton
               title="Guest Requests"
               icon="people"
-              color="#FF9801"
+              color={COLORS.limited}
               onPress={() => navigation.navigate('GuestManagement')}
             />
             <QuickActionButton
               title="Scan History"
               icon="time"
-              color="#2196F3"
+              color={COLORS.blue}
               onPress={() => navigation.navigate('ScanHistory')}
             />
             <QuickActionButton

@@ -31,7 +31,6 @@ import {
  */
 class ParkingConfigServiceClass {
   private static readonly API_BASE_URL = API_ENDPOINTS.baseUrl;
-  private static readonly CONFIG_ENDPOINT = '/public/parking-config';
   private static readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
 
   private static readonly CACHE_KEY = 'parking_config_cache';
@@ -106,7 +105,7 @@ class ParkingConfigServiceClass {
    */
   private async fetchAndCacheConfig(locationId: string): Promise<ParkingLocationConfig> {
     try {
-      const url = `${ParkingConfigServiceClass.API_BASE_URL}${ParkingConfigServiceClass.CONFIG_ENDPOINT}/${locationId}`;
+      const url = `${ParkingConfigServiceClass.API_BASE_URL}${API_ENDPOINTS.parkingConfig(locationId)}`;
 
       const response = await fetch(url, {
         method: 'GET',

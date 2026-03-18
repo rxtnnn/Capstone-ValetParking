@@ -121,7 +121,7 @@ const ScanMonitorScreen: React.FC = () => {
             <Ionicons
               name={getScanTypeIcon(item.scan_type) as any}
               size={20}
-              color={item.scan_type === 'entry' ? '#48D666' : '#2196F3'}
+              color={item.scan_type === 'entry' ? COLORS.green : COLORS.blue}
             />
             <Text style={styles.scanType}>
               {item.scan_type.charAt(0).toUpperCase() + item.scan_type.slice(1)}
@@ -217,7 +217,7 @@ const ScanMonitorScreen: React.FC = () => {
             <View style={styles.connectionIndicator}>
               <View style={[
                 styles.connectionDot,
-                { backgroundColor: connectionStatus === 'connected' ? '#48D666' : connectionStatus === 'error' ? '#FF6B6B' : '#9E9E9E' }
+                { backgroundColor: connectionStatus === 'connected' ? COLORS.green : connectionStatus === 'error' ? '#FF6B6B' : '#9E9E9E' }
               ]} />
               <Text style={styles.connectionText}>
                 {connectionStatus === 'connected' ? 'Live' : connectionStatus === 'error' ? 'Error' : 'Offline'}

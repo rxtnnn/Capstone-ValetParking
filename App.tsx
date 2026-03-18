@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { 
@@ -29,6 +29,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import NotificationService from './src/services/NotificationService';
+import { RealTimeParkingService } from './src/services/RealtimeParkingService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
 
@@ -216,6 +217,22 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
   const { user } = useAuth();
   const userRole = user?.role?.toLowerCase();
 
+  // Track best floor (most available spots) for smart map navigation
+  const [bestFloor, setBestFloor] = useState(4);
+  const unsubBestFloorRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const unsub = RealTimeParkingService.onParkingUpdate((stats) => {
+      if (stats.floors && stats.floors.length > 0) {
+        const top = stats.floors.reduce((best, f) =>
+          f.available > best.available ? f : best, stats.floors[0]);
+        setBestFloor(top.floor);
+      }
+    });
+    unsubBestFloorRef.current = unsub;
+    return () => { unsub(); };
+  }, []);
+
   // Debug: Log the user role to help identify issues
   console.log('GlobalTabBar - User role:', userRole, '| User:', user?.name);
 
@@ -271,7 +288,7 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 
         <TouchableOpacity
           style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]}
-          onPress={() => navigation.navigate('ParkingMap', { floor: 1 })}
+          onPress={() => navigation.navigate('ParkingMap', { floor: bestFloor })}
         >
           <Ionicons
             name={isActive('ParkingMap') ? 'map' : 'map-outline'}
@@ -334,7 +351,7 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 
         <TouchableOpacity
           style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]}
-          onPress={() => navigation.navigate('ParkingMap', { floor: 1 })}
+          onPress={() => navigation.navigate('ParkingMap', { floor: bestFloor })}
         >
           <Ionicons
             name={isActive('ParkingMap') ? 'map' : 'map-outline'}
@@ -396,7 +413,7 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
 
       <TouchableOpacity
         style={[tabBarStyles.tabItem, isActive('ParkingMap') && tabBarStyles.activeTab]}
-        onPress={() => navigation.navigate('ParkingMap', { floor: 1 })}
+        onPress={() => navigation.navigate('ParkingMap', { floor: bestFloor })}
       >
         <Ionicons
           name={isActive('ParkingMap') ? 'map' : 'map-outline'}
@@ -546,7 +563,7 @@ const AppNavigator: React.FC = () => {
   if (loading) {
     return (
       <NavigationContainer>
-        <StatusBar barStyle="light-content" backgroundColor="#4C0E0E" translucent={false} />
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.secondary} translucent={false} />
         <LoadingScreen />
       </NavigationContainer>
     );
@@ -805,7 +822,7 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
       name: 'VALET Notifications',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#B22020',
+      lightColor: COLORS.primary,
       sound: 'default',
     });
   }

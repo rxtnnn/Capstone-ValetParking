@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TokenManager } from '../config/api';
 import apiClient from '../config/api';
 import { NotificationManager } from './NotifManager';
+import { API_ENDPOINTS, COLORS } from '../constants/AppConst';
 
 export interface NotificationSettings {
   spotAvailable: boolean;
@@ -100,7 +101,7 @@ class NotificationServiceClass {
         name: 'Floor Status Updates',
         description: 'Updates about floor occupancy changes',
         importance: Notifications.AndroidImportance.DEFAULT,
-        lightColor: '#2196F3',
+        lightColor: COLORS.blue,
         vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         enableVibrate: settings.vibration,
         sound: settings.sound ? 'default' : undefined,
@@ -111,7 +112,7 @@ class NotificationServiceClass {
         name: 'Feedback Replies',
         description: 'Admin replies to your feedback',
         importance: Notifications.AndroidImportance.HIGH,
-        lightColor: '#B22020',
+        lightColor: COLORS.primary,
         vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         enableVibrate: settings.vibration,
         sound: settings.sound ? 'default' : undefined,
@@ -769,7 +770,7 @@ class NotificationServiceClass {
       console.log('=== PUSH TOKEN SYNC: Sending to backend ===', token);
 
       // Send to backend
-      const response = await apiClient.post('/user/push-token', {
+      const response = await apiClient.post(API_ENDPOINTS.pushToken, {
         expo_push_token: token,
       });
 
@@ -794,7 +795,7 @@ class NotificationServiceClass {
    */
   async removePushTokenFromBackend(): Promise<boolean> {
     try {
-      const response = await apiClient.delete('/user/push-token');
+      const response = await apiClient.delete(API_ENDPOINTS.pushToken);
 
       if (response.data?.success) {
         console.log('Push token removed from backend successfully');

@@ -307,7 +307,7 @@ const RfidTagFormScreen: React.FC = () => {
 
         {/* Info Card */}
         <View style={styles.infoCard}>
-          <Ionicons name="information-circle-outline" size={24} color="#2196F3" />
+          <Ionicons name="information-circle-outline" size={24} color={COLORS.blue} />
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>User & Vehicle Assignment</Text>
             <Text style={styles.infoText}>

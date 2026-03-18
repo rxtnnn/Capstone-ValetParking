@@ -28,7 +28,7 @@ export interface LoginResponse {
 
 const API_CONFIG = {
   BASE_URL: API_ENDPOINTS.baseUrl,
-  USERS_URL: API_ENDPOINTS.userUrl,
+  USERS_URL: `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.users}`,
 } as const;
 
 const ERROR_MESSAGES = {
@@ -65,7 +65,7 @@ class AuthService {
       };
 
       // Use the main login endpoint
-      const response = await fetch(`${API_CONFIG.BASE_URL}/login`, {
+      const response = await fetch(`${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.login}`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -140,7 +140,7 @@ class AuthService {
   async findUserInAPI(email: string): Promise<{ success: boolean; user?: User; message?: string }> {
     try {
       // Use apiClient which automatically includes the dynamic token
-      const response = await apiClient.get('/users');
+      const response = await apiClient.get(API_ENDPOINTS.users);
       
       const users = this.extractUsersArray(response.data);
 
@@ -171,7 +171,7 @@ class AuthService {
 
   async getAvailableUsers(): Promise<{ success: boolean; users: string[]; message: string }> {
     try {
-      const response = await apiClient.get('/users');
+      const response = await apiClient.get(API_ENDPOINTS.users);
       const users = this.extractUsersArray(response.data);
 
       if (users.length > 0) {
@@ -234,7 +234,7 @@ class AuthService {
   async logout(): Promise<void> {
     try {
       try {
-        await apiClient.post('/logout');
+        await apiClient.post(API_ENDPOINTS.logout);
       } catch (error) {
         console.warn('Logout endpoint call failed:', error);
       }
@@ -254,7 +254,7 @@ class AuthService {
 
   async validateToken(): Promise<boolean> {
     try {
-      await apiClient.get('/user'); 
+      await apiClient.get(API_ENDPOINTS.user); 
       return true;
     } catch (error: any) {
       if (error.response?.status === 401) {

@@ -175,7 +175,7 @@ const GuestManagementScreen: React.FC = () => {
 
       {item.status === 'approved' && item.approved_by_name && (
         <View style={styles.approvedInfo}>
-          <Ionicons name="checkmark-circle" size={16} color="#48D666" />
+          <Ionicons name="checkmark-circle" size={16} color={COLORS.green} />
           <Text style={styles.approvedText}>
             Approved by {item.approved_by_name}
           </Text>
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   headerBadge: {
-    backgroundColor: '#FF9801',
+    backgroundColor: COLORS.limited,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   approveButton: {
-    backgroundColor: '#48D666',
+    backgroundColor: COLORS.green,
   },
   denyButton: {
     backgroundColor: '#FF6B6B',
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   },
   approvedText: {
     fontSize: 13,
-    color: '#48D666',
+    color: COLORS.green,
     marginLeft: 6,
   },
   guestFooter: {

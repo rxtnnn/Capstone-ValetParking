@@ -126,7 +126,7 @@ const AlertsScreen: React.FC = () => {
         </View>
         {item.acknowledged ? (
           <View style={styles.acknowledgedBadge}>
-            <Ionicons name="checkmark-circle" size={16} color="#48D666" />
+            <Ionicons name="checkmark-circle" size={16} color={COLORS.green} />
             <Text style={styles.acknowledgedText}>Acknowledged</Text>
           </View>
         ) : (
@@ -225,7 +225,7 @@ const AlertsScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="checkmark-circle-outline" size={64} color="#48D666" />
+            <Ionicons name="checkmark-circle-outline" size={64} color={COLORS.green} />
             <Text style={styles.emptyTitle}>All Clear</Text>
             <Text style={styles.emptySubtitle}>
               {showAcknowledged
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#FF6B6B',
   },
   alertCardAcknowledged: {
-    borderLeftColor: '#48D666',
+    borderLeftColor: COLORS.green,
     opacity: 0.8,
   },
   alertHeader: {
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   acknowledgedText: {
     fontSize: 12,
-    color: '#48D666',
+    color: COLORS.green,
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   },
   acknowledgedInfoText: {
     fontSize: 12,
-    color: '#48D666',
+    color: COLORS.green,
   },
   acknowledgedNotes: {
     fontSize: 12,
