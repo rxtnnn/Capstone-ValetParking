@@ -8,6 +8,11 @@ import {
   RefreshControl,
   ActivityIndicator,
   useWindowDimensions,
+  Modal,
+  TextInput,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -16,6 +21,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidAdminService } from '../../services/RfidAdminService';
 import { RfidDashboardStats, getReaderStatusColor } from '../../types/rfid';
 import { COLORS } from '../../constants/AppConst';
+import apiClient from '../../config/api';
 
 type RootStackParamList = {
   AdminDashboard: undefined;
@@ -34,6 +40,29 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<RfidDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Verify Vehicle modal
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyMode, setVerifyMode] = useState<'rfid' | 'plate'>('rfid');
+  const [verifyInput, setVerifyInput] = useState('');
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  type VerifyResult = { found: boolean; valid?: boolean; status?: string; message: string; user_name?: string; user_role?: string; vehicle_plate?: string; vehicle_make?: string; vehicle_model?: string; uid?: string; expiry_date?: string };
+  const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+
+  const handleVerify = async () => {
+    const value = verifyInput.trim();
+    if (!value) return;
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    try {
+      const res = await apiClient.post('/public/verify-vehicle', { mode: verifyMode, value });
+      setVerifyResult(res.data);
+    } catch {
+      setVerifyResult({ found: false, message: 'Verification failed. Check connection.' });
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -271,11 +300,145 @@ const AdminDashboard: React.FC = () => {
               color="#9E9E9E"
               onPress={() => navigation.navigate('Settings')}
             />
+            <QuickActionButton
+              title="Verify Vehicle"
+              icon="search"
+              color="#9C27B0"
+              onPress={() => {
+                setVerifyMode('rfid');
+                setVerifyInput('');
+                setVerifyResult(null);
+                setShowVerifyModal(true);
+              }}
+            />
           </View>
         </View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Verify Vehicle Modal */}
+      <Modal
+        visible={showVerifyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowVerifyModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowVerifyModal(false)}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.5)' }}
+          >
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, overflow: 'hidden' }}>
+
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', gap: 10 }}>
+                  <Ionicons name="search" size={22} color="#333" />
+                  <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: '#333' }}>Verify Vehicle</Text>
+                  <TouchableOpacity onPress={() => setShowVerifyModal(false)} style={{ padding: 4 }}>
+                    <Ionicons name="close" size={22} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ padding: 16 }}>
+                  {/* Tab switcher */}
+                  <View style={{ flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, marginBottom: 16, padding: 3 }}>
+                    {(['rfid', 'plate'] as const).map(mode => (
+                      <TouchableOpacity
+                        key={mode}
+                        onPress={() => { setVerifyMode(mode); setVerifyInput(''); setVerifyResult(null); }}
+                        style={{
+                          flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          paddingVertical: 9, borderRadius: 6,
+                          backgroundColor: verifyMode === mode ? '#333' : 'transparent',
+                        }}
+                      >
+                        <Ionicons
+                          name={mode === 'rfid' ? 'card-outline' : 'person-outline'}
+                          size={15}
+                          color={verifyMode === mode ? '#fff' : '#888'}
+                        />
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: verifyMode === mode ? '#fff' : '#888' }}>
+                          {mode === 'rfid' ? 'RFID' : 'Guest'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Input */}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 6 }}>
+                    {verifyMode === 'rfid' ? 'RFID Tag' : 'Plate Number'}
+                  </Text>
+                  <TextInput
+                    style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#333', marginBottom: 12 }}
+                    placeholder={verifyMode === 'rfid' ? 'Enter RFID tag to verify...' : 'Enter plate number'}
+                    placeholderTextColor="#aaa"
+                    value={verifyInput}
+                    onChangeText={t => { setVerifyInput(t); setVerifyResult(null); }}
+                    autoCapitalize="characters"
+                    returnKeyType="search"
+                    onSubmitEditing={handleVerify}
+                  />
+
+                  {/* Result */}
+                  {verifyResult && (
+                    <View style={{
+                      borderRadius: 10, padding: 14, marginBottom: 12,
+                      backgroundColor: verifyResult.found && verifyResult.valid ? '#e8f5e9' : verifyResult.found ? '#fff8e1' : '#ffebee',
+                      borderWidth: 1,
+                      borderColor: verifyResult.found && verifyResult.valid ? '#a5d6a7' : verifyResult.found ? '#ffe082' : '#ef9a9a',
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Ionicons
+                          name={verifyResult.found && verifyResult.valid ? 'checkmark-circle' : verifyResult.found ? 'warning' : 'close-circle'}
+                          size={20}
+                          color={verifyResult.found && verifyResult.valid ? '#388e3c' : verifyResult.found ? '#f57f17' : '#c62828'}
+                        />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: verifyResult.found && verifyResult.valid ? '#388e3c' : verifyResult.found ? '#f57f17' : '#c62828', flex: 1 }}>
+                          {verifyResult.message}
+                        </Text>
+                      </View>
+                      {verifyResult.found && (
+                        <>
+                          {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Owner: {verifyResult.user_name} {verifyResult.user_role ? `(${verifyResult.user_role})` : ''}</Text>}
+                          {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
+                          {(verifyResult.vehicle_make || verifyResult.vehicle_model) && (
+                            <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Vehicle: {[verifyResult.vehicle_make, verifyResult.vehicle_model].filter(Boolean).join(' ')}</Text>
+                          )}
+                          {verifyResult.uid && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>RFID UID: {verifyResult.uid}</Text>}
+                          {verifyResult.expiry_date && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Expiry: {new Date(verifyResult.expiry_date).toLocaleDateString()}</Text>}
+                        </>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Buttons */}
+                  <View style={{ flexDirection: 'row', gap: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowVerifyModal(false)}
+                      style={{ flex: 1, paddingVertical: 11, borderRadius: 8, backgroundColor: '#e0e0e0', alignItems: 'center' }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ color: '#444', fontWeight: '600', fontSize: 14 }}>Close</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleVerify}
+                      disabled={verifyLoading || !verifyInput.trim()}
+                      style={{ flex: 1, paddingVertical: 11, borderRadius: 8, backgroundColor: COLORS.primary, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: verifyLoading || !verifyInput.trim() ? 0.6 : 1 }}
+                      activeOpacity={0.8}
+                    >
+                      {verifyLoading
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <><Ionicons name="search" size={16} color="#fff" /><Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Verify</Text></>}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 };
