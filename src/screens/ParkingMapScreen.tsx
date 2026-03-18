@@ -92,6 +92,10 @@ const ParkingMapScreen: React.FC = () => {
   const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
   const optimisticMalfunctionRef = useRef<{ [spotId: string]: boolean }>({}); // Optimistic malfunction overrides
 
+  // Spot picker modal (for security/admin on available spots)
+  const [showSpotPickerModal, setShowSpotPickerModal] = useState(false);
+  const [spotPickerTarget, setSpotPickerTarget] = useState<ParkingSpot | null>(null);
+
   // Spot actions modal
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
@@ -562,13 +566,19 @@ const ParkingMapScreen: React.FC = () => {
   const handleSpotPress = useCallback((spot: ParkingSpot) => {
     if (!spot.hasSensor) return;
 
-    // Security and admin can tap any sensor-assigned spot
+    // Security and admin: available spots show picker (Show Route / Report Malfunction)
     if (canAccessSpotActions) {
-      setSpotActionsTarget(spot);
-      setReportIssue('');
-      setReportCustomReason('');
-      setIssueDropdownOpen(false);
-      setShowSpotActionsModal(true);
+      if (!spot.malfunctioned && !spot.isOccupied) {
+        setSpotPickerTarget(spot);
+        setShowSpotPickerModal(true);
+      } else {
+        // Occupied or malfunctioned — go straight to actions modal
+        setSpotActionsTarget(spot);
+        setReportIssue('');
+        setReportCustomReason('');
+        setIssueDropdownOpen(false);
+        setShowSpotActionsModal(true);
+      }
       return;
     }
 
@@ -1315,6 +1325,86 @@ const ParkingMapScreen: React.FC = () => {
         </View>
       </View>
     </Modal>
+      {/* Spot Picker Modal — Show Route or Report Malfunction */}
+      <Modal
+        visible={showSpotPickerModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSpotPickerModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowSpotPickerModal(false)}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 340, overflow: 'hidden' }}>
+                {/* Header */}
+                <View style={{ backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="location" size={20} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Spot {spotPickerTarget?.id}</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontFamily: FONTS.regular, fontSize: 12 }}>Available</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowSpotPickerModal(false)}
+                    style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <Ionicons name="close" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Options */}
+                <View style={{ padding: 16, gap: 10 }}>
+                  {/* Show Route */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.green, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    onPress={() => {
+                      setShowSpotPickerModal(false);
+                      const spot = spotPickerTarget;
+                      if (!spot) return;
+                      setSelectedSpot(spot.id);
+                      setSelectedSpotForNav(spot.id);
+                      setHighlightedSpots([]);
+                      setShowNavigationModal(true);
+                    }}
+                  >
+                    <Ionicons name="navigate" size={22} color="#fff" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Show Route</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Display navigation on map</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
+
+                  {/* Report Malfunction */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderWidth: 1.5, borderColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    onPress={() => {
+                      setShowSpotPickerModal(false);
+                      if (!spotPickerTarget) return;
+                      setSpotActionsTarget(spotPickerTarget);
+                      setReportIssue('');
+                      setReportCustomReason('');
+                      setIssueDropdownOpen(false);
+                      setShowSpotActionsModal(true);
+                    }}
+                  >
+                    <Ionicons name="warning" size={22} color={COLORS.primary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: COLORS.primary, fontFamily: FONTS.semiBold, fontSize: 14 }}>Report Malfunction</Text>
+                      <Text style={{ color: '#888', fontFamily: FONTS.regular, fontSize: 12 }}>Flag this spot as malfunctioned</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       {/* Spot Actions Modal — Flag as Malfunctioned */}
       <Modal
         visible={showSpotActionsModal}
