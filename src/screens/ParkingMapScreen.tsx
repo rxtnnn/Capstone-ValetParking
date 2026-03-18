@@ -566,13 +566,14 @@ const ParkingMapScreen: React.FC = () => {
   const handleSpotPress = useCallback((spot: ParkingSpot) => {
     if (!spot.hasSensor) return;
 
-    // Security and admin: available spots show picker (Show Route / Report Malfunction)
+    // Security and admin can tap any sensor-assigned spot
     if (canAccessSpotActions) {
-      if (!spot.malfunctioned && !spot.isOccupied) {
+      // Security on available spots: show picker (Show Route / Report Malfunction)
+      if (isSecurityRole && !spot.malfunctioned && !spot.isOccupied) {
         setSpotPickerTarget(spot);
         setShowSpotPickerModal(true);
       } else {
-        // Occupied or malfunctioned — go straight to actions modal
+        // Admin/SSD, or occupied/malfunctioned spots — go straight to actions modal
         setSpotActionsTarget(spot);
         setReportIssue('');
         setReportCustomReason('');
