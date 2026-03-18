@@ -162,8 +162,8 @@ const RfidTagListScreen: React.FC = () => {
           style={styles.actionButton}
           onPress={() => navigation.navigate('RfidTagForm', { tagId: item.id })}
         >
-          <Ionicons name="create-outline" size={18} color="#2196F3" />
-          <Text style={[styles.actionText, { color: '#2196F3' }]}>Edit</Text>
+          <Ionicons name="create-outline" size={18} color={COLORS.blue} />
+          <Text style={[styles.actionText, { color: COLORS.blue }]}>Edit</Text>
         </TouchableOpacity>
         {item.status === 'active' && (
           <TouchableOpacity

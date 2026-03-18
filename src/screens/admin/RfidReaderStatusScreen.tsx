@@ -204,7 +204,7 @@ const RfidReaderStatusScreen: React.FC = () => {
     return (
       <View style={styles.summaryCard}>
         <View style={styles.summaryItem}>
-          <View style={[styles.summaryDot, { backgroundColor: '#48D666' }]} />
+          <View style={[styles.summaryDot, { backgroundColor: COLORS.green }]} />
           <Text style={styles.summaryValue}>{online}</Text>
           <Text style={styles.summaryLabel}>Online</Text>
         </View>

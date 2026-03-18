@@ -1,4 +1,3 @@
-// src/constants/AppConst.ts
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 
 export const COLORS = {
@@ -11,9 +10,47 @@ export const COLORS = {
 };
 
 export const API_ENDPOINTS = {
-  login: '/api/auth/login',
+  // Base
   baseUrl: 'https://valet.up.railway.app/api',
-  userUrl: 'https://valet.up.railway.app/api/public/users',
+
+  // Auth
+  login: '/login',
+  logout: '/logout',
+  changePassword: '/change-password',
+
+  // User
+  user: '/user',
+  users: '/users',
+  pushToken: '/user/push-token',
+
+  // Feedback
+  feedbacks: '/feedbacks',
+  feedbackById: (id: number) => `/feedbacks/${id}`,
+
+  // Parking (public)
+  publicParking: '/public/parking',
+  publicParkingMap: '/public/parking/map',
+  publicParkingDashboard: '/public/parking/dashboard',
+  parkingMalfunction: (spaceId: number) => `/parking/${spaceId}/malfunction`,
+
+  // Parking config (public)
+  parkingConfig: (locationId: number | string) => `/public/parking-config/${locationId}`,
+
+  // RFID (public)
+  publicRfidScans: '/public/rfid/scans',
+  publicRfidVerify: '/public/rfid/verify',
+  publicVerifyVehicle: '/public/verify-vehicle',
+
+  // RFID tags (admin)
+  rfidTags: '/rfid/tags',
+  rfidTagById: (id: number) => `/rfid/tags/${id}`,
+  rfidTagByUid: (uid: string) => `/rfid/tags/uid/${uid}`,
+  rfidTagDeactivate: (id: number) => `/rfid/tags/${id}/deactivate`,
+
+  // RFID readers (admin)
+  rfidReaders: '/rfid/readers',
+  rfidReaderById: (id: number) => `/rfid/readers/${id}`,
+  rfidReaderRestart: (id: number) => `/rfid/readers/${id}/restart`,
 };
 
 export const FONTS = {

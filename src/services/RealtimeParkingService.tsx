@@ -1,6 +1,7 @@
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
 import { TokenManager } from '../config/api';
+import { API_ENDPOINTS } from '../constants/AppConst';
 
 export interface ParkingSpace {
   id: number;
@@ -36,7 +37,7 @@ type ParkingUpdateCallback = (data: ParkingStats) => void;
 type ConnectionStatusCallback = (status: 'connected' | 'disconnected' | 'error') => void;
 
 class RealTimeParkingServiceClass {
-  private apiUrl = 'https://valet.up.railway.app/api/public/parking';
+  private apiUrl = `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.publicParking}`;
   private readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
   
   private updateCallbacks: ParkingUpdateCallback[] = [];
@@ -509,7 +510,7 @@ class RealTimeParkingServiceClass {
   }
 
   async reportMalfunction(spaceId: number, reason: string, token: string, slotName?: string): Promise<{ success: boolean; message: string }> {
-    const url = `https://valet.up.railway.app/api/parking/${spaceId}/malfunction`;
+    const url = `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.parkingMalfunction(spaceId)}`;
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -538,7 +539,7 @@ class RealTimeParkingServiceClass {
   }
 
   async clearMalfunction(spaceId: number, token: string): Promise<{ success: boolean; message: string }> {
-    const url = `https://valet.up.railway.app/api/parking/${spaceId}/malfunction`;
+    const url = `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.parkingMalfunction(spaceId)}`;
     try {
       const response = await fetch(url, {
         method: 'DELETE',

@@ -21,6 +21,7 @@ import {
 import apiClient, { TokenManager } from '../config/api';
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
+import { API_ENDPOINTS } from '../constants/AppConst';
 
 // Invalid statuses that should trigger alerts/notifications
 const INVALID_STATUSES = new Set(['invalid', 'expired', 'suspended', 'lost', 'unknown']);
@@ -140,7 +141,7 @@ class RfidSecurityServiceClass {
 
     try {
       // Fetch real RFID scan data from backend
-      const response = await apiClient.get('/public/rfid/scans', {
+      const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, {
         params: { minutes: 5 },
       });
 
@@ -636,7 +637,7 @@ class RfidSecurityServiceClass {
 
   async verifyRfidManually(uid: string): Promise<VerificationResult> {
     try {
-      const response = await apiClient.post('/public/rfid/verify', { uid: uid.toUpperCase() });
+      const response = await apiClient.post(API_ENDPOINTS.publicRfidVerify, { uid: uid.toUpperCase() });
       const data = response.data;
 
       const scan: RfidScanEvent = {

@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native";
+import { COLORS } from '../../constants/AppConst';
 
 export const styles = StyleSheet.create({
   overlay: {
@@ -63,7 +64,7 @@ export const styles = StyleSheet.create({
     marginRight: 8,
   },
   activeFilterTab: {
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
   },
   filterTabText: {
     fontSize: 12,
@@ -117,7 +118,7 @@ export const styles = StyleSheet.create({
   unreadNotification: {
     backgroundColor: '#fafafa',
     borderLeftWidth: 3,
-    borderLeftColor: '#B22020',
+    borderLeftColor: COLORS.primary,
   },
   deletingNotification: {
     opacity: 0.5,
@@ -152,7 +153,7 @@ export const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
     marginTop: 4,
     marginRight: 8,
   },
@@ -189,7 +190,7 @@ export const styles = StyleSheet.create({
   feedbackIdText: {
     fontSize: 10,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#B22020',
+    color: COLORS.primary,
   },
   feedbackPreview: {
     fontSize: 11,
@@ -214,7 +215,7 @@ export const styles = StyleSheet.create({
   floorInfo: {
     fontSize: 11,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#48D666',
+    color: COLORS.green,
     marginBottom: 2,
   },
   spotsInfo: {
@@ -258,7 +259,7 @@ export const styles = StyleSheet.create({
   markAllReadText: {
     fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#B22020',
+    color: COLORS.primary,
   },
   floorBadge: {
     flexDirection: 'row',
@@ -285,7 +286,7 @@ export const styles = StyleSheet.create({
     gap: 6,
   },
   spotIdBadge: {
-    backgroundColor: '#48D666',
+    backgroundColor: COLORS.green,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -308,7 +309,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#2196F3',
+    borderLeftColor: COLORS.blue,
   },
   floorUpdateHeader: {
     flexDirection: 'row',
@@ -317,7 +318,7 @@ export const styles = StyleSheet.create({
     marginBottom: 6,
   },
   occupancyBadge: {
-    backgroundColor: '#2196F3',
+    backgroundColor: COLORS.blue,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,

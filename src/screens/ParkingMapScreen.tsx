@@ -391,8 +391,8 @@ const ParkingMapScreen: React.FC = () => {
   }, [updateParkingSpotsFromService]);
 
   useEffect(() => {
-     translateX.value = -300; 
-    translateY.value = 100; 
+    translateX.value = 90;
+    translateY.value = 70;
     subscribeToParkingData();
     return () => {
       Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
@@ -719,7 +719,7 @@ const ParkingMapScreen: React.FC = () => {
       style={[
         styles.sectionIndicator,
         { 
-          backgroundColor: section.isFull ? '#666' : '#B22020',
+          backgroundColor: section.isFull ? '#666' : COLORS.primary,
           borderColor: highlightedSection === section.id ? '#FFD700' : 'transparent',
           borderWidth: highlightedSection === section.id ? 2 : 0,
         },
@@ -914,16 +914,16 @@ const ParkingMapScreen: React.FC = () => {
         <Text style={styles.refreshText}>Refresh</Text>
       </TouchableOpacity>
 
-      {/* Legend */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 6, gap: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+      <View style={{ position: 'absolute', top: 130, left: 12, right: 12, zIndex: 2000, flexDirection: 'row', justifyContent: 'center', gap: 10, backgroundColor: 'rgb(71, 69, 69)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, elevation: 10 }}>
         {[
-          { color: '#48D666', label: 'Available' },
-          { color: '#B22020', label: 'Occupied' },
+          { color: COLORS.green, label: 'Available' },
+          { color: COLORS.primary, label: 'Occupied' },
+          { color: '#FF9800', label: 'Malfunction' },
           { color: '#CCCCCC', label: 'No Sensor' },
         ].map(({ color, label }) => (
           <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: color }} />
-            <Text style={{ fontSize: 11, color: '#444', fontFamily: FONTS.regular }}>{label}</Text>
+            <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: color }} />
+            <Text style={{ fontSize: 11, color: 'white', fontFamily: FONTS.regular }}>{label}</Text>
           </View>
         ))}
       </View>
@@ -989,7 +989,11 @@ const ParkingMapScreen: React.FC = () => {
       </GestureDetector>
 
       {showNavigation && (
-        <View style={{ position: 'absolute', top: 150, right: 20, gap: 10, zIndex: 2000 }}>
+        <View style={{ position: 'absolute', top: 180, right: 20, gap: 10, zIndex: 2000 }}>
+          <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.green }]} onPress={() => setShowParkingConfirmModal(true)}>
+            <Ionicons name="checkmark-circle" size={20} color="white" />
+            <Text style={styles.clearRouteText}>I've Parked</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.primary }]} onPress={clearNavigation}>
             <Ionicons name="close-circle" size={20} color="white" />
             <Text style={styles.clearRouteText}>Clear Route</Text>

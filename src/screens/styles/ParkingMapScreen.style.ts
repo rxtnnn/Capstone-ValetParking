@@ -85,7 +85,7 @@ export const styles = StyleSheet.create({
   },
   refreshButton: {
     position: 'absolute',
-    top: 150,
+    top: 180,
     left: 20,
     backgroundColor: 'rgba(178, 32, 32, 0.8)',
     borderRadius: 20,
@@ -322,7 +322,7 @@ export const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
   },
   primaryButton: {
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 10,
     paddingVertical: 12,
     borderRadius: 25,
@@ -343,7 +343,7 @@ export const styles = StyleSheet.create({
   },
   clearRouteButton: {
     position: 'absolute',
-    top: 150,
+    top: 180,
     right: 20,
     backgroundColor: 'rgba(255, 0, 0, 0.8)',
     borderRadius: 20,

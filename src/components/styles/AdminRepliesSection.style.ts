@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { COLORS } from '../../constants/AppConst';
 
 export const adminRepliesStyles = StyleSheet.create({
   container: {
@@ -22,7 +23,7 @@ export const adminRepliesStyles = StyleSheet.create({
     flex: 1,
   },
   headerBadge: {
-    backgroundColor: '#B22020',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -122,7 +123,7 @@ export const adminRepliesStyles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#B22020',
+    borderLeftColor: COLORS.primary,
   },
   adminReplyHeader: {
     flexDirection: 'row',
@@ -132,7 +133,7 @@ export const adminRepliesStyles = StyleSheet.create({
   adminReplyLabel: {
     fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#B22020',
+    color: COLORS.primary,
     marginLeft: 6,
     flex: 1,
   },

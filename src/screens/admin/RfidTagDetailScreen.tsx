@@ -416,10 +416,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   editActionButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: COLORS.blue,
   },
   deactivateButton: {
-    backgroundColor: '#FF9801',
+    backgroundColor: COLORS.limited,
   },
   deleteButton: {
     backgroundColor: '#FF6B6B',

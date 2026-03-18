@@ -1,5 +1,6 @@
 // RFID Types for VALET Parking App
 // Used by Admin and Security roles for RFID management and monitoring
+import { COLORS } from '../constants/AppConst';
 
 // ============================================
 // Core Data Models
@@ -292,19 +293,19 @@ export const isAlertType = (value: string): value is AlertType => {
 export const getStatusColor = (status: RfidTagStatus | ScanStatus | GuestAccessStatus): string => {
   const colorMap: Record<string, string> = {
     // RfidTagStatus
-    active: '#48D666',
+    active: COLORS.green,
     expired: '#FF6B6B',
-    suspended: '#FF9801',
+    suspended: COLORS.limited,
     lost: '#9E9E9E',
     // ScanStatus
-    valid: '#48D666',
+    valid: COLORS.green,
     invalid: '#FF6B6B',
     unknown: '#9E9E9E',
     // GuestAccessStatus
-    pending: '#FF9801',
-    approved: '#48D666',
+    pending: COLORS.limited,
+    approved: COLORS.green,
     denied: '#FF6B6B',
-    checked_in: '#2196F3',
+    checked_in: COLORS.blue,
     checked_out: '#9E9E9E',
   };
   return colorMap[status] || '#9E9E9E';
@@ -312,7 +313,7 @@ export const getStatusColor = (status: RfidTagStatus | ScanStatus | GuestAccessS
 
 export const getReaderStatusColor = (status: ReaderStatus): string => {
   switch (status) {
-    case 'online': return '#48D666';
+    case 'online': return COLORS.green;
     case 'offline': return '#9E9E9E';
     case 'error': return '#FF6B6B';
     default: return '#9E9E9E';
@@ -321,10 +322,10 @@ export const getReaderStatusColor = (status: ReaderStatus): string => {
 
 export const getAlertSeverityColor = (severity: RfidAlert['severity']): string => {
   switch (severity) {
-    case 'low': return '#2196F3';
-    case 'medium': return '#FF9801';
+    case 'low': return COLORS.blue;
+    case 'medium': return COLORS.limited;
     case 'high': return '#FF6B6B';
-    case 'critical': return '#B22020';
+    case 'critical': return COLORS.primary;
     default: return '#9E9E9E';
   }
 };

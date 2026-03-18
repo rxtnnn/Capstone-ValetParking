@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { COLORS } from '../../constants/AppConst';
 
 interface ResponsiveStylesParams {
   width: number;
@@ -108,7 +109,7 @@ export const createResponsiveStyles = ({ width, height }: ResponsiveStylesParams
       marginBottom: width * 0.044,
     },
     errorText: {
-      color: '#C53030',
+      color: COLORS.buttons,
       fontSize: getResponsiveSize(12, 14, 15, 16),
       marginLeft: width * 0.022,
       flex: 1,
@@ -136,8 +137,8 @@ export const createResponsiveStyles = ({ width, height }: ResponsiveStylesParams
       backgroundColor: '#ffffff',
     },
     checkboxChecked: {
-      backgroundColor: '#C53030',
-      borderColor: '#C53030',
+      backgroundColor: COLORS.buttons,
+      borderColor: COLORS.buttons,
     },
     rememberMeText: {
       fontSize: getResponsiveSize(12, 14, 15, 16),
@@ -145,12 +146,12 @@ export const createResponsiveStyles = ({ width, height }: ResponsiveStylesParams
     },
     forgotPasswordText: {
       fontSize: getResponsiveSize(12, 14, 15, 16),
-      color: '#C53030',
+      color: COLORS.buttons,
       fontWeight: '500',
     },
     loginButton: {
       height: getResponsiveSize(45, 50, 52, 56),
-      backgroundColor: '#C53030',
+      backgroundColor: COLORS.buttons,
       borderRadius: 8,
       justifyContent: 'center',
       alignItems: 'center',
@@ -198,7 +199,7 @@ export const createResponsiveStyles = ({ width, height }: ResponsiveStylesParams
     },
     createAccountLink: {
       fontSize: getResponsiveSize(12, 14, 15, 16),
-      color: '#C53030',
+      color: COLORS.buttons,
       fontWeight: '600',
     },
   });

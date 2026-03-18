@@ -330,7 +330,7 @@ export const logout = async (): Promise<void> => {
   try {
     // Call logout endpoint to revoke Sanctum token on server
     try {
-      await apiClient.post('/logout');
+      await apiClient.post(API_ENDPOINTS.logout);
       console.log('Sanctum token revoked on server');
     } catch (apiError: any) {
       // Log but don't fail - we still want to clear local token

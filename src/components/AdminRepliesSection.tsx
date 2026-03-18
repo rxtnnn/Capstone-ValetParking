@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { COLORS } from '../constants/AppConst';
 import {
   View,
   Text,
@@ -90,7 +91,7 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
     return (
       <View style={adminRepliesStyles.container}>
         <View style={adminRepliesStyles.header}>
-          <Ionicons name="chatbubbles-outline" size={24} color="#B22020" />
+          <Ionicons name="chatbubbles-outline" size={24} color={COLORS.primary} />
           <Text style={adminRepliesStyles.headerTitle}>Admin Replies</Text>
           <TouchableOpacity onPress={handleRefresh} style={adminRepliesStyles.refreshButton}>
             <Ionicons name="refresh" size={20} color="#6B7280" />
@@ -154,7 +155,7 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
 
             <View style={adminRepliesStyles.adminReplyContainer}>
               <View style={adminRepliesStyles.adminReplyHeader}>
-                <Ionicons name="person-circle-outline" size={20} color="#B22020" />
+                <Ionicons name="person-circle-outline" size={20} color={COLORS.primary} />
                 <Text style={adminRepliesStyles.adminReplyLabel}>Admin Response</Text>
                 {item.responded_at && (
                   <Text style={adminRepliesStyles.replyTime}>
@@ -175,7 +176,7 @@ const AdminRepliesSection: React.FC<AdminRepliesSectionProps> = ({ onRefresh }) 
                 borderTopWidth: 1,
                 borderTopColor: '#f0f0f0',
               }}>
-                <Ionicons name="notifications-outline" size={14} color="#B22020" />
+                <Ionicons name="notifications-outline" size={14} color={COLORS.primary} />
                 <Text style={{
                   fontSize: 11,
                   color: '#666',

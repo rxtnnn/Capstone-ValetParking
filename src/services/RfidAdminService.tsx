@@ -11,6 +11,7 @@ import {
   PaginatedResponse,
 } from '../types/rfid';
 import apiClient from '../config/api';
+import { API_ENDPOINTS } from '../constants/AppConst';
 
 // ============================================
 // Service Class
@@ -28,7 +29,7 @@ class RfidAdminServiceClass {
   async getAllTags(filters?: RfidTagFilters): Promise<PaginatedResponse<RfidTag>> {
     try {
       // Try to fetch from backend API
-      const response = await apiClient.get('/rfid/tags', { params: filters });
+      const response = await apiClient.get(API_ENDPOINTS.rfidTags, { params: filters });
       if (response.data?.data) {
         this.tags = response.data.data;
         return {
@@ -78,7 +79,7 @@ class RfidAdminServiceClass {
 
   async getTagById(id: number): Promise<RfidTag | null> {
     try {
-      const response = await apiClient.get(`/rfid/tags/${id}`);
+      const response = await apiClient.get(API_ENDPOINTS.rfidTagById(id));
       return response.data?.data || response.data || null;
     } catch (error: any) {
       console.log('RFID tag detail API not available:', error?.message);
@@ -88,7 +89,7 @@ class RfidAdminServiceClass {
 
   async getTagByUid(uid: string): Promise<RfidTag | null> {
     try {
-      const response = await apiClient.get(`/rfid/tags/uid/${uid.toUpperCase()}`);
+      const response = await apiClient.get(API_ENDPOINTS.rfidTagByUid(uid.toUpperCase()));
       return response.data?.data || response.data || null;
     } catch (error: any) {
       console.log('RFID tag UID lookup API not available:', error?.message);
@@ -98,7 +99,7 @@ class RfidAdminServiceClass {
 
   async createTag(data: RfidTagFormData): Promise<RfidApiResponse<RfidTag>> {
     try {
-      const response = await apiClient.post('/rfid/tags', {
+      const response = await apiClient.post(API_ENDPOINTS.rfidTags, {
         ...data,
         uid: data.uid.toUpperCase(),
       });
@@ -118,7 +119,7 @@ class RfidAdminServiceClass {
 
   async updateTag(id: number, data: Partial<RfidTagFormData>): Promise<RfidApiResponse<RfidTag>> {
     try {
-      const response = await apiClient.put(`/rfid/tags/${id}`, {
+      const response = await apiClient.put(API_ENDPOINTS.rfidTagById(id), {
         ...data,
         uid: data.uid ? data.uid.toUpperCase() : undefined,
       });
@@ -138,7 +139,7 @@ class RfidAdminServiceClass {
 
   async deactivateTag(id: number): Promise<RfidApiResponse<void>> {
     try {
-      const response = await apiClient.patch(`/rfid/tags/${id}/deactivate`);
+      const response = await apiClient.patch(API_ENDPOINTS.rfidTagDeactivate(id));
       return {
         success: true,
         message: response.data?.message || 'RFID tag deactivated successfully',
@@ -153,7 +154,7 @@ class RfidAdminServiceClass {
 
   async deleteTag(id: number): Promise<RfidApiResponse<void>> {
     try {
-      const response = await apiClient.delete(`/rfid/tags/${id}`);
+      const response = await apiClient.delete(API_ENDPOINTS.rfidTagById(id));
       return {
         success: true,
         message: response.data?.message || 'RFID tag deleted successfully',
@@ -172,7 +173,7 @@ class RfidAdminServiceClass {
 
   async getReaders(): Promise<RfidReader[]> {
     try {
-      const response = await apiClient.get('/rfid/readers');
+      const response = await apiClient.get(API_ENDPOINTS.rfidReaders);
       if (response.data?.data) {
         this.readers = response.data.data;
         return response.data.data;
@@ -184,9 +185,9 @@ class RfidAdminServiceClass {
     return [...this.readers];
   }
 
-  async getReaderById(id: string): Promise<RfidReader | null> {
+  async getReaderById(id: string | number): Promise<RfidReader | null> {
     try {
-      const response = await apiClient.get(`/rfid/readers/${id}`);
+      const response = await apiClient.get(API_ENDPOINTS.rfidReaderById(Number(id)));
       return response.data?.data || response.data || null;
     } catch (error: any) {
       console.log('RFID reader detail API not available:', error?.message);
@@ -194,9 +195,9 @@ class RfidAdminServiceClass {
     }
   }
 
-  async restartReader(readerId: string): Promise<RfidApiResponse<void>> {
+  async restartReader(readerId: string | number): Promise<RfidApiResponse<void>> {
     try {
-      const response = await apiClient.post(`/rfid/readers/${readerId}/restart`);
+      const response = await apiClient.post(API_ENDPOINTS.rfidReaderRestart(Number(readerId)));
       return {
         success: true,
         message: response.data?.message || 'Reader restart initiated successfully',
@@ -215,7 +216,7 @@ class RfidAdminServiceClass {
 
   async getDashboardStats(): Promise<RfidDashboardStats> {
     try {
-      const response = await apiClient.get('/public/parking/dashboard');
+      const response = await apiClient.get(API_ENDPOINTS.publicParkingDashboard);
       const data = response.data;
 
       // Map backend parking dashboard to RFID dashboard stats

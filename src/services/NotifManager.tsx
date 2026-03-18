@@ -411,7 +411,6 @@ class NotificationManagerClass {
         if (!this.processedReplies.has(replyId)) {
           await this.addFeedbackReplyNotification(
             feedback.id,
-            feedback.message,
             feedback.admin_response!,
             'Admin Team',
             feedback.responded_at

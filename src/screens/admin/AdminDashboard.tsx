@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidAdminService } from '../../services/RfidAdminService';
 import { RfidDashboardStats, getReaderStatusColor } from '../../types/rfid';
-import { COLORS } from '../../constants/AppConst';
+import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
 import apiClient from '../../config/api';
 
 type RootStackParamList = {
@@ -55,7 +55,7 @@ const AdminDashboard: React.FC = () => {
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
-      const res = await apiClient.post('/public/verify-vehicle', { mode: verifyMode, value });
+      const res = await apiClient.post(API_ENDPOINTS.publicVerifyVehicle, { mode: verifyMode, value });
       setVerifyResult(res.data);
     } catch {
       setVerifyResult({ found: false, message: 'Verification failed. Check connection.' });
@@ -184,14 +184,14 @@ const AdminDashboard: React.FC = () => {
               value={stats?.total_tags || 0}
               icon="card"
               iconFamily="material"
-              color="#2196F3"
+              color={COLORS.blue}
               onPress={() => navigation.navigate('RfidTagList')}
             />
             <StatCard
               title="Active"
               value={stats?.active_tags || 0}
               icon="checkmark-circle"
-              color="#48D666"
+              color={COLORS.green}
               onPress={() => navigation.navigate('RfidTagList')}
             />
             <StatCard
@@ -205,7 +205,7 @@ const AdminDashboard: React.FC = () => {
               title="Expiring Soon"
               value={stats?.expiring_soon || 0}
               icon="warning"
-              color="#FF9801"
+              color={COLORS.limited}
               onPress={() => navigation.navigate('RfidTagList')}
             />
           </View>
@@ -222,7 +222,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.readerStatusCard}>
             <View style={styles.readerStatusRow}>
               <View style={styles.readerStatusItem}>
-                <View style={[styles.statusDot, { backgroundColor: '#48D666' }]} />
+                <View style={[styles.statusDot, { backgroundColor: COLORS.green }]} />
                 <Text style={styles.readerStatusValue}>{stats?.readers_online || 0}</Text>
                 <Text style={styles.readerStatusLabel}>Online</Text>
               </View>
@@ -246,13 +246,13 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.activityCard}>
             <View style={styles.activityRow}>
               <View style={styles.activityItem}>
-                <Ionicons name="enter-outline" size={24} color="#48D666" />
+                <Ionicons name="enter-outline" size={24} color={COLORS.green} />
                 <Text style={styles.activityValue}>{stats?.today_entries || 0}</Text>
                 <Text style={styles.activityLabel}>Entries</Text>
               </View>
               <View style={styles.activityDivider} />
               <View style={styles.activityItem}>
-                <Ionicons name="exit-outline" size={24} color="#2196F3" />
+                <Ionicons name="exit-outline" size={24} color={COLORS.blue} />
                 <Text style={styles.activityValue}>{stats?.today_exits || 0}</Text>
                 <Text style={styles.activityLabel}>Exits</Text>
               </View>
@@ -264,7 +264,7 @@ const AdminDashboard: React.FC = () => {
               </View>
               <View style={styles.activityDivider} />
               <View style={styles.activityItem}>
-                <Ionicons name="car" size={24} color="#FF9801" />
+                <Ionicons name="car" size={24} color={COLORS.limited} />
                 <Text style={styles.activityValue}>{stats?.current_parked || 0}</Text>
                 <Text style={styles.activityLabel}>Parked</Text>
               </View>
@@ -285,13 +285,13 @@ const AdminDashboard: React.FC = () => {
             <QuickActionButton
               title="View All Tags"
               icon="list"
-              color="#2196F3"
+              color={COLORS.blue}
               onPress={() => navigation.navigate('RfidTagList')}
             />
             <QuickActionButton
               title="Reader Status"
               icon="hardware-chip-outline"
-              color="#48D666"
+              color={COLORS.green}
               onPress={() => navigation.navigate('RfidReaderStatus')}
             />
             <QuickActionButton

@@ -98,7 +98,7 @@ const ScanHistoryScreen: React.FC = () => {
           <Ionicons
             name={item.scan_type === 'entry' ? 'enter-outline' : 'exit-outline'}
             size={18}
-            color={item.scan_type === 'entry' ? '#48D666' : '#2196F3'}
+            color={item.scan_type === 'entry' ? COLORS.green : COLORS.blue}
           />
           <Text style={styles.scanTime}>
             {new Date(item.timestamp).toLocaleTimeString()}
