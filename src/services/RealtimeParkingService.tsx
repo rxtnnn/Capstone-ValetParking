@@ -305,11 +305,6 @@ class RealTimeParkingServiceClass {
   };
 
   private transformRawData(rawData: ParkingSpace[]): ParkingStats {
-    // Filter to only include spots that have sensors assigned (sensor_id is not null)
-    // A slot is considered "assigned" if it has a sensor_id linked via sensor_assignments
-    // - is_occupied = true means car is detected (occupied)
-    // - is_occupied = false means no car detected (available)
-    // Slots without sensor_id are unassigned (gray in parking map, not counted)
     const activeSpots = rawData.filter(space =>
       space.slot_name !== null &&
       space.slot_name !== undefined &&
@@ -326,7 +321,7 @@ class RealTimeParkingServiceClass {
 
     for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
-      // Malfunctioned spots are excluded from available count
+      // exclude maulfunctioned
       const isAvailable = !space.is_occupied && !space.malfunctioned;
 
       if (isAvailable) availableSpots++;
@@ -361,10 +356,6 @@ class RealTimeParkingServiceClass {
       };
     }).sort((a, b) => b.available - a.available);
 
-    console.log('Processed floors:', floors);
-    console.log('Total:', totalSpots, 'Available:', availableSpots);
-
-    const malfunctionedSpots = activeSpots.filter(s => s.malfunctioned).length;
     const occupiedSpots = activeSpots.filter(s => s.is_occupied && !s.malfunctioned).length;
 
     return {
@@ -382,14 +373,12 @@ class RealTimeParkingServiceClass {
     if (!this.lastData?.sensorData || !newData.sensorData) return;
 
     const oldData = this.lastData;
-    // Track previously available spots by slot_name
     const oldAvailable = new Set(
       (oldData.sensorData ?? [])
         .filter(s => !s.is_occupied && s.slot_name)
         .map(s => s.slot_name)
     );
 
-    // Find spots that are now available but weren't before
     const newlyAvailableSpots = newData.sensorData.filter(
       s => !s.is_occupied && s.slot_name && !oldAvailable.has(s.slot_name)
     );
@@ -398,7 +387,6 @@ class RealTimeParkingServiceClass {
       const floorGrouped: Record<number, string[]> = {};
       for (const spot of newlyAvailableSpots) {
         const floor = this.extractFloorFromLocation(spot.floor_level);
-        // Use slot_name directly from API
         const label = spot.slot_name || 'Unknown';
         (floorGrouped[floor] = floorGrouped[floor] || []).push(label);
       }
@@ -429,7 +417,6 @@ class RealTimeParkingServiceClass {
         .catch(err => console.log('Error fetching settings:', err));
     }
 
-    // Detect spots that just became malfunctioned — notify only opposite role
     const oldMalfunctionedSet = new Set(
       (oldData.sensorData ?? []).filter(s => s.malfunctioned && s.slot_name).map(s => s.slot_name)
     );
@@ -523,12 +510,11 @@ class RealTimeParkingServiceClass {
       });
       let data: any = {};
       const text = await response.text();
-      try { data = JSON.parse(text); } catch { /* non-JSON */ }
+      try { data = JSON.parse(text); } catch { }
       const isSuccess = data.success === true || (data.success === undefined && response.ok);
       if (isSuccess) {
         this.consecErrors = 0;
         this.retryCount = 0;
-        // Track self-flagged spot so poll won't notify the reporter
         if (slotName) this.selfFlaggedSpots.add(slotName);
         setTimeout(() => this.fetchAndUpdate(), 1500);
       }
@@ -551,7 +537,7 @@ class RealTimeParkingServiceClass {
       });
       let data: any = {};
       const text = await response.text();
-      try { data = JSON.parse(text); } catch { /* non-JSON */ }
+      try { data = JSON.parse(text); } catch { }
       const isSuccess = data.success === true || (data.success === undefined && response.ok);
       if (isSuccess) {
         this.consecErrors = 0;
