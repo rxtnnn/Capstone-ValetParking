@@ -400,8 +400,6 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
         return <Ionicons name="car" size={20} color={COLORS.green} />;
       case 'feedback_reply':
         return <Ionicons name="chatbubble" size={20} color={COLORS.primary} />;
-      case 'spot_override':
-        return <Ionicons name="shield-checkmark" size={20} color="#FF9800" />;
       case 'spot_malfunction':
         return <Ionicons name="warning" size={20} color="#FF9800" />;
       case 'rfid_alert':

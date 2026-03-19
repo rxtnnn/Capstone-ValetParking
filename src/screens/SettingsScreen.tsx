@@ -8,7 +8,6 @@ import {
   Switch,
   ActivityIndicator,
   Modal,
-  Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -68,7 +67,6 @@ const APP_SETTINGS = [
   { icon: 'chatbubble-outline', title: 'Feedback', desc: 'Send feedback & suggestions', navigate: 'Feedback' as keyof RootStackParamList }
 ] as const;
 
-// Custom Alert Modal Component
 interface CustomAlertProps {
   visible: boolean;
   title: string;
@@ -90,7 +88,6 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
   confirmText = 'OK',
   type = 'default'
 }) => {
-  const { width } = Dimensions.get('window');
 
   const getIcon = () => {
     switch (type) {
@@ -146,7 +143,6 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
   const { user, logout, isAuthenticated } = useAuth();
-  const [fontsLoaded] = useFonts(FONTS);
 
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
@@ -206,7 +202,6 @@ const SettingsScreen: React.FC = () => {
     setAlertConfig(prev => ({ ...prev, visible: false }));
   };
 
-  // Update user context when auth state changes
   useEffect(() => {
     if (user && isAuthenticated) {
       setUserContext({

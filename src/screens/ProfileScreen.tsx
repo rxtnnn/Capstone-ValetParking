@@ -186,7 +186,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, []);
 
-  // Password validation
   const validatePassword = useCallback((password: string): PasswordRules => {
     return {
       length: password.length >= 8,
@@ -205,14 +204,10 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleSubmitPasswordChange = useCallback(async () => {
     const newErrors: PasswordErrors = { current: '', new: '', confirm: '' };
     let hasErrors = false;
-
-    // Validate current password
     if (!passwords.current) {
       newErrors.current = 'Current password is required';
       hasErrors = true;
     }
-
-    // Validate new password
     const rules = validatePassword(passwords.new);
     const allRulesMet = Object.values(rules).every(rule => rule);
 
@@ -223,8 +218,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       newErrors.new = 'Password must meet all requirements';
       hasErrors = true;
     }
-
-    // Validate confirm password
     if (!passwords.confirm) {
       newErrors.confirm = 'Please confirm your password';
       hasErrors = true;
@@ -233,7 +226,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       hasErrors = true;
     }
 
-    // Check if new password is same as current
     if (passwords.current && passwords.new && passwords.current === passwords.new) {
       newErrors.new = 'New password must be different from current password';
       hasErrors = true;
@@ -243,9 +235,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       setPasswordErrors(newErrors);
       return;
     }
-
     setIsChangingPassword(true);
-
     try {
       const response = await fetch(`${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.changePassword}`, {
         method: 'POST',
@@ -414,7 +404,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       onConfirm: async () => {
         try {
           await logout();
-          
           showAlert({
             title: 'Signed Out',
             message: 'You have been successfully signed out of VALET.',
@@ -455,9 +444,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           userFetchedRef.current = true;
         }
       };
-
       checkAuthAndLoad();
-
       return () => {
         isActive = false;
         userFetchedRef.current = false;
@@ -502,7 +489,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [alert.visible, fadeAnim, scaleAnim]);
 
-  // Password Requirement Component
   const PasswordRequirement: React.FC<{ met: boolean; text: string }> = ({ met, text }) => (
     <View style={styles.passwordRequirement}>
       <MaterialIcons 
@@ -516,7 +502,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 
-  // Password Change Modal
   const PasswordChangeModal = useCallback(() => {
     const passwordRules = validatePassword(passwords.new);
 

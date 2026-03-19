@@ -509,7 +509,7 @@ const ParkingMapScreen: React.FC = () => {
     setHighlightedSpots([]);
   }, []);
 
-  const handleParkingConfirm = useCallback(async () => {
+  const handleParkingConfirm = useCallback(async () => { //I've parked button
     await NotificationManager.pauseSpotNotifications();
     setShowParkingConfirmModal(false);
     setNavigatingToSpot(null);
@@ -524,7 +524,7 @@ const ParkingMapScreen: React.FC = () => {
     if (navigatingToSpot) {
       const takenSpotSection = navigatingToSpot.charAt(1); // Extract section from '4A1' -> 'A'
 
-      // Find available spots, prioritizing same section
+      // Find available spots in same section first
       const availableSpots = parkingData
         .filter(spot => spot.hasSensor && !spot.isOccupied && spot.id !== navigatingToSpot)
         .sort((a, b) => {
@@ -536,22 +536,14 @@ const ParkingMapScreen: React.FC = () => {
           return a.id.localeCompare(b.id);
         });
 
-      // Clear current navigation
       clearNavigation();
 
-      // Get up to 3 nearby suggestions
       const suggestions = availableSpots.slice(0, 3).map(s => s.id);
       setSuggestedSpots(suggestions);
       setShowSpotTakenModal(true);
-
-      // Highlight the specific suggested spots (not the whole section)
       setHighlightedSpots(suggestions);
     }
   }, [navigatingToSpot, parkingData, clearNavigation]);
-
-  const showParkingConfirmation = useCallback(() => {
-    setShowParkingConfirmModal(true);
-  }, []);
 
   const handleSectionPress = useCallback((sectionId: string) => {
     setHighlightedSection(prev => prev === sectionId ? null : sectionId);
@@ -560,14 +552,11 @@ const ParkingMapScreen: React.FC = () => {
   const handleSpotPress = useCallback((spot: ParkingSpot) => {
     if (!spot.hasSensor) return;
 
-    // Security and admin can tap any sensor-assigned spot
     if (canAccessSpotActions) {
-      // Security on available spots: show picker (Show Route / Report Malfunction)
       if (isSecurityRole && !spot.malfunctioned && !spot.isOccupied) {
         setSpotPickerTarget(spot);
         setShowSpotPickerModal(true);
       } else {
-        // Admin/SSD, or occupied/malfunctioned spots — go straight to actions modal
         setSpotActionsTarget(spot);
         setReportIssue('');
         setReportCustomReason('');
@@ -597,7 +586,7 @@ const ParkingMapScreen: React.FC = () => {
     navigation.navigate('Home');
   }, [navigation]);
 
-  // Get available spots for current floor
+
   const currentFloorAvailableSpots = useMemo(() => {
     const floorData = parkingStats?.floors?.find(f => f.floor === floorNumber);
     return floorData?.available ?? 0;

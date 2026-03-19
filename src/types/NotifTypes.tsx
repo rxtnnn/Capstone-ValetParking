@@ -30,20 +30,6 @@ export interface GenericNotificationData {
   [key: string]: any;
 }
 
-export interface SpotOverrideData {
-  spotCode: string;
-  newStatus: 'available' | 'occupied';
-  guardName: string;
-  floor: string | number;
-  reason: string;
-  userId?: number;
-}
-
-export interface SpotOverrideNotification extends BaseNotification {
-  type: 'spot_override';
-  data: SpotOverrideData;
-}
-
 export interface SpotMalfunctionData {
   spotCode: string;
   reportedBy: string;
@@ -103,7 +89,6 @@ export interface GenericNotification extends BaseNotification {
 export type AppNotification =
   | SpotAvailableNotification
   | FeedbackReplyNotification
-  | SpotOverrideNotification
   | SpotMalfunctionNotification
   | RfidAlertNotification
   | GuestRequestNotification

@@ -19,44 +19,28 @@ import {
   ENTRANCE_POINT,
 } from '../components/MapLayout';
 
-/**
- * ParkingConfigService
- *
- * Manages dynamic parking configuration for scalable multi-location support.
- * Features:
- * - Fetches parking layout from API
- * - Caches configuration locally
- * - Provides fallback to hardcoded data
- * - Supports multiple floors and locations
- */
+
 class ParkingConfigServiceClass {
   private static readonly API_BASE_URL = API_ENDPOINTS.baseUrl;
   private static readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
 
   private static readonly CACHE_KEY = 'parking_config_cache';
   private static readonly CACHE_METADATA_KEY = 'parking_config_metadata';
-  private static readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+  private static readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; 
 
   private cachedConfig: ParkingLocationConfig | null = null;
   private isLoading = false;
   private loadPromise: Promise<ParkingLocationConfig> | null = null;
 
-  /**
-   * Get parking configuration for a specific location
-   * Uses cache if available and valid, otherwise fetches from API
-   */
   async getConfig(locationId: string = 'usjr_quadricentennial'): Promise<ParkingLocationConfig> {
-    // Return cached config if available
     if (this.cachedConfig && this.cachedConfig.location_id === locationId) {
       return this.cachedConfig;
     }
 
-    // If already loading, return existing promise
     if (this.isLoading && this.loadPromise) {
       return this.loadPromise;
     }
 
-    // Start new load
     this.isLoading = true;
     this.loadPromise = this.loadConfigWithFallback(locationId);
 
@@ -70,39 +54,26 @@ class ParkingConfigServiceClass {
     }
   }
 
-  /**
-   * Load configuration with fallback strategy:
-   * 1. Try cache first
-   * 2. Try API
-   * 3. Fall back to hardcoded default
-   */
   private async loadConfigWithFallback(locationId: string): Promise<ParkingLocationConfig> {
     try {
-      // Try cache first
       const cachedConfig = await this.loadFromCache(locationId);
       if (cachedConfig) {
         console.log('Loaded parking config from cache');
-        // Fetch updated config in background
         this.fetchAndCacheConfig(locationId).catch(err =>
           console.log('Background config update failed:', err)
         );
         return cachedConfig;
       }
 
-      // Cache miss - fetch from API
       console.log('Cache miss - fetching parking config from API');
       const apiConfig = await this.fetchAndCacheConfig(locationId);
       return apiConfig;
     } catch (error) {
       console.log('Failed to load config from cache/API, using fallback:', error);
-      // Fall back to hardcoded default
       return this.getHardcodedFallbackConfig(locationId);
     }
   }
 
-  /**
-   * Fetch configuration from API and cache it
-   */
   private async fetchAndCacheConfig(locationId: string): Promise<ParkingLocationConfig> {
     try {
       const url = `${ParkingConfigServiceClass.API_BASE_URL}${API_ENDPOINTS.parkingConfig(locationId)}`;
@@ -128,8 +99,6 @@ class ParkingConfigServiceClass {
       }
 
       const config = apiResponse.data;
-
-      // Cache the configuration
       await this.saveToCache(config);
 
       return config;
@@ -139,9 +108,6 @@ class ParkingConfigServiceClass {
     }
   }
 
-  /**
-   * Load configuration from local cache
-   */
   private async loadFromCache(locationId: string): Promise<ParkingLocationConfig | null> {
     try {
       const [metadataJson, configJson] = await Promise.all([
@@ -155,12 +121,10 @@ class ParkingConfigServiceClass {
 
       const metadata: ConfigCacheMetadata = JSON.parse(metadataJson);
 
-      // Check if cache is for the correct location
       if (metadata.location_id !== locationId) {
         return null;
       }
 
-      // Check if cache has expired
       const expiresAt = new Date(metadata.expires_at);
       if (expiresAt < new Date()) {
         console.log('Cache expired');
@@ -175,9 +139,6 @@ class ParkingConfigServiceClass {
     }
   }
 
-  /**
-   * Save configuration to local cache
-   */
   private async saveToCache(config: ParkingLocationConfig): Promise<void> {
     try {
       const now = new Date();
@@ -201,17 +162,11 @@ class ParkingConfigServiceClass {
     }
   }
 
-  /**
-   * Get configuration for a specific floor
-   */
   async getFloorConfig(locationId: string, floorNumber: number): Promise<FloorConfig | null> {
     const config = await this.getConfig(locationId);
     return config.floors.find(f => f.floor_number === floorNumber) || null;
   }
 
-  /**
-   * Get sensor to spot mapping for a floor
-   */
   getSensorToSpotMapping(floorConfig: FloorConfig): SensorToSpotMapping {
     const mapping: SensorToSpotMapping = {};
     floorConfig.parking_spots.forEach(spot => {
@@ -222,9 +177,6 @@ class ParkingConfigServiceClass {
     return mapping;
   }
 
-  /**
-   * Get navigation waypoints as a map
-   */
   getWaypointsMap(floorConfig: FloorConfig): { [id: string]: Position } {
     const map: { [id: string]: Position } = {};
     floorConfig.navigation_waypoints.forEach(waypoint => {
@@ -233,10 +185,6 @@ class ParkingConfigServiceClass {
     return map;
   }
 
-  /**
-   * Hardcoded fallback configuration
-   * Uses spot layout from MapLayout.tsx for all floors
-   */
   private getHardcodedFallbackConfig(locationId: string): ParkingLocationConfig {
     console.warn('Using hardcoded fallback configuration');
 

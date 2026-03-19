@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
-  getNotificationUserId, setNotificationUserId, SpotOverrideData, SpotMalfunctionData,
+  getNotificationUserId, setNotificationUserId, SpotMalfunctionData,
   RfidAlertData, GuestRequestData } from '../types/NotifTypes';
 import { FeedbackData } from '../types/feedback';
 
@@ -14,8 +14,7 @@ const STORAGE_KEYS = {
 } as const;
 
 const MAX_NOTIFICATIONS = 100;
-const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_override', 'spot_malfunction', 'rfid_alert', 'guest_request'] as const;
-const ADMIN_ROLES = ['admin', 'ssd'] as const;
+const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_malfunction', 'rfid_alert', 'guest_request'] as const;
 const BLOCKED_TITLES = ['VALET Connected!', 'Connection Established', 'Welcome to VALET', 'System Ready', 'App Initialized'];
 
 type NotificationListener = (notifications: AppNotification[]) => void;
@@ -78,19 +77,12 @@ class NotificationManagerClass {
   }
 
   private async handleUserChange(newUserId: number | null): Promise<void> {
-    if (this.isInitializing) return; // Prevent multiple simultaneous changes
-    
+    if (this.isInitializing) return;
     this.isInitializing = true;
-    
     try {
-      // Update current user immediately to prevent mismatch warnings
       this.currentUserId = newUserId;
-
-      // Clear current data
       this.notifications = [];
       this.processedReplies.clear();
-
-      // Load data for new user
       if (newUserId) {
         await Promise.all([
           this.loadNotifications(),
@@ -98,11 +90,9 @@ class NotificationManagerClass {
           this.loadSpotNotificationsPaused(),
         ]);
       }
-
-      // Notify all listeners about the change
       this.notifyListeners();
       this.notifyUserChangeListeners();
-      
+
     } catch (error) {
       console.log('Error during user change:', error);
     } finally {
@@ -197,7 +187,6 @@ class NotificationManagerClass {
 
       const storedNotifications = JSON.parse(stored);
       
-      // Filter notifications for current user
       this.notifications = this.currentUserId 
         ? storedNotifications.filter((notif: AppNotification) => {
             const userId = getNotificationUserId(notif);
@@ -278,7 +267,6 @@ class NotificationManagerClass {
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
     if (spotsAvailable <= 0 || !spotIds || spotIds.length === 0) return;
 
-    // Don't send spot notifications if user has parked
     if (this.spotNotificationsPaused) {
       return;
     }
@@ -412,32 +400,6 @@ class NotificationManagerClass {
     await this.saveProcessedReplies();
   }
 
-  async addOverrideNotification(data: SpotOverrideData): Promise<void> {
-    const role = TokenManager.getUser()?.role as string | undefined;
-    if (!role || !ADMIN_ROLES.includes(role as any)) return;
-    if (!this.currentUserId) return;
-
-    const statusLabel = data.newStatus === 'available' ? 'Available' : 'Occupied';
-    const notification: CreateNotificationInput = {
-      type: 'spot_override',
-      title: `Spot ${data.spotCode} Overridden`,
-      message: `Floor ${data.floor} • ${statusLabel} • By ${data.guardName} • ${data.reason}`,
-      priority: 'high',
-      data: { ...data, userId: this.currentUserId },
-    };
-
-    const newNotification: AppNotification = {
-      ...notification,
-      id: `override_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-      timestamp: Date.now(),
-      isRead: false,
-    } as AppNotification;
-
-    this.notifications.unshift(newNotification);
-    await this.saveNotifications();
-    this.notifyListeners();
-  }
-
   async processFeedbackReplies(feedbackArray: FeedbackData[]): Promise<void> {
     if (!this.currentUserId) {
       console.warn('No current user ID - cannot process feedback replies');
@@ -468,10 +430,8 @@ class NotificationManagerClass {
     }
   }
 
-  // FIX: Improved feedback replies checking with better user validation
   async checkForFeedbackReplies(userId: number, feedbackArray?: FeedbackData[]): Promise<void> {
     try {
-      // FIX: Accept the requested userId and update if different
       if (this.currentUserId !== userId) {
         await this.setCurrentUserId(userId);
       }
@@ -578,7 +538,7 @@ class NotificationManagerClass {
     return () => {
       const index = this.userChangeListeners.indexOf(listener);
       if (index > -1) this.userChangeListeners.splice(index, 1);
-    };
+    }; 
   }
 
   private notifyListeners(): void {
@@ -729,7 +689,6 @@ class NotificationManagerClass {
     return this.rfidEntryDetected;
   }
 
-  // Pause spot notifications when user has parked — only takes effect if RFID entry was detected
   async pauseSpotNotifications(): Promise<void> {
     if (!this.rfidEntryDetected) {
       return;
