@@ -270,12 +270,10 @@ const ParkingMapScreen: React.FC = () => {
     const spot = parkingData.find(s => s.id === spotId);
     if (!spot) return [];
 
-    const section = spotId.charAt(1); // Extract section from '4A1' -> 'A'
-    const index = parseInt(spotId.slice(2)); // Extract index from '4A1' -> 1
+    const section = spotId.charAt(1);
+    const index = parseInt(spotId.slice(2));
     const waypointsMap = ParkingConfigService.getWaypointsMap(floorConfig);
 
-    // Find the navigation route for this specific slot (section + index)
-    // Falls back to section-only route if no index-specific route exists
     let route = floorConfig.navigation_routes.find(
       (r: any) => r.section === section && r.index === index
     );
@@ -288,10 +286,8 @@ const ParkingMapScreen: React.FC = () => {
 
     const path: Position[] = [];
 
-    // Build path from waypoint IDs
     for (const waypointId of route.waypoints) {
       if (waypointId === 'destination') {
-        // Get custom offset for this spot, or use default
         const spotKey = `${section}${index}`;
         const offset = DESTINATION_OFFSETS[spotKey] || { offsetX: 20, offsetY: 30 };
         path.push({
@@ -514,8 +510,6 @@ const ParkingMapScreen: React.FC = () => {
   }, []);
 
   const handleParkingConfirm = useCallback(async () => {
-    // TODO: remove setRfidEntryDetected(true) when RFID hardware is available for testing
-    NotificationManager.setRfidEntryDetected(true);
     await NotificationManager.pauseSpotNotifications();
     setShowParkingConfirmModal(false);
     setNavigatingToSpot(null);
@@ -526,7 +520,7 @@ const ParkingMapScreen: React.FC = () => {
   const handleParkingCancel = useCallback(() => {
     setShowParkingConfirmModal(false);
 
-    // If someone else took the spot, find nearby available spots
+    // find nearby available spots
     if (navigatingToSpot) {
       const takenSpotSection = navigatingToSpot.charAt(1); // Extract section from '4A1' -> 'A'
 

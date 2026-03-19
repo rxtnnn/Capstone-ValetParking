@@ -159,28 +159,36 @@ const LoginScreen: React.FC = () => {
   }, [email, password, showCustomAlert]);
   
   const handleLogin = useCallback(async () => {
+    // Step 1: Validate email and password fields before proceeding
     if (!validateForm()) return;
-    
+
+    // Step 2: Show loading state and clear any previous error
     setIsSubmitting(true);
     clearError();
 
     try {
+      // Step 3: Send credentials to the API via AuthContext login()
       const result = await login({
         email: email.trim().toLowerCase(),
         password: password.trim(),
       });
 
       if (result.success) {
+        // Step 4a: If login succeeded, handle Remember Me preference
         if (rememberMe) {
+          // Save credentials to AsyncStorage for next app open
           await AsyncStorage.setItem('savedEmail', email);
           await AsyncStorage.setItem('savedPass', password);
-        }else{
+        } else {
+          // Clear any previously saved credentials
           await AsyncStorage.removeItem('savedEmail');
-          await AsyncStorage.removeItem('savedPass'); 
+          await AsyncStorage.removeItem('savedPass');
         }
+        // Step 4b: Clear input fields after successful login
         setEmail('');
         setPassword('');
       } else if (result.reason === 'inactive') {
+        // Step 5a: Account exists but is deactivated
         showCustomAlert(
             ALERT_MESSAGES.ACCNT_INACTIVE,
             ALERT_MESSAGES.LOGIN_INACTIVE,
@@ -188,6 +196,7 @@ const LoginScreen: React.FC = () => {
           );
           setIsSubmitting(false);
       } else {
+        // Step 5b: Wrong email or password
         showCustomAlert(
           ALERT_MESSAGES.LOGIN_FAILED,
           ALERT_MESSAGES.LOGIN_FAILED_MSG,
@@ -196,12 +205,14 @@ const LoginScreen: React.FC = () => {
         setIsSubmitting(false);
       }
     } catch (error) {
+      // Step 6: Network or server error — show generic error alert
       showCustomAlert(
         ALERT_MESSAGES.LOGIN_ERROR,
         ALERT_MESSAGES.UNEXPECTED_ERROR,
         'OK'
       );
     } finally {
+      // Step 7: Always stop the loading spinner regardless of outcome
       setIsSubmitting(false);
     }
   }, [validateForm, clearError, login, email, password, showCustomAlert, rememberMe]);

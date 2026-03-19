@@ -56,7 +56,7 @@ class RealTimeParkingServiceClass {
   private consecErrors = 0;
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
-  private selfFlaggedSpots = new Set<string>(); // spots flagged by current user, suppress bell
+  private selfFlaggedSpots = new Set<string>(); // spots flagged by current user
 
   constructor() {
     this.initializeService();
