@@ -404,6 +404,10 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
         return <Ionicons name="shield-checkmark" size={20} color="#FF9800" />;
       case 'spot_malfunction':
         return <Ionicons name="warning" size={20} color="#FF9800" />;
+      case 'rfid_alert':
+        return <Ionicons name="card" size={20} color="#FF6B6B" />;
+      case 'guest_request':
+        return <Ionicons name="person-add" size={20} color={COLORS.blue} />;
       default:
         return <Ionicons name="notifications" size={20} color="#666" />;
     }

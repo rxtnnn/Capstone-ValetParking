@@ -57,6 +57,34 @@ export interface SpotMalfunctionNotification extends BaseNotification {
   data: SpotMalfunctionData;
 }
 
+export interface RfidAlertData {
+  alertType: 'invalid' | 'expired' | 'suspended' | 'unknown';
+  rfidUid: string;
+  readerLocation: string;
+  userName?: string;
+  vehiclePlate?: string;
+  message?: string;
+  userId?: number;
+}
+
+export interface RfidAlertNotification extends BaseNotification {
+  type: 'rfid_alert';
+  data: RfidAlertData;
+}
+
+export interface GuestRequestData {
+  guestName: string;
+  vehiclePlate: string;
+  purpose: string;
+  guestId?: string;
+  userId?: number;
+}
+
+export interface GuestRequestNotification extends BaseNotification {
+  type: 'guest_request';
+  data: GuestRequestData;
+}
+
 export interface SpotAvailableNotification extends BaseNotification {
   type: 'spot_available';
   data: SpotAvailableData;
@@ -77,6 +105,8 @@ export type AppNotification =
   | FeedbackReplyNotification
   | SpotOverrideNotification
   | SpotMalfunctionNotification
+  | RfidAlertNotification
+  | GuestRequestNotification
   | GenericNotification;
 
 // guards for safe type checking

@@ -178,7 +178,7 @@ class RfidSecurityServiceClass {
     }
   }
 
-  private processNewScans(apiScans: any[]): void {
+  private async processNewScans(apiScans: any[]): Promise<void> {
     const newInvalidScans: RfidScanEvent[] = [];
 
     for (const raw of apiScans) {
@@ -219,14 +219,13 @@ class RfidSecurityServiceClass {
 
         if (matchesUser) {
           if (scan.scan_type === 'entry') {
-            NotificationManager.resumeSpotNotifications().then(() => {
-              NotificationManager.setRfidEntryDetected(true);
-            });
+            // User entered via RFID — set flag then start spot notifications
+            NotificationManager.setRfidEntryDetected(true);
+            await NotificationManager.resumeSpotNotifications();
           } else if (scan.scan_type === 'exit') {
-            NotificationManager.setRfidEntryDetected(true); 
-            NotificationManager.pauseSpotNotifications().then(() => {
-              NotificationManager.setRfidEntryDetected(false); 
-            });
+            // User exited via RFID — pause spot notifications (flag must be true first)
+            NotificationManager.setRfidEntryDetected(true);
+            await NotificationManager.pauseSpotNotifications();
           }
         }
       }
@@ -279,6 +278,7 @@ class RfidSecurityServiceClass {
     try {
       const alertType = STATUS_TO_NOTIF_TYPE[scan.status] || 'unknown';
 
+      // Device push notification
       await NotificationService.showRfidAlertNotification(
         alertType,
         scan.rfid_uid,
@@ -289,6 +289,16 @@ class RfidSecurityServiceClass {
           message: scan.message || undefined,
         }
       );
+
+      // Persist to AsyncStorage so it appears in-app and survives restarts
+      await NotificationManager.addRfidAlertNotification({
+        alertType,
+        rfidUid: scan.rfid_uid,
+        readerLocation: scan.reader_name ?? 'Unknown',
+        userName: scan.user_name || undefined,
+        vehiclePlate: scan.vehicle_plate || undefined,
+        message: scan.message || undefined,
+      });
 
       console.log(`RFID local notification triggered: ${alertType} - ${scan.rfid_uid}`);
     } catch (error) {
@@ -449,12 +459,22 @@ class RfidSecurityServiceClass {
 
   async notifyNewGuestRequest(guest: GuestAccess): Promise<void> {
     try {
+      // Device push notification
       await NotificationService.showGuestRequestNotification(
         guest.name,
         guest.vehicle_plate,
         guest.purpose,
         String(guest.id)
       );
+
+      // Persist to AsyncStorage so it appears in-app and survives restarts
+      await NotificationManager.addGuestRequestNotification({
+        guestName: guest.name,
+        vehiclePlate: guest.vehicle_plate,
+        purpose: guest.purpose,
+        guestId: String(guest.id),
+      });
+
       console.log(`Guest request notification sent for: ${guest.name}`);
     } catch (error) {
       console.log('Error sending guest request notification:', error);

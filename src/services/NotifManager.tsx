@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
-  getNotificationUserId, setNotificationUserId, SpotOverrideData, SpotMalfunctionData } from '../types/NotifTypes';
+  getNotificationUserId, setNotificationUserId, SpotOverrideData, SpotMalfunctionData,
+  RfidAlertData, GuestRequestData } from '../types/NotifTypes';
 import { FeedbackData } from '../types/feedback';
 
 const STORAGE_KEYS = {
@@ -13,7 +14,7 @@ const STORAGE_KEYS = {
 } as const;
 
 const MAX_NOTIFICATIONS = 100;
-const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_override', 'spot_malfunction'] as const;
+const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_override', 'spot_malfunction', 'rfid_alert', 'guest_request'] as const;
 const ADMIN_ROLES = ['admin', 'ssd'] as const;
 const BLOCKED_TITLES = ['VALET Connected!', 'Connection Established', 'Welcome to VALET', 'System Ready', 'App Initialized'];
 
@@ -323,6 +324,51 @@ class NotificationManagerClass {
       type: 'spot_malfunction',
       title: `⚠️ Spot ${data.spotCode} Malfunctioned`,
       message: `Floor ${data.floor} • Reported by ${data.reportedBy} • ${data.reason}`,
+      timestamp: Date.now(),
+      isRead: false,
+      priority: 'high',
+      data: { ...data, userId: this.currentUserId },
+    } as AppNotification;
+
+    this.notifications.unshift(newNotification);
+    await this.saveNotifications();
+    this.notifyListeners();
+  }
+
+  async addRfidAlertNotification(data: RfidAlertData): Promise<void> {
+    if (!this.currentUserId) return;
+
+    const alertLabels: Record<string, string> = {
+      invalid: 'Invalid RFID Detected',
+      expired: 'Expired RFID Detected',
+      suspended: 'Suspended RFID Detected',
+      unknown: 'Unknown Card Detected',
+    };
+
+    const newNotification: AppNotification = {
+      id: `rfid_alert_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      type: 'rfid_alert',
+      title: alertLabels[data.alertType] ?? 'RFID Alert',
+      message: `${data.rfidUid} at ${data.readerLocation}${data.userName ? ` — ${data.userName}` : ''}`,
+      timestamp: Date.now(),
+      isRead: false,
+      priority: 'high',
+      data: { ...data, userId: this.currentUserId },
+    } as AppNotification;
+
+    this.notifications.unshift(newNotification);
+    await this.saveNotifications();
+    this.notifyListeners();
+  }
+
+  async addGuestRequestNotification(data: GuestRequestData): Promise<void> {
+    if (!this.currentUserId) return;
+
+    const newNotification: AppNotification = {
+      id: `guest_request_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      type: 'guest_request',
+      title: 'New Guest Access Request',
+      message: `${data.guestName} (${data.vehiclePlate}) — ${data.purpose}`,
       timestamp: Date.now(),
       isRead: false,
       priority: 'high',
