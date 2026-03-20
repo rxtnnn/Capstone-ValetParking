@@ -400,7 +400,7 @@ class RealTimeParkingServiceClass {
             const floor = parseInt(floorStr, 10);
             const spotIds = floorGrouped[floor];
 
-            if (settings.spotAvailable && isUser && !NotificationManager.isSpotNotificationsPaused()) {
+            if (settings.spotAvailable && isUser && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused()) {
               NotificationService.showSpotAvailableNotification(
                 spotIds.length,
                 floor,
