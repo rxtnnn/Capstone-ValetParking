@@ -391,6 +391,7 @@ class RealTimeParkingServiceClass {
         (floorGrouped[floor] = floorGrouped[floor] || []).push(label);
       }
 
+      //spot notif
       NotificationService.getNotificationSettings()
         .then(settings => {
           const userRole = TokenManager.getUser()?.role;
@@ -399,7 +400,7 @@ class RealTimeParkingServiceClass {
           for (const floorStr in floorGrouped) {
             const floor = parseInt(floorStr, 10);
             const spotIds = floorGrouped[floor];
-
+            // settings notif
             if (settings.spotAvailable && isUser && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused()) {
               NotificationService.showSpotAvailableNotification(
                 spotIds.length,
@@ -452,13 +453,13 @@ class RealTimeParkingServiceClass {
     }
 
     const role = TokenManager.getUser()?.role;
-    const isStaff = role === 'admin' || role === 'ssd' || role === 'security';
-    if (!isStaff) {
-      NotificationService.getNotificationSettings()
+    const isUser = role === 'user';
+    if (isUser) {
+      NotificationService.getNotificationSettings() //floor notif
         .then(settings => {
           for (const newFloor of newData.floors) {
             const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-            if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && !NotificationManager.isSpotNotificationsPaused()) {
+            if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused()) {
               NotificationService.showFloorUpdateNotification(
                 newFloor.floor,
                 newFloor.available,
