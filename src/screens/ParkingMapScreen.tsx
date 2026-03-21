@@ -517,16 +517,17 @@ const ParkingMapScreen: React.FC = () => {
     setShowSuccessModal(true);
   }, [clearNavigation]);
 
+  //parking recommendation 
   const handleParkingCancel = useCallback(() => {
     setShowParkingConfirmModal(false);
 
     // find nearby available spots
     if (navigatingToSpot) {
-      const takenSpotSection = navigatingToSpot.charAt(1); // Extract section from '4A1' -> 'A'
+      const takenSpotSection = navigatingToSpot.charAt(1);
 
-      // Find available spots in same section first
+      // find available spots in same section first
       const availableSpots = parkingData
-        .filter(spot => spot.hasSensor && !spot.isOccupied && spot.id !== navigatingToSpot)
+        .filter(spot => spot.hasSensor && !spot.isOccupied && !spot.malfunctioned && spot.id !== navigatingToSpot)
         .sort((a, b) => {
           const aSection = a.id.charAt(1);
           const bSection = b.id.charAt(1);
@@ -605,7 +606,7 @@ const ParkingMapScreen: React.FC = () => {
 
     if (spot.hasSensor) {
       if (spot.malfunctioned) {
-        backgroundColor = '#FF9800';
+        backgroundColor = '#FFDE42';
       } else {
         backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green;
       }
@@ -901,7 +902,7 @@ const ParkingMapScreen: React.FC = () => {
         {[
           { color: COLORS.green, label: 'Available' },
           { color: COLORS.primary, label: 'Occupied' },
-          { color: '#FF9800', label: 'Malfunction' },
+          { color: '#FFDE42', label: 'Malfunction' },
           { color: '#CCCCCC', label: 'No Sensor' },
         ].map(({ color, label }) => (
           <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -1429,7 +1430,7 @@ const ParkingMapScreen: React.FC = () => {
             <View style={styles.spotActionsSpotInfo}>
               <View style={[styles.spotActionsStatusBadge, {
                 backgroundColor: spotActionsTarget?.malfunctioned
-                  ? '#FF9800'
+                  ? '#FFDE42'
                   : spotActionsTarget?.isOccupied ? COLORS.primary : COLORS.green,
               }]}>
                 <Text style={styles.spotActionsStatusText}>
@@ -1653,7 +1654,7 @@ const ParkingMapScreen: React.FC = () => {
               <TouchableOpacity
                 style={[styles.parkingConfirmYesButton, { flex: 1, backgroundColor:
                   spotActionsResult?.type === 'success' ? COLORS.green :
-                  spotActionsResult?.type === 'warning' ? '#FF9800' : COLORS.primary,
+                  spotActionsResult?.type === 'warning' ? '#FFDE42' : COLORS.primary,
                 }]}
                 onPress={() => setSpotActionsResult(null)}
                 activeOpacity={0.8}
