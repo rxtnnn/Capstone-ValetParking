@@ -990,7 +990,16 @@ const ParkingMapScreen: React.FC = () => {
 
       {showNavigation && (
         <View style={{ position: 'absolute', top: 180, right: 20, gap: 10, zIndex: 2000 }}>
-          <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.green }]} onPress={() => setShowParkingConfirmModal(true)}>
+          <TouchableOpacity
+            style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: NotificationManager.isRfidEntryDetected() ? COLORS.green : '#A0A0A0' }]}
+            onPress={() => {
+              if (!NotificationManager.isRfidEntryDetected()) {
+                Alert.alert('Not Inside Parking', 'Your RFID must be detected at the entrance before you can mark as parked.');
+                return;
+              }
+              setShowParkingConfirmModal(true);
+            }}
+          >
             <Ionicons name="checkmark-circle" size={20} color="white" />
             <Text style={styles.clearRouteText}>I've Parked</Text>
           </TouchableOpacity>
