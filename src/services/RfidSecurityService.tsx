@@ -228,12 +228,12 @@ class RfidSecurityServiceClass {
           } else if (scan.scan_type === 'exit') {
             NotificationManager.setRfidEntryDetected(false);
             await NotificationManager.pauseSpotNotifications();
+            RealTimeParkingService.resetNotificationDedup();
           }
         }
       }
 
       // If invalid, create alert and queue for notification
-      // Exclude "Vehicle already inside" — not a security threat
       const isAlreadyInsideMsg = scan.message?.toLowerCase().includes('already inside');
       if (INVALID_STATUSES.has(scan.status) && !isAlreadyInsideMsg) {
         const alert = this.createAlertFromScan(scan);
@@ -250,7 +250,6 @@ class RfidSecurityServiceClass {
       this.alerts = this.alerts.slice(0, 100);
     }
 
-    // Keep processedScanIds from growing too large
     if (this.processedScanIds.size > 500) {
       const idsArray = Array.from(this.processedScanIds);
       this.processedScanIds = new Set(idsArray.slice(-200));
@@ -333,10 +332,6 @@ class RfidSecurityServiceClass {
     };
   }
 
-  // ----------------------------------------
-  // Subscription Methods
-  // ----------------------------------------
-
   onScanUpdate(callback: ScanUpdateCallback): () => void {
     this.scanCallbacks.push(callback);
 
@@ -348,7 +343,6 @@ class RfidSecurityServiceClass {
       }
     }
 
-    // Auto-start if not running
     if (!this.updateInterval) {
       this.start();
     }
@@ -401,8 +395,6 @@ class RfidSecurityServiceClass {
         console.log('Error in stats callback:', error);
       }
     }
-
-    // Auto-start if not running
     if (!this.updateInterval) {
       this.start();
     }
@@ -412,10 +404,6 @@ class RfidSecurityServiceClass {
       if (index > -1) this.statsCallbacks.splice(index, 1);
     };
   }
-
-  // ----------------------------------------
-  // Callback Notification Methods
-  // ----------------------------------------
 
   private notifyScanUpdate(): void {
     for (const callback of this.scanCallbacks) {
@@ -463,13 +451,8 @@ class RfidSecurityServiceClass {
     }
   }
 
-  // ----------------------------------------
-  // Guest Notification
-  // ----------------------------------------
-
   async notifyNewGuestRequest(guest: GuestAccess): Promise<void> {
     try {
-      // Device push notification
       await NotificationService.showGuestRequestNotification(
         guest.name,
         guest.vehicle_plate,
@@ -477,7 +460,6 @@ class RfidSecurityServiceClass {
         String(guest.id)
       );
 
-      // Persist to AsyncStorage so it appears in-app and survives restarts
       await NotificationManager.addGuestRequestNotification({
         guestName: guest.name,
         vehiclePlate: guest.vehicle_plate,
@@ -490,10 +472,6 @@ class RfidSecurityServiceClass {
       console.log('Error sending guest request notification:', error);
     }
   }
-
-  // ----------------------------------------
-  // Data Access Methods
-  // ----------------------------------------
 
   async getRecentScans(filters?: ScanHistoryFilters): Promise<PaginatedResponse<RfidScanEvent>> {
     try {
@@ -516,7 +494,6 @@ class RfidSecurityServiceClass {
         user_name: raw.user_name || undefined,
         vehicle_plate: raw.vehicle_plate || undefined,
       }));
-      // Merge with in-memory and deduplicate by id
       const merged = [...mapped];
       const ids = new Set(mapped.map(s => s.id));
       for (const s of this.recentScans) {
@@ -551,7 +528,6 @@ class RfidSecurityServiceClass {
           filteredScans = filteredScans.filter(s => new Date(s.timestamp) <= toDate);
         }
       }
-
       return {
         success: true,
         data: filteredScans,
@@ -635,10 +611,6 @@ class RfidSecurityServiceClass {
     return { success: true, message: 'Alert acknowledged' };
   }
 
-  // ----------------------------------------
-  // Guest Management
-  // ----------------------------------------
-
   async getPendingGuests(): Promise<GuestAccess[]> {
     return this.guests.filter(g => g.status === 'pending');
   }
@@ -716,10 +688,6 @@ class RfidSecurityServiceClass {
     return { success: true, message: 'Guest denied' };
   }
 
-  // ----------------------------------------
-  // Manual Verification - Uses real API
-  // ----------------------------------------
-
   async verifyRfidManually(uid: string): Promise<VerificationResult> {
     try {
       const response = await apiClient.post(API_ENDPOINTS.publicRfidVerify, { uid: uid.toUpperCase() });
@@ -766,12 +734,7 @@ class RfidSecurityServiceClass {
     }
   }
 
-  // ----------------------------------------
-  // Dashboard Stats
-  // ----------------------------------------
-
   async getDashboardStats(): Promise<SecurityDashboardStats> {
-    // Trigger a fresh fetch if we have no stats
     if (!this.lastStats) {
       await this.fetchAndUpdate();
     }
@@ -790,11 +753,6 @@ class RfidSecurityServiceClass {
   getLastStats(): SecurityDashboardStats | null {
     return this.lastStats;
   }
-
-  // ----------------------------------------
-  // Service Status
-  // ----------------------------------------
-
   getServiceStatus() {
     return {
       isRunning: this.isRunning,
@@ -806,7 +764,6 @@ class RfidSecurityServiceClass {
       processedIds: this.processedScanIds.size,
     };
   }
-
   clearData(): void {
     this.recentScans = [];
     this.alerts = [];
@@ -816,5 +773,4 @@ class RfidSecurityServiceClass {
   }
 }
 
-// Export singleton instance
 export const RfidSecurityService = new RfidSecurityServiceClass();

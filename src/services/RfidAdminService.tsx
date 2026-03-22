@@ -1,6 +1,3 @@
-// RFID Admin Service - Fetches real data from backend API
-// Uses /public/parking/dashboard for stats and /public/rfid/verify for verification
-
 import {
   RfidTag,
   RfidReader,
@@ -13,22 +10,12 @@ import {
 import apiClient from '../config/api';
 import { API_ENDPOINTS } from '../constants/AppConst';
 
-// ============================================
-// Service Class
-// ============================================
-
 class RfidAdminServiceClass {
-  // Local cache for tags/readers (populated from API when endpoints become available)
   private tags: RfidTag[] = [];
   private readers: RfidReader[] = [];
 
-  // ----------------------------------------
-  // Tag Management
-  // ----------------------------------------
-
   async getAllTags(filters?: RfidTagFilters): Promise<PaginatedResponse<RfidTag>> {
     try {
-      // Try to fetch from backend API
       const response = await apiClient.get(API_ENDPOINTS.publicRfidTags, { params: filters });
       const tags = response.data?.tags ?? response.data?.data ?? (Array.isArray(response.data) ? response.data : null);
       if (tags) {
@@ -168,10 +155,6 @@ class RfidAdminServiceClass {
     }
   }
 
-  // ----------------------------------------
-  // Reader Management
-  // ----------------------------------------
-
   async getReaders(): Promise<RfidReader[]> {
     try {
       const response = await apiClient.get(API_ENDPOINTS.rfidReaders);
@@ -210,10 +193,6 @@ class RfidAdminServiceClass {
       };
     }
   }
-
-  // ----------------------------------------
-  // Statistics - Uses real parking dashboard API
-  // ----------------------------------------
 
   async getDashboardStats(): Promise<RfidDashboardStats> {
     try {
@@ -275,5 +254,4 @@ class RfidAdminServiceClass {
   }
 }
 
-// Export singleton instance
 export const RfidAdminService = new RfidAdminServiceClass();

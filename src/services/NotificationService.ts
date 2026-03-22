@@ -363,14 +363,14 @@ class NotificationServiceClass {
     if (!NotificationManager.isRfidEntryDetected()) return;
     if (NotificationManager.isSpotNotificationsPaused()) return;
 
-    // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
+    // Always re-read from AsyncStorage
     try {
       const userId = TokenManager.getUser()?.id;
       if (userId) {
         const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
         if (stored === 'true') return;
       }
-    } catch { /* ignore */ }
+    } catch {}
 
     try {
       const settings = await this.getNotificationSettings();
@@ -448,7 +448,6 @@ class NotificationServiceClass {
     }
   }
 
-  // RFID Alert Notifications - For Security Personnel
   async showRfidAlertNotification(
     alertType: 'invalid' | 'expired' | 'suspended' | 'unknown',
     rfidUid: string,
@@ -504,7 +503,6 @@ class NotificationServiceClass {
     }
   }
 
-  // Guest Request Notifications - For Security Personnel
   async showGuestRequestNotification(
     guestName: string,
     vehiclePlate: string,
@@ -675,7 +673,6 @@ class NotificationServiceClass {
     await this.saveNotificationSettings(DEFAULT_SETTINGS);
   }
 
-  // enable/disable all notifications at once for current user
   async setAllNotifications(enabled: boolean): Promise<void> {
     const settings: NotificationSettings = {
       spotAvailable: enabled,
@@ -687,7 +684,6 @@ class NotificationServiceClass {
     await this.saveNotificationSettings(settings);
   }
 
-  //check if user has any notifs enabled
   async hasNotificationsEnabled(): Promise<boolean> {
     try {
       const settings = await this.getNotificationSettings();
@@ -747,14 +743,6 @@ class NotificationServiceClass {
     }
   }
 
-  // ----------------------------------------
-  // Push Token Backend Sync
-  // ----------------------------------------
-
-  /**
-   * Send the Expo push token to the backend for push notifications
-   * Should be called after user login
-   */
   async syncPushTokenWithBackend(): Promise<boolean> {
     try {
       // Get or register the push token
@@ -767,21 +755,15 @@ class NotificationServiceClass {
         console.log('=== PUSH TOKEN SYNC: No token available ===');
         return false;
       }
-
       console.log('=== PUSH TOKEN SYNC: Sending to backend ===', token);
-
-      // Send to backend
       const response = await apiClient.post(API_ENDPOINTS.pushToken, {
         expo_push_token: token,
       });
-
       console.log('=== PUSH TOKEN SYNC RESPONSE ===', JSON.stringify(response.data));
-
       if (response.data?.success) {
         console.log('=== PUSH TOKEN SYNCED SUCCESSFULLY ===');
         return true;
       }
-
       console.log('Failed to sync push token:', response.data?.message);
       return false;
     } catch (error: any) {
@@ -790,10 +772,6 @@ class NotificationServiceClass {
     }
   }
 
-  /**
-   * Remove the push token from the backend
-   * Should be called on user logout
-   */
   async removePushTokenFromBackend(): Promise<boolean> {
     try {
       const response = await apiClient.delete(API_ENDPOINTS.pushToken);
@@ -806,7 +784,6 @@ class NotificationServiceClass {
       console.log('Failed to remove push token:', response.data?.message);
       return false;
     } catch (error: any) {
-      // Don't fail on logout - just log it
       console.log('Error removing push token from backend:', error?.message || error);
       return false;
     }

@@ -124,7 +124,6 @@ const ParkingMapScreen: React.FC = () => {
   const translateY = useSharedValue(0);
   const bottomPanelY = useSharedValue(0);
 
-  // Load parking configuration on mount
   useEffect(() => {
     let isMounted = true;
 
@@ -132,8 +131,6 @@ const ParkingMapScreen: React.FC = () => {
       try {
         setIsLoadingConfig(true);
         setConfigError(null);
-
-        // Load floor configuration based on route parameter
         const config = await ParkingConfigService.getFloorConfig('usjr_quadricentennial', floorNumber);
 
         if (!isMounted) return;
@@ -143,8 +140,6 @@ const ParkingMapScreen: React.FC = () => {
         }
 
         setFloorConfig(config);
-
-        // Initialize parking spots from config
         const initialSpots: ParkingSpot[] = config.parking_spots.map(spot => ({
           id: spot.spot_id,
           isOccupied: false,
@@ -158,7 +153,6 @@ const ParkingMapScreen: React.FC = () => {
 
         setParkingData(initialSpots);
 
-        // Set initial view position if configured
         if (config.initial_view) {
           translateX.value = config.initial_view.translateX;
           translateY.value = config.initial_view.translateY;
@@ -185,7 +179,7 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, [floorNumber]);
 
-  // Clear navigation when floor changes
+  // clear navigation when floor changes
   useEffect(() => {
     setShowNavigation(false);
     setNavigationPath([]);
@@ -200,13 +194,12 @@ const ParkingMapScreen: React.FC = () => {
     const targetSpot = parkingData.find(spot => spot.id === navigatingToSpot);
     const previousSpot = previousParkingDataRef.current.find(spot => spot.id === navigatingToSpot);
 
-    // Check if the spot just became occupied (was not occupied before, now is occupied)
+    // check if the spot just became occupied (was not occupied before, now is occupied)
     if (targetSpot && previousSpot && !previousSpot.isOccupied && targetSpot.isOccupied) {
-      // Show confirmation modal asking if user parked
+      // show confirmation modal asking if user parked
       setShowParkingConfirmModal(true);
     }
 
-    // Update previous data reference
     previousParkingDataRef.current = parkingData;
   }, [parkingData, navigatingToSpot, showNavigation]);
 
@@ -214,11 +207,6 @@ const ParkingMapScreen: React.FC = () => {
   const sensorToSpotMapping = useMemo(() => {
     if (!floorConfig) return {};
     return ParkingConfigService.getSensorToSpotMapping(floorConfig);
-  }, [floorConfig]);
-
-  const navigationWaypointsMap = useMemo(() => {
-    if (!floorConfig) return {};
-    return ParkingConfigService.getWaypointsMap(floorConfig);
   }, [floorConfig]);
 
   const gestureLimits = useMemo(() => {
@@ -513,7 +501,6 @@ const ParkingMapScreen: React.FC = () => {
 
   const handleParkingConfirm = useCallback(async () => { //I've parked button
     await NotificationManager.pauseSpotNotifications();
-    // Notify backend that user has parked
     try {
       const tagsRes = await apiClient.get(API_ENDPOINTS.publicRfidTags);
       const tags: any[] = tagsRes.data?.tags ?? [];
@@ -525,7 +512,6 @@ const ParkingMapScreen: React.FC = () => {
         await apiClient.post(API_ENDPOINTS.publicRfidParked, { uid: userTag.uid });
       }
     } catch {
-      // silent fail — parking confirmation still proceeds
     }
     setShowParkingConfirmModal(false);
     setNavigatingToSpot(null);
