@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   FEEDBACK_CHECK: '@valet_last_feedback_check',
   PROCESSED_REPLIES: '@valet_processed_replies',
   SPOT_NOTIFS_PAUSED: '@valet_spot_notifs_paused',
+  RFID_ENTRY_DETECTED: '@valet_rfid_entry_detected',
 } as const;
 
 const MAX_NOTIFICATIONS = 100;
@@ -26,8 +27,8 @@ class NotificationManagerClass {
   private currentUserId: number | null = null;
   private userChangeListeners: (() => void)[] = [];
   private isInitializing = false;
-  private spotNotificationsPaused = false; 
-  private rfidEntryDetected = false; 
+  private spotNotificationsPaused = true;
+  private rfidEntryDetected = false;
 
   constructor() {
     this.init();
@@ -41,6 +42,7 @@ class NotificationManagerClass {
       this.loadNotifications(),
       this.loadProcessedReplies(),
       this.loadSpotNotificationsPaused(),
+      this.loadRfidEntryDetected(),
     ]);
   }
 
@@ -50,9 +52,10 @@ class NotificationManagerClass {
       if (!userId) return;
       const key = `${STORAGE_KEYS.SPOT_NOTIFS_PAUSED}_${userId}`;
       const stored = await AsyncStorage.getItem(key);
-      this.spotNotificationsPaused = stored === 'true';
+      // If no stored value, default to true (paused until RFID entry)
+      this.spotNotificationsPaused = stored === null ? true : stored === 'true';
     } catch {
-      this.spotNotificationsPaused = false;
+      this.spotNotificationsPaused = true;
     }
   }
 
@@ -63,7 +66,30 @@ class NotificationManagerClass {
       const key = `${STORAGE_KEYS.SPOT_NOTIFS_PAUSED}_${userId}`;
       await AsyncStorage.setItem(key, String(this.spotNotificationsPaused));
     } catch {
-     
+
+    }
+  }
+
+  private async loadRfidEntryDetected(): Promise<void> {
+    try {
+      const userId = this.currentUserId ?? TokenManager.getUser()?.id;
+      if (!userId) return;
+      const key = `${STORAGE_KEYS.RFID_ENTRY_DETECTED}_${userId}`;
+      const stored = await AsyncStorage.getItem(key);
+      this.rfidEntryDetected = stored === 'true';
+    } catch {
+      this.rfidEntryDetected = false;
+    }
+  }
+
+  private async saveRfidEntryDetected(): Promise<void> {
+    try {
+      const userId = this.currentUserId ?? TokenManager.getUser()?.id;
+      if (!userId) return;
+      const key = `${STORAGE_KEYS.RFID_ENTRY_DETECTED}_${userId}`;
+      await AsyncStorage.setItem(key, String(this.rfidEntryDetected));
+    } catch {
+
     }
   }
 
@@ -87,8 +113,15 @@ class NotificationManagerClass {
         await Promise.all([
           this.loadNotifications(),
           this.loadProcessedReplies(),
-          this.loadSpotNotificationsPaused(),
+          this.loadRfidEntryDetected(),
         ]);
+        // If RFID was not previously detected, reset paused state to true
+        if (!this.rfidEntryDetected) {
+          this.spotNotificationsPaused = true;
+          await this.saveSpotNotificationsPaused();
+        } else {
+          await this.loadSpotNotificationsPaused();
+        }
       }
       this.notifyListeners();
       this.notifyUserChangeListeners();
@@ -267,7 +300,7 @@ class NotificationManagerClass {
   async addSpotAvailableNotification(spotsAvailable: number, floor?: number, spotIds?: string[]): Promise<void> {
     if (spotsAvailable <= 0 || !spotIds || spotIds.length === 0) return;
 
-    if (this.spotNotificationsPaused) {
+    if (!this.rfidEntryDetected || this.spotNotificationsPaused) {
       return;
     }
 
@@ -683,6 +716,7 @@ class NotificationManagerClass {
 
   setRfidEntryDetected(detected: boolean): void {
     this.rfidEntryDetected = detected;
+    this.saveRfidEntryDetected();
   }
 
   isRfidEntryDetected(): boolean {
@@ -690,11 +724,8 @@ class NotificationManagerClass {
   }
 
   async pauseSpotNotifications(): Promise<void> {
-    if (!this.rfidEntryDetected) {
-      return;
-    }
     this.spotNotificationsPaused = true;
-    await this.saveSpotNotificationsPaused(); 
+    await this.saveSpotNotificationsPaused();
     Notifications.dismissAllNotificationsAsync();
     Notifications.cancelAllScheduledNotificationsAsync();
   }

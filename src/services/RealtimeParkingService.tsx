@@ -57,6 +57,8 @@ class RealTimeParkingServiceClass {
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
   private selfFlaggedSpots = new Set<string>(); // spots flagged by current user
+  private notifiedAvailableSpots = new Set<string>(); // spots already notified as available
+  private notifiedAvailableFloors = new Set<string>(); // floors already notified as available
 
   constructor() {
     this.initializeService();
@@ -379,6 +381,19 @@ class RealTimeParkingServiceClass {
         .map(s => s.slot_name)
     );
 
+    // When a spot becomes occupied, remove it from dedup so it can notify again when available
+    const newOccupied = newData.sensorData.filter(
+      s => s.is_occupied && s.slot_name && oldAvailable.has(s.slot_name)
+    );
+    for (const spot of newOccupied) {
+      // Remove any dedup keys that include this slot
+      for (const key of this.notifiedAvailableSpots) {
+        if (key.includes(spot.slot_name!)) {
+          this.notifiedAvailableSpots.delete(key);
+        }
+      }
+    }
+
     const newlyAvailableSpots = newData.sensorData.filter(
       s => !s.is_occupied && s.slot_name && !oldAvailable.has(s.slot_name)
     );
@@ -396,12 +411,12 @@ class RealTimeParkingServiceClass {
         .then(settings => {
           const userRole = TokenManager.getUser()?.role;
           const isUser = userRole === 'user' && !!TokenManager.getToken();
-
           for (const floorStr in floorGrouped) {
             const floor = parseInt(floorStr, 10);
             const spotIds = floorGrouped[floor];
-            // settings notif
-            if (settings.spotAvailable && isUser && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused()) {
+            const spotKey = `${floor}:${spotIds.sort().join(',')}`;
+            if (settings.spotAvailable && isUser && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused() && !this.notifiedAvailableSpots.has(spotKey)) {
+              this.notifiedAvailableSpots.add(spotKey);
               NotificationService.showSpotAvailableNotification(
                 spotIds.length,
                 floor,
@@ -459,7 +474,20 @@ class RealTimeParkingServiceClass {
         .then(settings => {
           for (const newFloor of newData.floors) {
             const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
-            if (oldFloor && newFloor.available > oldFloor.available && settings.floorUpdates && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused()) {
+            if (!oldFloor) continue;
+
+            // When available count drops, clear dedup so next increase re-notifies
+            if (newFloor.available < oldFloor.available) {
+              for (const key of this.notifiedAvailableFloors) {
+                if (key.startsWith(`${newFloor.floor}:`)) {
+                  this.notifiedAvailableFloors.delete(key);
+                }
+              }
+            }
+
+            const floorKey = `${newFloor.floor}:${newFloor.available}`;
+            if (newFloor.available > oldFloor.available && settings.floorUpdates && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused() && !this.notifiedAvailableFloors.has(floorKey)) {
+              this.notifiedAvailableFloors.add(floorKey);
               NotificationService.showFloorUpdateNotification(
                 newFloor.floor,
                 newFloor.available,
@@ -551,14 +579,28 @@ class RealTimeParkingServiceClass {
     }
   }
 
+  resetNotificationDedup(): void {
+    this.notifiedAvailableSpots.clear();
+    this.notifiedAvailableFloors.clear();
+    // Mark all current spots as occupied so next poll treats available ones as newly available
+    if (this.lastData?.sensorData) {
+      this.lastData = {
+        ...this.lastData,
+        sensorData: this.lastData.sensorData.map(s => ({ ...s, is_occupied: true })),
+        floors: this.lastData.floors.map(f => ({ ...f, available: 0 })),
+      };
+    }
+  }
+
   async forceUpdate(): Promise<void> {
     this.consecErrors = 0;
     this.retryCount = 0;
-    
+    this.lastFetchTime = 0; // bypass the 2s debounce so the fetch actually runs
+
     if (!this.updateInterval) {
       this.start();
     }
-    
+
     await this.fetchAndUpdate();
   }
 

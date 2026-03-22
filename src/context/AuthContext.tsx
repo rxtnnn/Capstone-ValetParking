@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { login as apiLogin, logout as apiLogout, TokenManager } from '../config/api';
 import { NotificationManager } from '../services/NotifManager';
 import NotificationService from '../services/NotificationService';
+import { RfidSecurityService } from '../services/RfidSecurityService';
 
 interface User {
   id: number;
@@ -63,6 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Sync push token with backend for push notifications (RFID alerts, etc.)
         await NotificationService.syncPushTokenWithBackend();
+
+        // Restore rfidEntryDetected from latest scan
+        await RfidSecurityService.restoreRfidStateForUser(user.name);
       } else {
         await NotificationManager.onUserLogout();
         await NotificationService.clearUserSettings();

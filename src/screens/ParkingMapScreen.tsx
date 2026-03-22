@@ -30,6 +30,8 @@ import { ParkingConfigService } from '../services/ParkingConfigService';
 import { FloorConfig, Position } from '../types/parkingConfig';
 import { NotificationManager } from '../services/NotifManager';
 import { TokenManager } from '../config/api';
+import apiClient from '../config/api';
+import { API_ENDPOINTS } from '../constants/AppConst';
 
 
 type RootStackParamList = {
@@ -511,6 +513,20 @@ const ParkingMapScreen: React.FC = () => {
 
   const handleParkingConfirm = useCallback(async () => { //I've parked button
     await NotificationManager.pauseSpotNotifications();
+    // Notify backend that user has parked
+    try {
+      const tagsRes = await apiClient.get(API_ENDPOINTS.publicRfidTags);
+      const tags: any[] = tagsRes.data?.tags ?? [];
+      const currentUser = TokenManager.getUser();
+      const userTag = tags.find(t =>
+        t.user_name?.toLowerCase() === currentUser?.name?.toLowerCase() && t.status === 'active'
+      );
+      if (userTag?.uid) {
+        await apiClient.post(API_ENDPOINTS.publicRfidParked, { uid: userTag.uid });
+      }
+    } catch {
+      // silent fail — parking confirmation still proceeds
+    }
     setShowParkingConfirmModal(false);
     setNavigatingToSpot(null);
     clearNavigation();

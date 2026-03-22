@@ -282,6 +282,7 @@ class NotificationServiceClass {
     forceShow: boolean = false
   ): Promise<void> {
     if (spotsAvailable <= 0) return;
+    if (!forceShow && !NotificationManager.isRfidEntryDetected()) return;
     if (!forceShow && NotificationManager.isSpotNotificationsPaused()) return;
 
     // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
@@ -359,7 +360,7 @@ class NotificationServiceClass {
   ): Promise<void> {
     if (availableSpots <= 0) return;
 
-    // Check in-memory flag (fast path)
+    if (!NotificationManager.isRfidEntryDetected()) return;
     if (NotificationManager.isSpotNotificationsPaused()) return;
 
     // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload

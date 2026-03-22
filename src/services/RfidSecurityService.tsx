@@ -21,6 +21,7 @@ import {
 import apiClient, { TokenManager } from '../config/api';
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
+import { RealTimeParkingService } from './RealtimeParkingService';
 import { API_ENDPOINTS } from '../constants/AppConst';
 
 // Invalid statuses that should trigger alerts/notifications
@@ -142,7 +143,7 @@ class RfidSecurityServiceClass {
     try {
       // Fetch real RFID scan data from backend
       const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, {
-        params: { minutes: 5 },
+        params: { minutes: 60 },
       });
 
       const data = response.data;
@@ -209,29 +210,32 @@ class RfidSecurityServiceClass {
       // Add to recent scans (newest first)
       this.recentScans.unshift(scan);
 
-      // for notification logic 
+      // for notification logic
       if (scan.status === 'valid') {
         const currentUser = TokenManager.getUser();
-        const matchesUser = currentUser && ( //check if rfid userid belongs to current user
+        const matchesUser = currentUser && (
           (raw.user_id && raw.user_id === currentUser.id) ||
           (raw.user_name && currentUser.name && raw.user_name.toLowerCase() === currentUser.name.toLowerCase())
         );
 
         if (matchesUser) {
           if (scan.scan_type === 'entry') {
-            // User entered via RFID — set flag then start spot notifications
             NotificationManager.setRfidEntryDetected(true);
             await NotificationManager.resumeSpotNotifications();
+            RealTimeParkingService.resetNotificationDedup();
+            // Force immediate parking poll so newly-available spots are detected right away
+            setTimeout(() => RealTimeParkingService.forceUpdate(), 500);
           } else if (scan.scan_type === 'exit') {
-            // User exited via RFID — pause spot notifications (flag must be true first)
-            NotificationManager.setRfidEntryDetected(true);
+            NotificationManager.setRfidEntryDetected(false);
             await NotificationManager.pauseSpotNotifications();
           }
         }
       }
 
       // If invalid, create alert and queue for notification
-      if (INVALID_STATUSES.has(scan.status)) {
+      // Exclude "Vehicle already inside" — not a security threat
+      const isAlreadyInsideMsg = scan.message?.toLowerCase().includes('already inside');
+      if (INVALID_STATUSES.has(scan.status) && !isAlreadyInsideMsg) {
         const alert = this.createAlertFromScan(scan);
         this.alerts.unshift(alert);
         newInvalidScans.push(scan);
@@ -276,6 +280,12 @@ class RfidSecurityServiceClass {
 
   private async triggerLocalNotification(scan: RfidScanEvent): Promise<void> {
     try {
+      // Only send RFID alert notifications to security and admin roles
+      const currentUser = TokenManager.getUser();
+      if (!currentUser || !['security', 'admin', 'ssd'].includes(currentUser.role)) {
+        return;
+      }
+
       const alertType = STATUS_TO_NOTIF_TYPE[scan.status] || 'unknown';
 
       // Device push notification
@@ -486,46 +496,101 @@ class RfidSecurityServiceClass {
   // ----------------------------------------
 
   async getRecentScans(filters?: ScanHistoryFilters): Promise<PaginatedResponse<RfidScanEvent>> {
-    let filteredScans = [...this.recentScans];
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, {
+        params: { minutes: 1440 }, // last 24 hours
+      });
+      const data = response.data;
+      const apiScans: any[] = data?.scans || [];
+      const mapped: RfidScanEvent[] = apiScans.map((raw: any) => ({
+        id: `scan-${raw.id}`,
+        timestamp: raw.timestamp || new Date().toISOString(),
+        reader_id: raw.gate_mac || 'unknown',
+        reader_name: raw.gate_mac || 'Gate',
+        reader_location: raw.gate_mac || 'Unknown Location',
+        rfid_uid: raw.uid || 'Unknown',
+        scan_type: raw.scan_type || 'entry',
+        status: raw.status || 'unknown',
+        message: raw.message || '',
+        duration: raw.status === 'valid' ? 7 : 10,
+        user_name: raw.user_name || undefined,
+        vehicle_plate: raw.vehicle_plate || undefined,
+      }));
+      // Merge with in-memory and deduplicate by id
+      const merged = [...mapped];
+      const ids = new Set(mapped.map(s => s.id));
+      for (const s of this.recentScans) {
+        if (!ids.has(s.id)) merged.push(s);
+      }
+      let filteredScans = merged;
 
-    if (filters) {
-      if (filters.status) {
-        filteredScans = filteredScans.filter(s => s.status === filters.status);
+      if (filters) {
+        if (filters.status) {
+          filteredScans = filteredScans.filter(s => s.status === filters.status);
+        }
+        if (filters.scan_type) {
+          filteredScans = filteredScans.filter(s => s.scan_type === filters.scan_type);
+        }
+        if (filters.reader_id) {
+          filteredScans = filteredScans.filter(s => s.reader_id === filters.reader_id);
+        }
+        if (filters.search) {
+          const searchLower = filters.search.toLowerCase();
+          filteredScans = filteredScans.filter(s =>
+            s.rfid_uid.toLowerCase().includes(searchLower) ||
+            s.user_name?.toLowerCase().includes(searchLower) ||
+            s.vehicle_plate?.toLowerCase().includes(searchLower)
+          );
+        }
+        if (filters.from_date) {
+          const fromDate = new Date(filters.from_date);
+          filteredScans = filteredScans.filter(s => new Date(s.timestamp) >= fromDate);
+        }
+        if (filters.to_date) {
+          const toDate = new Date(filters.to_date);
+          filteredScans = filteredScans.filter(s => new Date(s.timestamp) <= toDate);
+        }
       }
-      if (filters.scan_type) {
-        filteredScans = filteredScans.filter(s => s.scan_type === filters.scan_type);
-      }
-      if (filters.reader_id) {
-        filteredScans = filteredScans.filter(s => s.reader_id === filters.reader_id);
-      }
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        filteredScans = filteredScans.filter(s =>
-          s.rfid_uid.toLowerCase().includes(searchLower) ||
-          s.user_name?.toLowerCase().includes(searchLower) ||
-          s.vehicle_plate?.toLowerCase().includes(searchLower)
-        );
-      }
-      if (filters.from_date) {
-        const fromDate = new Date(filters.from_date);
-        filteredScans = filteredScans.filter(s => new Date(s.timestamp) >= fromDate);
-      }
-      if (filters.to_date) {
-        const toDate = new Date(filters.to_date);
-        filteredScans = filteredScans.filter(s => new Date(s.timestamp) <= toDate);
-      }
+
+      return {
+        success: true,
+        data: filteredScans,
+        pagination: {
+          current_page: 1,
+          per_page: 50,
+          total: filteredScans.length,
+          total_pages: 1,
+        },
+      };
+    } catch {
+      return { success: false, data: [], pagination: { current_page: 1, per_page: 50, total: 0, total_pages: 1 } };
     }
+  }
 
-    return {
-      success: true,
-      data: filteredScans,
-      pagination: {
-        current_page: 1,
-        per_page: 50,
-        total: filteredScans.length,
-        total_pages: 1,
-      },
-    };
+  async restoreRfidStateForUser(userName: string): Promise<void> {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 1440 } });
+      const scans: any[] = response.data?.scans ?? [];
+      // Find the most recent valid scan for this user
+      const userScans = scans
+        .filter(s => s.status === 'valid' && s.user_name?.toLowerCase() === userName.toLowerCase())
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      if (userScans.length > 0) {
+        const latest = userScans[0];
+        if (latest.scan_type === 'entry') {
+          NotificationManager.setRfidEntryDetected(true);
+          await NotificationManager.resumeSpotNotifications();
+          RealTimeParkingService.resetNotificationDedup();
+          setTimeout(() => RealTimeParkingService.forceUpdate(), 500);
+        } else if (latest.scan_type === 'exit') {
+          NotificationManager.setRfidEntryDetected(false);
+          await NotificationManager.pauseSpotNotifications();
+        }
+      }
+    } catch {
+      // silent fail — state remains as loaded from AsyncStorage
+    }
   }
 
   async getActiveAlerts(filters?: AlertFilters): Promise<RfidAlert[]> {

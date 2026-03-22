@@ -39,9 +39,13 @@ export const API_ENDPOINTS = {
   // RFID (public)
   publicRfidScans: '/public/rfid/scans',
   publicRfidVerify: '/public/rfid/verify',
+  publicRfidExit: '/public/rfid/exit',
+  publicRfidParked: '/public/rfid/parked',
+  publicGuestVerify: '/public/guest/verify',
   publicVerifyVehicle: '/public/verify-vehicle',
 
   // RFID tags (admin)
+  publicRfidTags: '/public/rfid/tags',
   rfidTags: '/rfid/tags',
   rfidTagById: (id: number) => `/rfid/tags/${id}`,
   rfidTagByUid: (uid: string) => `/rfid/tags/uid/${uid}`,
