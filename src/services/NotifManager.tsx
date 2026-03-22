@@ -701,7 +701,6 @@ class NotificationManagerClass {
 
   async resumeSpotNotifications(): Promise<void> {
     this.spotNotificationsPaused = false;
-    this.rfidEntryDetected = false;
     await this.saveSpotNotificationsPaused();
   }
 
