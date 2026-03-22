@@ -252,15 +252,18 @@ class NotificationManagerClass {
   }
 
   private isDuplicateNotification(notification: CreateNotificationInput): boolean {
+    // spot_available notifications should always be shown — state changes are meaningful
+    if (notification.type === 'spot_available') return false;
+
     const fiveMinutesAgo = Date.now() - 300000;
-    
+
     return this.notifications.some((existing: AppNotification) => {
       if (notification.type === 'feedback_reply' && existing.type === 'feedback_reply') {
         const existingId = (existing.data as any)?.feedbackId;
         const newId = (notification.data as any)?.feedbackId;
         return existingId && newId && existingId === newId;
-      } 
-      
+      }
+
       return existing.type === notification.type &&
              existing.title === notification.title &&
              existing.message === notification.message &&
