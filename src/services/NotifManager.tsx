@@ -115,7 +115,6 @@ class NotificationManagerClass {
           this.loadProcessedReplies(),
           this.loadRfidEntryDetected(),
         ]);
-        // If RFID was not previously detected, reset paused state to true
         if (!this.rfidEntryDetected) {
           this.spotNotificationsPaused = true;
           await this.saveSpotNotificationsPaused();
@@ -338,6 +337,29 @@ class NotificationManagerClass {
       title, message, spotsAvailable, floor, spotIds, this.currentUserId
     );
     await this.addNotification(notification);
+  }
+
+  async addFloorUpdateNotification(floor: number, available: number, total: number, previousAvailable: number): Promise<void> {
+    if (!this.currentUserId) return;
+    if (!this.rfidEntryDetected || this.spotNotificationsPaused) return;
+
+    const difference = available - previousAvailable;
+    const newNotification: AppNotification = {
+      id: `floor_update_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      type: 'spot_available',
+      title: 'Floor Update',
+      message: difference > 0
+        ? `Floor ${floor}: ${difference} more spot${difference > 1 ? 's' : ''} available (${available}/${total} total)`
+        : `Floor ${floor}: ${available}/${total} spots available`,
+      timestamp: Date.now(),
+      isRead: false,
+      priority: 'normal',
+      data: { floor, available, total, previousAvailable, userId: this.currentUserId },
+    } as unknown as AppNotification;
+
+    this.notifications.unshift(newNotification);
+    await this.saveNotifications();
+    this.notifyListeners();
   }
 
   async addMalfunctionNotification(data: SpotMalfunctionData): Promise<void> {
@@ -719,7 +741,7 @@ class NotificationManagerClass {
 
   setRfidEntryDetected(detected: boolean): void {
     this.rfidEntryDetected = detected;
-    this.saveRfidEntryDetected();
+    this.saveRfidEntryDetected(); // fire-and-forget is acceptable here — in-memory is authoritative
   }
 
   isRfidEntryDetected(): boolean {

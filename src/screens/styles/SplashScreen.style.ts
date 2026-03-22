@@ -113,6 +113,7 @@ export const createResponsiveStyles = ({ width, height }: ResponsiveStylesParams
       fontSize: getResponsiveSize(16, 18, 20, 22),
       fontWeight: '600',
       marginRight: 8,
+      textAlign: 'center',
     },
     exploreButtonArrow: {
       color: 'white',
