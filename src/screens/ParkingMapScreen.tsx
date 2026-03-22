@@ -522,12 +522,10 @@ const ParkingMapScreen: React.FC = () => {
   //parking recommendation 
   const handleParkingCancel = useCallback(() => {
     setShowParkingConfirmModal(false);
-
     // find nearby available spots
     if (navigatingToSpot) {
       const takenSpotSection = navigatingToSpot.charAt(1);
-
-      // find available spots in same section first
+      // find available spots in same section 
       const availableSpots = parkingData
         .filter(spot => spot.hasSensor && !spot.isOccupied && !spot.malfunctioned && spot.id !== navigatingToSpot)
         .sort((a, b) => {
