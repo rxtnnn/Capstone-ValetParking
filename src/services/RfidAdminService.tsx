@@ -29,16 +29,17 @@ class RfidAdminServiceClass {
   async getAllTags(filters?: RfidTagFilters): Promise<PaginatedResponse<RfidTag>> {
     try {
       // Try to fetch from backend API
-      const response = await apiClient.get(API_ENDPOINTS.rfidTags, { params: filters });
-      if (response.data?.data) {
-        this.tags = response.data.data;
+      const response = await apiClient.get(API_ENDPOINTS.publicRfidTags, { params: filters });
+      const tags = response.data?.tags ?? response.data?.data ?? (Array.isArray(response.data) ? response.data : null);
+      if (tags) {
+        this.tags = tags;
         return {
           success: true,
-          data: response.data.data,
-          pagination: response.data.pagination || {
+          data: tags,
+          pagination: {
             current_page: 1,
             per_page: 50,
-            total: response.data.data.length,
+            total: response.data?.count ?? tags.length,
             total_pages: 1,
           },
         };
@@ -216,24 +217,42 @@ class RfidAdminServiceClass {
 
   async getDashboardStats(): Promise<RfidDashboardStats> {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.publicParkingDashboard);
-      const data = response.data;
+      const [tagsRes, scansRes] = await Promise.all([
+        apiClient.get(API_ENDPOINTS.publicRfidTags),
+        apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 1440 } }),
+      ]);
 
-      // Map backend parking dashboard to RFID dashboard stats
+      const tags: any[] = tagsRes.data?.tags ?? tagsRes.data?.data ?? (Array.isArray(tagsRes.data) ? tagsRes.data : []);
+      const scans: any[] = scansRes.data?.scans ?? (Array.isArray(scansRes.data) ? scansRes.data : []);
+
+      const today = new Date().toDateString();
+      const todayScans = scans.filter(s => new Date(s.timestamp).toDateString() === today);
+
+      const total_tags = tags.length;
+      const active_tags = tags.filter(t => t.status === 'active' || t.status === 'valid').length;
+      const expired_tags = tags.filter(t => t.status === 'expired').length;
+      const suspended_tags = tags.filter(t => t.status === 'suspended').length;
+      const lost_tags = tags.filter(t => t.status === 'lost').length;
+
+      const today_entries = todayScans.filter(s => s.scan_type === 'entry' && s.status === 'valid').length;
+      const today_exits = todayScans.filter(s => s.scan_type === 'exit').length;
+      const today_invalid_scans = todayScans.filter(s => s.status !== 'valid').length;
+      const current_parked = today_entries - today_exits > 0 ? today_entries - today_exits : 0;
+
       return {
-        total_tags: data?.total_tags ?? 0,
-        active_tags: data?.active_tags ?? 0,
-        expired_tags: data?.expired_tags ?? 0,
-        suspended_tags: data?.suspended_tags ?? 0,
-        lost_tags: data?.lost_tags ?? 0,
-        expiring_soon: data?.expiring_soon ?? 0,
-        readers_online: data?.readers_online ?? 0,
-        readers_offline: data?.readers_offline ?? 0,
-        readers_error: data?.readers_error ?? 0,
-        today_entries: data?.today_entries ?? data?.entries_today ?? 0,
-        today_exits: data?.today_exits ?? data?.exits_today ?? 0,
-        today_invalid_scans: data?.today_invalid_scans ?? data?.invalid_scans_today ?? 0,
-        current_parked: data?.current_parked ?? data?.currently_parked ?? 0,
+        total_tags,
+        active_tags,
+        expired_tags,
+        suspended_tags,
+        lost_tags,
+        expiring_soon: 0,
+        readers_online: 0,
+        readers_offline: 0,
+        readers_error: 0,
+        today_entries,
+        today_exits,
+        today_invalid_scans,
+        current_parked,
       };
     } catch (error) {
       console.log('Error fetching dashboard stats:', error);
