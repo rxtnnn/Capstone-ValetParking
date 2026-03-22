@@ -395,7 +395,7 @@ class RealTimeParkingServiceClass {
       NotificationService.getNotificationSettings()
         .then(settings => {
           const userRole = TokenManager.getUser()?.role;
-          const isUser = userRole === 'user';
+          const isUser = userRole === 'user' && !!TokenManager.getToken();
 
           for (const floorStr in floorGrouped) {
             const floor = parseInt(floorStr, 10);
@@ -453,7 +453,7 @@ class RealTimeParkingServiceClass {
     }
 
     const role = TokenManager.getUser()?.role;
-    const isUser = role === 'user';
+    const isUser = role === 'user' && !!TokenManager.getToken();
     if (isUser) {
       NotificationService.getNotificationSettings() //floor notif
         .then(settings => {
