@@ -86,13 +86,13 @@ const ParkingMapScreen: React.FC = () => {
   const [showParkingConfirmModal, setShowParkingConfirmModal] = useState(false);
   const [showNavigationModal, setShowNavigationModal] = useState(false);
   const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null);
-  const [navigatingToSpot, setNavigatingToSpot] = useState<string | null>(null); // Track which spot user is navigating to
-  const [showSuccessModal, setShowSuccessModal] = useState(false); // Success modal after parking confirmed
-  const [showSpotTakenModal, setShowSpotTakenModal] = useState(false); // Modal when someone else took the spot
-  const [suggestedSpots, setSuggestedSpots] = useState<string[]>([]); // Suggested spots when spot is taken
-  const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); // Highlight specific spots
-  const previousParkingDataRef = useRef<ParkingSpot[]>([]); // Track previous parking data to detect changes
-  const optimisticMalfunctionRef = useRef<{ [spotId: string]: boolean }>({}); // Optimistic malfunction overrides
+  const [navigatingToSpot, setNavigatingToSpot] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSpotTakenModal, setShowSpotTakenModal] = useState(false); 
+  const [suggestedSpots, setSuggestedSpots] = useState<string[]>([]); 
+  const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); 
+  const previousParkingDataRef = useRef<ParkingSpot[]>([]); 
+  const optimisticMalfunctionRef = useRef<{ [spotId: string]: boolean }>({});
 
   // Spot picker modal (for security/admin on available spots)
   const [showSpotPickerModal, setShowSpotPickerModal] = useState(false);
@@ -300,7 +300,6 @@ const ParkingMapScreen: React.FC = () => {
 
     setParkingStats(stats);
 
-    // Build maps from API data using slot_name directly
     const spotOccupancyMap: { [key: string]: boolean } = {};
     const spotHasSensorMap: { [key: string]: boolean } = {};
     const spotMalfunctionedMap: { [key: string]: boolean } = {};
@@ -554,7 +553,7 @@ const ParkingMapScreen: React.FC = () => {
     if (!spot.hasSensor) return;
 
     if (canAccessSpotActions) {
-      if (isSecurityRole && !spot.malfunctioned && !spot.isOccupied) {
+      if (isSecurityRole && !spot.malfunctioned) {
         setSpotPickerTarget(spot);
         setShowSpotPickerModal(true);
       } else {
