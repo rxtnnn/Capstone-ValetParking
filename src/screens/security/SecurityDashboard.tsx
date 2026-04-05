@@ -29,6 +29,8 @@ type RootStackParamList = {
   AlertsScreen: undefined;
   GuestManagement: undefined;
   ScanHistory: undefined;
+  IncidentReport: undefined;
+  IncidentLog: undefined;
   Profile: undefined;
 };
 
@@ -320,6 +322,18 @@ const SecurityDashboard: React.FC = () => {
                 setVerifyResult(null);
                 setShowVerifyModal(true);
               }}
+            />
+            <QuickActionButton
+              title="File Incident"
+              icon="warning"
+              color="#E65100"
+              onPress={() => navigation.navigate('IncidentReport')}
+            />
+            <QuickActionButton
+              title="Incident Log"
+              icon="document-text"
+              color="#5C6BC0"
+              onPress={() => navigation.navigate('IncidentLog')}
             />
           </View>
         </View>

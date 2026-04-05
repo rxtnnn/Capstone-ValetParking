@@ -49,6 +49,8 @@ import {
   AlertsScreen,
   GuestManagementScreen,
   ScanHistoryScreen,
+  IncidentReportScreen,
+  IncidentLogScreen,
 } from './src/screens/security';
 
 Notifications.setNotificationHandler({
@@ -790,6 +792,22 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen
               name="ScanHistory"
               component={ScanHistoryScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="IncidentReport"
+              component={IncidentReportScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen
+              name="IncidentLog"
+              component={IncidentLogScreen}
               options={{
                 headerShown: false,
                 gestureEnabled: true,
