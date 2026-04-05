@@ -56,9 +56,9 @@ class RealTimeParkingServiceClass {
   private consecErrors = 0;
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
-  private selfFlaggedSpots = new Set<string>(); // spots flagged by current user
-  private notifiedAvailableSpots = new Set<string>(); // spots already notified as available
-  private notifiedAvailableFloors = new Set<string>(); // floors already notified as available
+  private selfFlaggedSpots = new Set<string>();
+  private notifiedAvailableSpots = new Set<string>();
+  private notifiedAvailableFloors = new Set<string>();
 
   constructor() {
     this.initializeService();
@@ -94,7 +94,7 @@ class RealTimeParkingServiceClass {
 
     this.updateInterval = setInterval(() => {
       if (!this.shouldStop && this.isRunning && !this.isFetching) {
-        this.fetchAndUpdate(); //fetch every 3secs
+        this.fetchAndUpdate();
       }
     }, this.updateIntervalMs);
   }
@@ -323,7 +323,7 @@ class RealTimeParkingServiceClass {
 
     for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
-      // exclude maulfunctioned
+
       const isAvailable = !space.is_occupied && !space.malfunctioned;
 
       if (isAvailable) availableSpots++;
@@ -381,12 +381,10 @@ class RealTimeParkingServiceClass {
         .map(s => s.slot_name)
     );
 
-    // When a spot becomes occupied, remove it from dedup so it can notify again when available
     const newOccupied = newData.sensorData.filter(
       s => s.is_occupied && s.slot_name && oldAvailable.has(s.slot_name)
     );
     for (const spot of newOccupied) {
-      // Remove any dedup keys that include this slot
       for (const key of this.notifiedAvailableSpots) {
         if (key.includes(spot.slot_name!)) {
           this.notifiedAvailableSpots.delete(key);
@@ -406,7 +404,6 @@ class RealTimeParkingServiceClass {
         (floorGrouped[floor] = floorGrouped[floor] || []).push(label);
       }
 
-      //spot notif
       NotificationService.getNotificationSettings()
         .then(settings => {
           const userRole = TokenManager.getUser()?.role;
@@ -450,7 +447,6 @@ class RealTimeParkingServiceClass {
       if (isAdminOrSsd || isSecurity) {
         for (const spot of newlyMalfunctioned) {
           const reporter = spot.malfunction_reported_by ?? 'Unknown';
-          // Skip if flagged by the current user (tracked by slot name or name match)
           if (spot.slot_name && this.selfFlaggedSpots.has(spot.slot_name)) {
             this.selfFlaggedSpots.delete(spot.slot_name);
             continue;
@@ -471,13 +467,12 @@ class RealTimeParkingServiceClass {
     const role = TokenManager.getUser()?.role;
     const isUser = role === 'user' && !!TokenManager.getToken();
     if (isUser) {
-      NotificationService.getNotificationSettings() //floor notif
+      NotificationService.getNotificationSettings()
         .then(settings => {
           for (const newFloor of newData.floors) {
             const oldFloor = oldData.floors.find(f => f.floor === newFloor.floor);
             if (!oldFloor) continue;
 
-            // When available count drops, clear dedup so next increase re-notifies
             if (newFloor.available < oldFloor.available) {
               for (const key of this.notifiedAvailableFloors) {
                 if (key.startsWith(`${newFloor.floor}:`)) {
@@ -589,7 +584,6 @@ class RealTimeParkingServiceClass {
   resetNotificationDedup(): void {
     this.notifiedAvailableSpots.clear();
     this.notifiedAvailableFloors.clear();
-    // Mark all current spots as occupied so next poll treats available ones as newly available
     if (this.lastData?.sensorData) {
       this.lastData = {
         ...this.lastData,
@@ -602,7 +596,7 @@ class RealTimeParkingServiceClass {
   async forceUpdate(): Promise<void> {
     this.consecErrors = 0;
     this.retryCount = 0;
-    this.lastFetchTime = 0; // bypass the 2s debounce so the fetch actually runs
+    this.lastFetchTime = 0;
 
     if (!this.updateInterval) {
       this.start();

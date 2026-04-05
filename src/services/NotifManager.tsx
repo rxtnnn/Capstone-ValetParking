@@ -52,7 +52,6 @@ class NotificationManagerClass {
       if (!userId) return;
       const key = `${STORAGE_KEYS.SPOT_NOTIFS_PAUSED}_${userId}`;
       const stored = await AsyncStorage.getItem(key);
-      // If no stored value, default to true (paused until RFID entry)
       this.spotNotificationsPaused = stored === null ? true : stored === 'true';
     } catch {
       this.spotNotificationsPaused = true;
@@ -251,7 +250,6 @@ class NotificationManagerClass {
   }
 
   private isDuplicateNotification(notification: CreateNotificationInput): boolean {
-    // spot_available notifications should always be shown — state changes are meaningful
     if (notification.type === 'spot_available') return false;
 
     const fiveMinutesAgo = Date.now() - 300000;

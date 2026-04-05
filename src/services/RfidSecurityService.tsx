@@ -1,7 +1,3 @@
-// RFID Security Service - Real-time monitoring using backend API
-// Polls /public/rfid/scans for scan events and triggers local notifications
-// Follows the same pattern as RealtimeParkingService
-
 import {
   RfidScanEvent,
   RfidAlert,
@@ -24,10 +20,8 @@ import { NotificationManager } from './NotifManager';
 import { RealTimeParkingService } from './RealtimeParkingService';
 import { API_ENDPOINTS } from '../constants/AppConst';
 
-// Invalid statuses that should trigger alerts/notifications
 const INVALID_STATUSES = new Set(['invalid', 'expired', 'suspended', 'lost', 'unknown']);
 
-// Map scan status to alert type
 const STATUS_TO_ALERT_TYPE: Record<string, RfidAlert['alert_type']> = {
   invalid: 'invalid_rfid',
   expired: 'expired_rfid',
@@ -36,7 +30,6 @@ const STATUS_TO_ALERT_TYPE: Record<string, RfidAlert['alert_type']> = {
   unknown: 'unknown_rfid',
 };
 
-// Map scan status to notification alert type
 const STATUS_TO_NOTIF_TYPE: Record<string, 'invalid' | 'expired' | 'suspended' | 'unknown'> = {
   invalid: 'invalid',
   expired: 'expired',
@@ -45,7 +38,6 @@ const STATUS_TO_NOTIF_TYPE: Record<string, 'invalid' | 'expired' | 'suspended' |
   unknown: 'unknown',
 };
 
-// Map scan status to severity
 const STATUS_TO_SEVERITY: Record<string, RfidAlert['severity']> = {
   invalid: 'medium',
   expired: 'low',
@@ -55,52 +47,34 @@ const STATUS_TO_SEVERITY: Record<string, RfidAlert['severity']> = {
 };
 
 class RfidSecurityServiceClass {
-  // Callbacks
   private scanCallbacks: ScanUpdateCallback[] = [];
   private alertCallbacks: AlertCallback[] = [];
   private connectionCallbacks: ConnectionStatusCallback[] = [];
   private statsCallbacks: StatsUpdateCallback[] = [];
 
-  // Polling state
   private updateInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private shouldStop: boolean = false;
-  private pollingIntervalMs: number = 10000; // 10 seconds like web team suggested
+  private pollingIntervalMs: number = 10000;
   private isFetching: boolean = false;
-
-  // Connection state
   private connectionStatus: 'connected' | 'disconnected' | 'error' = 'disconnected';
   private consecutiveErrors: number = 0;
   private maxConsecutiveErrors: number = 5;
-
-  // Data storage
   private recentScans: RfidScanEvent[] = [];
   private alerts: RfidAlert[] = [];
   private guests: GuestAccess[] = [];
   private lastStats: SecurityDashboardStats | null = null;
-
-  // Track processed scan IDs to avoid duplicate notifications
   private processedScanIds: Set<number> = new Set();
 
-  // ----------------------------------------
-  // Real-time Monitoring (Polling)
-  // ----------------------------------------
-
   start(): void {
-    if (this.updateInterval) {
-      console.log('RfidSecurityService already running');
-      return;
-    }
+    if (this.updateInterval) return;
 
-    console.log('Starting RfidSecurityService');
     this.isRunning = true;
     this.shouldStop = false;
     this.consecutiveErrors = 0;
 
-    // Initial fetch
     this.fetchAndUpdate();
 
-    // Set up polling
     this.updateInterval = setInterval(() => {
       if (!this.shouldStop && this.isRunning && !this.isFetching) {
         this.fetchAndUpdate();
@@ -109,7 +83,6 @@ class RfidSecurityServiceClass {
   }
 
   stop(): void {
-    console.log('Stopping RfidSecurityService');
     this.shouldStop = true;
     this.isRunning = false;
 
@@ -141,7 +114,6 @@ class RfidSecurityServiceClass {
     this.isFetching = true;
 
     try {
-      // Fetch real RFID scan data from backend
       const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, {
         params: { minutes: 60 },
       });
@@ -151,18 +123,12 @@ class RfidSecurityServiceClass {
 
       if (this.shouldStop || !this.isRunning) return;
 
-      // Process new scans and detect changes
       this.processNewScans(scans);
-
-      // Update stats from scan data
       this.updateStatsFromScans(scans);
-
-      // Notify callbacks
       this.notifyScanUpdate();
       this.notifyAlertUpdate();
       this.notifyStatsUpdate();
 
-      // Reset error counter and set connected
       this.consecutiveErrors = 0;
       this.setConnectionStatus('connected');
 
@@ -207,10 +173,8 @@ class RfidSecurityServiceClass {
         vehicle_plate: raw.vehicle_plate || undefined,
       };
 
-      // Add to recent scans (newest first)
       this.recentScans.unshift(scan);
 
-      // for notification logic
       if (scan.status === 'valid') {
         const currentUser = TokenManager.getUser();
         const matchesUser = currentUser && (
@@ -223,7 +187,6 @@ class RfidSecurityServiceClass {
             NotificationManager.setRfidEntryDetected(true);
             await NotificationManager.resumeSpotNotifications();
             RealTimeParkingService.resetNotificationDedup();
-            // Force immediate parking poll so newly-available spots are detected right away
             setTimeout(() => RealTimeParkingService.forceUpdate(), 500);
           } else if (scan.scan_type === 'exit') {
             NotificationManager.setRfidEntryDetected(false);
@@ -233,7 +196,6 @@ class RfidSecurityServiceClass {
         }
       }
 
-      // If invalid, create alert and queue for notification
       const isAlreadyInsideMsg = scan.message?.toLowerCase().includes('already inside');
       if (INVALID_STATUSES.has(scan.status) && !isAlreadyInsideMsg) {
         const alert = this.createAlertFromScan(scan);
@@ -242,7 +204,6 @@ class RfidSecurityServiceClass {
       }
     }
 
-    // Keep only last 100 scans and 100 alerts
     if (this.recentScans.length > 100) {
       this.recentScans = this.recentScans.slice(0, 100);
     }
@@ -255,8 +216,6 @@ class RfidSecurityServiceClass {
       this.processedScanIds = new Set(idsArray.slice(-200));
     }
 
-    // Trigger local notifications for new invalid scans
-    // (Same pattern as RealtimeParkingService triggering NotificationService)
     for (const scan of newInvalidScans) {
       this.triggerLocalNotification(scan);
     }
@@ -279,15 +238,11 @@ class RfidSecurityServiceClass {
 
   private async triggerLocalNotification(scan: RfidScanEvent): Promise<void> {
     try {
-      // Only send RFID alert notifications to security and admin roles
       const currentUser = TokenManager.getUser();
-      if (!currentUser || !['security', 'admin', 'ssd'].includes(currentUser.role)) {
-        return;
-      }
+      if (!currentUser || !['security', 'admin', 'ssd'].includes(currentUser.role)) return;
 
       const alertType = STATUS_TO_NOTIF_TYPE[scan.status] || 'unknown';
 
-      // Device push notification
       await NotificationService.showRfidAlertNotification(
         alertType,
         scan.rfid_uid,
@@ -299,7 +254,6 @@ class RfidSecurityServiceClass {
         }
       );
 
-      // Persist to AsyncStorage so it appears in-app and survives restarts
       await NotificationManager.addRfidAlertNotification({
         alertType,
         rfidUid: scan.rfid_uid,
@@ -308,8 +262,6 @@ class RfidSecurityServiceClass {
         vehiclePlate: scan.vehicle_plate || undefined,
         message: scan.message || undefined,
       });
-
-      console.log(`RFID local notification triggered: ${alertType} - ${scan.rfid_uid}`);
     } catch (error) {
       console.log('Error triggering RFID local notification:', error);
     }
