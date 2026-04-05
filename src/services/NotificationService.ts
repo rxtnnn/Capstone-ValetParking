@@ -780,11 +780,8 @@ class NotificationServiceClass {
         console.log('Push token removed from backend successfully');
         return true;
       }
-
-      console.log('Failed to remove push token:', response.data?.message);
       return false;
     } catch (error: any) {
-      console.log('Error removing push token from backend:', error?.message || error);
       return false;
     }
   }

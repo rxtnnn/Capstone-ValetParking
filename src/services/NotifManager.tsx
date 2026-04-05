@@ -741,7 +741,7 @@ class NotificationManagerClass {
 
   setRfidEntryDetected(detected: boolean): void {
     this.rfidEntryDetected = detected;
-    this.saveRfidEntryDetected(); // fire-and-forget is acceptable here — in-memory is authoritative
+    this.saveRfidEntryDetected();
   }
 
   isRfidEntryDetected(): boolean {
