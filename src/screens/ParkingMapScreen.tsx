@@ -1602,7 +1602,7 @@ const ParkingMapScreen: React.FC = () => {
                           setSpotActionsResult({ type: 'error', title: 'Error', message: `Spot ID not found for ${targetId}. Try again.` });
                           return;
                         }
-                        // Optimistic: turn yellow immediately before API call
+                        // turn yellow immediately before API call
                         optimisticMalfunctionRef.current[targetId!] = true;
                         setParkingData(prev => prev.map(s =>
                           s.id === targetId ? { ...s, malfunctioned: true } : s

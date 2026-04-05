@@ -436,6 +436,7 @@ class RealTimeParkingServiceClass {
     const oldMalfunctionedSet = new Set(
       (oldData.sensorData ?? []).filter(s => s.malfunctioned && s.slot_name).map(s => s.slot_name)
     );
+
     const newlyMalfunctioned = (newData.sensorData ?? []).filter(
       s => s.malfunctioned && s.slot_name && !oldMalfunctionedSet.has(s.slot_name)
     );
@@ -445,7 +446,7 @@ class RealTimeParkingServiceClass {
       const userName = currentUser?.name;
       const isAdminOrSsd = userRole === 'admin' || userRole === 'ssd';
       const isSecurity = userRole === 'security';
-
+      
       if (isAdminOrSsd || isSecurity) {
         for (const spot of newlyMalfunctioned) {
           const reporter = spot.malfunction_reported_by ?? 'Unknown';
