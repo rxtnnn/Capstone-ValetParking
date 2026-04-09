@@ -482,7 +482,8 @@ class RealTimeParkingServiceClass {
             }
 
             const floorKey = `${newFloor.floor}:${newFloor.available}`;
-            if (newFloor.available > oldFloor.available && settings.floorUpdates && isUser && NotificationManager.isRfidEntryDetected() && !NotificationManager.isSpotNotificationsPaused() && !this.notifiedAvailableFloors.has(floorKey)) {
+            if (newFloor.available > oldFloor.available && settings.floorUpdates && isUser && NotificationManager.isRfidEntryDetected() 
+              && !NotificationManager.isSpotNotificationsPaused() && !this.notifiedAvailableFloors.has(floorKey)) {
               this.notifiedAvailableFloors.add(floorKey);
               NotificationService.showFloorUpdateNotification(
                 newFloor.floor,

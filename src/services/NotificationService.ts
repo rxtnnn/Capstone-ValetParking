@@ -285,7 +285,6 @@ class NotificationServiceClass {
     if (!forceShow && !NotificationManager.isRfidEntryDetected()) return;
     if (!forceShow && NotificationManager.isSpotNotificationsPaused()) return;
 
-    // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
     if (!forceShow) {
       try {
         const userId = TokenManager.getUser()?.id;
@@ -293,7 +292,7 @@ class NotificationServiceClass {
           const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
           if (stored === 'true') return;
         }
-      } catch { /* ignore */ }
+      } catch {}
     }
 
     try {
@@ -363,7 +362,6 @@ class NotificationServiceClass {
     if (!NotificationManager.isRfidEntryDetected()) return;
     if (NotificationManager.isSpotNotificationsPaused()) return;
 
-    // Always re-read from AsyncStorage
     try {
       const userId = TokenManager.getUser()?.id;
       if (userId) {
@@ -552,14 +550,13 @@ class NotificationServiceClass {
         title,
         body: message,
         data: data || {},
-        sound: settings.sound ? 'default' : false, // FIX: Explicit sound setting
-        vibrate: settings.vibration ? DEFAULT_VIBRATION : [0], // FIX: Explicit vibration
+        sound: settings.sound ? 'default' : false, 
+        vibrate: settings.vibration ? DEFAULT_VIBRATION : [0], 
       };
 
-      // FIX 5: Use proper identifier and trigger
       await Notifications.scheduleNotificationAsync({
         content: notificationContent,
-        trigger: null, // Show immediately
+        trigger: null, 
         identifier: `valet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       });
 
@@ -745,7 +742,6 @@ class NotificationServiceClass {
 
   async syncPushTokenWithBackend(): Promise<boolean> {
     try {
-      // Get or register the push token
       let token = this.expoPushToken;
       if (!token) {
         token = await this.registerPushNotif();
