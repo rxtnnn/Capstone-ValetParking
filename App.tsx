@@ -312,17 +312,6 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[tabBarStyles.tabItem, isActive('Feedback') && tabBarStyles.activeTab]}
-          onPress={() => navigation.navigate('Feedback')}
-        >
-          <Ionicons
-            name={isActive('Feedback') ? 'chatbubble' : 'chatbubble-outline'}
-            size={24}
-            color="white"
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[tabBarStyles.tabItem, isActive('Profile') && tabBarStyles.activeTab]}
           onPress={() => navigation.navigate('Profile', user?.id ? { userId: user.id } : undefined)}
         >
@@ -650,14 +639,14 @@ const AppNavigator: React.FC = () => {
               })}
             />
             
-            <Stack.Screen 
-              name="Feedback" 
+            <Stack.Screen
+              name="Feedback"
               component={FeedbackScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Feedback" 
+                  <GradientHeader
+                    title="Feedback"
                     navigation={navigation}
                     canGoBack={true}
                   />
@@ -665,15 +654,15 @@ const AppNavigator: React.FC = () => {
                 gestureEnabled: true,
               })}
             />
-            
-            <Stack.Screen 
-              name="Settings" 
+
+            <Stack.Screen
+              name="Settings"
               component={SettingsScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Settings" 
+                  <GradientHeader
+                    title="Settings"
                     navigation={navigation}
                     canGoBack={true}
                   />
@@ -681,15 +670,15 @@ const AppNavigator: React.FC = () => {
                 gestureEnabled: true,
               })}
             />
-            
-            <Stack.Screen 
-              name="Profile" 
+
+            <Stack.Screen
+              name="Profile"
               component={ProfileScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Profile" 
+                  <GradientHeader
+                    title="Profile"
                     navigation={navigation}
                     canGoBack={true}
                   />
@@ -697,7 +686,7 @@ const AppNavigator: React.FC = () => {
                 gestureEnabled: true,
               })}
             />
-            
+
             <Stack.Screen
               name="AdminReplies"
               component={AdminRepliesSection}
