@@ -1,7 +1,7 @@
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
 import { TokenManager } from '../config/api';
-import { API_ENDPOINTS } from '../constants/AppConst';
+import { API_ENDPOINTS, API_TOKEN } from '../constants/AppConst';
 
 export interface ParkingSpace {
   id: number;
@@ -38,11 +38,10 @@ type ConnectionStatusCallback = (status: 'connected' | 'disconnected' | 'error')
 
 class RealTimeParkingServiceClass {
   private apiUrl = `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.publicParking}`;
-  private readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
   
   private updateCallbacks: ParkingUpdateCallback[] = [];
   private connectionCallbacks: ConnectionStatusCallback[] = [];
-  private updateInterval: NodeJS.Timeout | null = null;
+  private updateInterval: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
   private lastData: ParkingStats | null = null;
   private connectionStatus: 'connected' | 'disconnected' | 'error' = 'disconnected';
@@ -66,12 +65,10 @@ class RealTimeParkingServiceClass {
 
   private initializeService(): void {
     if (this.isInitialized) return;
+
     this.isInitialized = true;
-    
     this.isRunning = true;
     this.shouldStop = false;
-    
-    console.log('RealTimeParkingService initialized');
   }
 
   start(): void {
@@ -80,16 +77,12 @@ class RealTimeParkingServiceClass {
     }
     
     if (this.updateInterval) {
-      console.log('Service already running, skipping start');
       return;
     }
-    
-    console.log('Starting RealTimeParkingService data fetching');
     this.isRunning = true;
     this.shouldStop = false;
     this.consecErrors = 0;
     this.retryCount = 0;
-    
     this.fetchAndUpdate();
 
     this.updateInterval = setInterval(() => {
@@ -99,11 +92,8 @@ class RealTimeParkingServiceClass {
     }, this.updateIntervalMs);
   }
 
-
-
   stop(): void {
     console.log('Stopping RealTimeParkingService');
-    
     this.shouldStop = true;
     this.isRunning = false;
     
@@ -122,7 +112,6 @@ class RealTimeParkingServiceClass {
   }
 
   manualStop(): void {
-    console.log('Manual stop requested - use for logout/app close only');
     this.stop();
   }
 
@@ -192,7 +181,6 @@ class RealTimeParkingServiceClass {
     if (now - this.lastFetchTime < 2000) return;
 
     if (this.consecErrors >= this.maxConsecutiveErrors) {
-      console.log(`Too many consecutive errors (${this.consecErrors}), extending retry delay`);
       const extendedDelay = Math.min(30000, this.updateIntervalMs * 3);
       setTimeout(() => {
         if (this.isRunning && !this.shouldStop) {
@@ -219,7 +207,7 @@ class RealTimeParkingServiceClass {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_TOKEN}`,
+          'Authorization': `Bearer ${API_TOKEN}`,
           'Cache-Control': 'no-cache',
           'User-Agent': 'VALET-RealTime/1.0',
         },
@@ -230,7 +218,6 @@ class RealTimeParkingServiceClass {
       if (this.fetchController.signal.aborted) return;
 
       if (response.status === 401 || response.status === 403) {
-        console.log(`API authentication error: ${response.status}`);
         this.setConnectionStatus('error');
         this.consecErrors++;
         return;
@@ -381,10 +368,8 @@ class RealTimeParkingServiceClass {
         .map(s => s.slot_name)
     );
 
-    // When a spot becomes occupied, remove it from dedup so it can notify again when available
-    const newOccupied = newData.sensorData.filter(
-      s => s.is_occupied && s.slot_name && oldAvailable.has(s.slot_name)
-    );
+    // allow users to notify when spots becomes available
+    const newOccupied = newData.sensorData.filter(s => s.is_occupied && s.slot_name && oldAvailable.has(s.slot_name)); //latest data
     for (const spot of newOccupied) {
       // Remove any dedup keys that include this slot
       for (const key of this.notifiedAvailableSpots) {
@@ -622,7 +607,7 @@ class RealTimeParkingServiceClass {
       retryCount: this.retryCount,
       consecErrors: this.consecErrors,
       apiEndpoint: this.apiUrl,
-      hasValidToken: !!this.API_TOKEN,
+      hasValidToken: !!API_TOKEN,
       sensorCount: this.lastData?.sensorData?.length || 0,
       isInitialized: this.isInitialized,
       hasActiveInterval: !!this.updateInterval,

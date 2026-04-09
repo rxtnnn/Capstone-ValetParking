@@ -36,7 +36,7 @@ export const API_ENDPOINTS = {
   // Parking config (public)
   parkingConfig: (locationId: number | string) => `/public/parking-config/${locationId}`,
 
-  // RFID (public)
+  // rfid (public)
   publicRfidScans: '/public/rfid/scans',
   publicRfidVerify: '/public/rfid/verify',
   publicRfidExit: '/public/rfid/exit',
@@ -44,14 +44,14 @@ export const API_ENDPOINTS = {
   publicGuestVerify: '/public/guest/verify',
   publicVerifyVehicle: '/public/verify-vehicle',
 
-  // RFID tags (admin)
+  // rfid tags (admin)
   publicRfidTags: '/public/rfid/tags',
   rfidTags: '/rfid/tags',
   rfidTagById: (id: number) => `/rfid/tags/${id}`,
   rfidTagByUid: (uid: string) => `/rfid/tags/uid/${uid}`,
   rfidTagDeactivate: (id: number) => `/rfid/tags/${id}/deactivate`,
 
-  // RFID readers (admin)
+  // rfid readers (admin)
   rfidReaders: '/rfid/readers',
   rfidReaderById: (id: number) => `/rfid/readers/${id}`,
   rfidReaderRestart: (id: number) => `/rfid/readers/${id}/restart`,
@@ -60,6 +60,8 @@ export const API_ENDPOINTS = {
   incidents: '/incidents',
   incidentById: (id: number) => `/incidents/${id}`,
 };
+
+export const API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
 
 export const FONTS = {
   regular: 'Poppins_400Regular',

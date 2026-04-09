@@ -1,32 +1,15 @@
-// src/services/ParkingConfigService.tsx
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  ParkingLocationConfig,
-  FloorConfig,
-  ParkingConfigApiResponse,
-  ConfigCacheMetadata,
-  SensorToSpotMapping,
-  Position,
-} from '../types/parkingConfig';
-import { API_ENDPOINTS } from '../constants/AppConst';
-import {
-  generateFloorSpots,
-  NAVIGATION_WAYPOINTS,
-  NAVIGATION_ROUTES,
-  GESTURE_LIMITS,
-  INITIAL_VIEW,
-  ENTRANCE_POINT,
-} from '../components/MapLayout';
-
+import {ParkingLocationConfig, FloorConfig, ParkingConfigApiResponse, ConfigCacheMetadata,
+  SensorToSpotMapping, Position } from '../types/parkingConfig';
+import { API_ENDPOINTS, API_TOKEN } from '../constants/AppConst';
+import { generateFloorSpots, NAVIGATION_WAYPOINTS, NAVIGATION_ROUTES, GESTURE_LIMITS,
+  INITIAL_VIEW, ENTRANCE_POINT } from '../components/MapLayout';
 
 class ParkingConfigServiceClass {
   private static readonly API_BASE_URL = API_ENDPOINTS.baseUrl;
-  private static readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
-
   private static readonly CACHE_KEY = 'parking_config_cache';
   private static readonly CACHE_METADATA_KEY = 'parking_config_metadata';
-  private static readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; 
+  private static readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000;  //24hrs
 
   private cachedConfig: ParkingLocationConfig | null = null;
   private isLoading = false;
@@ -83,7 +66,7 @@ class ParkingConfigServiceClass {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ParkingConfigServiceClass.API_TOKEN}`,
+          'Authorization': `Bearer ${API_TOKEN}`,
           'Cache-Control': 'no-cache',
         },
       });
