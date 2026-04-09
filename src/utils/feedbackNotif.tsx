@@ -12,7 +12,7 @@ export class FeedbackNotificationHelper {
     try {
       await NotificationManager.addFeedbackReplyNotification(
         feedback.id,
-        feedback.message,
+        feedback.message ?? '',
         feedback.admin_response,
         'Admin Team'
       );

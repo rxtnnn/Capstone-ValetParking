@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { styles } from './styles/ProfileScreen.style';
-import {API_ENDPOINTS, COLORS} from '../constants/AppConst';
+import { API_ENDPOINTS, API_TOKEN, COLORS } from '../constants/AppConst';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -41,7 +41,6 @@ interface Props {
     };
   };
 }
-
 interface User {
   id: number;
   name: string;
@@ -54,7 +53,6 @@ interface User {
   created_at?: string;
   updated_at?: string;
 }
-
 interface AlertConfig {
   visible: boolean;
   title: string;
@@ -66,14 +64,12 @@ interface AlertConfig {
   confirmText?: string;
   cancelText?: string;
 }
-
 interface UserStats {
   totalParkingSessions: number;
   hoursParked: number;
   favoriteFloor: number;
   lastParked: string;
 }
-
 interface PasswordChangeState {
   current: string;
   new: string;
@@ -96,18 +92,18 @@ interface PasswordRules {
 
 const API_CONFIG = {
   BASE_URL: `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.users}`,
-  TOKEN: '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad',
+  TOKEN: API_TOKEN,
   HEADERS: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
     'User-Agent': 'VALET-Mobile/1.0',
   }
-} as const;
+};
 
 const ALERT_COLORS = {
-  success: '#4CAF50',
-  warning: '#FF9800',
-  confirm: '#F44336',
+  success: COLORS.green,
+  warning: COLORS.limited,
+  confirm: COLORS.buttons,
   info: COLORS.blue
 } as const;
 
@@ -494,7 +490,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <MaterialIcons 
         name={met ? 'check-circle' : 'cancel'} 
         size={16} 
-        color={met ? '#4CAF50' : '#BDBDBD'} 
+        color={met ? COLORS.green : '#BDBDBD'}
       />
       <Text style={[styles.passwordRequirementText, met && styles.passwordRequirementMet]}>
         {text}
@@ -502,7 +498,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 
-  const PasswordChangeModal = useCallback(() => {
+  const PasswordChangeModal = () => {
     const passwordRules = validatePassword(passwords.new);
 
     return (
@@ -691,7 +687,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </Modal>
     );
-  }, [showPasswordModal, passwords, passwordErrors, showCurrentPassword, showNewPassword, showConfirmPassword, isChangingPassword, handlePasswordChange, handleSubmitPasswordChange, validatePassword]);
+  };
 
   const CustomAlert = useCallback(() => {
     const getIconColor = () => ALERT_COLORS[alert.type];
@@ -841,7 +837,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         </LinearGradient>
 <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <MaterialIcons name="account-box" size={22} color="#4F46E5"/>
+            <MaterialIcons name="account-box" size={22} color={COLORS.secondary}/>
             <Text style={styles.cardTitle}>Personal Information</Text>
           </View>
                 
@@ -875,7 +871,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             onPress={() => setShowPasswordModal(true)}
           >
             <View style={styles.actionLeft}>
-              <MaterialIcons name="lock" size={20} color="#F44336" />
+              <MaterialIcons name="lock" size={20} color={COLORS.buttons} />
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Change Password</Text>
                 <Text style={styles.actionDesc}>Update your account password</Text>
@@ -887,7 +883,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <MaterialIcons name="help" size={20} color="#B71C1C" />
+            <MaterialIcons name="help" size={20} color={COLORS.primary} />
             <Text style={styles.cardTitle}>Support & Info</Text>
           </View>
 
