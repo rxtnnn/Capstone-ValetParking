@@ -28,7 +28,6 @@ type RootStackParamList = {
   RfidTagList: undefined;
   RfidTagForm: { tagId?: number };
   RfidReaderStatus: undefined;
-  Settings: undefined;
   Profile: undefined;
 };
 
@@ -197,35 +196,6 @@ const AdminDashboard: React.FC = () => {
           </View>
         </View>
 
-        {/* Reader Status */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Reader Status</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('RfidReaderStatus')}>
-              <Text style={styles.seeAllText}>Manage</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.readerStatusCard}>
-            <View style={styles.readerStatusRow}>
-              <View style={styles.readerStatusItem}>
-                <View style={[styles.statusDot, { backgroundColor: COLORS.green }]} />
-                <Text style={styles.readerStatusValue}>{stats?.readers_online || 0}</Text>
-                <Text style={styles.readerStatusLabel}>Online</Text>
-              </View>
-              <View style={styles.readerStatusItem}>
-                <View style={[styles.statusDot, { backgroundColor: '#9E9E9E' }]} />
-                <Text style={styles.readerStatusValue}>{stats?.readers_offline || 0}</Text>
-                <Text style={styles.readerStatusLabel}>Offline</Text>
-              </View>
-              <View style={styles.readerStatusItem}>
-                <View style={[styles.statusDot, { backgroundColor: '#FF6B6B' }]} />
-                <Text style={styles.readerStatusValue}>{stats?.readers_error || 0}</Text>
-                <Text style={styles.readerStatusLabel}>Error</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
         {/* Today's Activity */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Today's Activity</Text>
@@ -279,12 +249,6 @@ const AdminDashboard: React.FC = () => {
               icon="hardware-chip-outline"
               color={COLORS.green}
               onPress={() => navigation.navigate('RfidReaderStatus')}
-            />
-            <QuickActionButton
-              title="Settings"
-              icon="settings"
-              color="#9E9E9E"
-              onPress={() => navigation.navigate('Settings')}
             />
             <QuickActionButton
               title="Verify Vehicle"
