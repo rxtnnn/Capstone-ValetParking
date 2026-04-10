@@ -7,6 +7,7 @@ export type VerifyResult = {
   valid?: boolean;
   status?: string;
   message: string;
+  // Registered user fields
   user_name?: string;
   user_role?: string;
   vehicle_plate?: string;
@@ -14,6 +15,11 @@ export type VerifyResult = {
   vehicle_model?: string;
   uid?: string;
   expiry_date?: string;
+  // Guest fields
+  is_guest?: boolean;
+  purpose?: string;
+  valid_from?: string;
+  valid_until?: string;
 };
 
 export function useVerifyVehicle() {
@@ -23,14 +29,21 @@ export function useVerifyVehicle() {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
 
-  const handleVerify = async () => { //verify vehicle
+  const handleVerify = async () => {
     const value = verifyInput.trim();
     if (!value) return;
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
-      const res = await apiClient.post(API_ENDPOINTS.publicVerifyVehicle, { mode: verifyMode, value });
-      setVerifyResult(res.data);
+      if (verifyMode === 'plate') {
+        // Guest plate lookup — uses dedicated guest verify endpoint
+        const res = await apiClient.post(API_ENDPOINTS.publicGuestVerify, { plate: value });
+        setVerifyResult({ ...res.data, is_guest: true });
+      } else {
+        // RFID lookup — uses general vehicle verify endpoint
+        const res = await apiClient.post(API_ENDPOINTS.publicVerifyVehicle, { mode: 'rfid', value });
+        setVerifyResult(res.data);
+      }
     } catch {
       setVerifyResult({ found: false, message: 'Verification failed. Check connection.' });
     } finally {

@@ -56,6 +56,10 @@ export const API_ENDPOINTS = {
   rfidReaderById: (id: number) => `/rfid/readers/${id}`,
   rfidReaderRestart: (id: number) => `/rfid/readers/${id}/restart`,
 
+  // Guests
+  guests: '/guests',
+  guestById: (id: number) => `/guests/${id}`,
+
   // Incidents (security)
   incidents: '/incidents',
   incidentById: (id: number) => `/incidents/${id}`,

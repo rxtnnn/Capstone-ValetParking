@@ -7,7 +7,7 @@ import { COLORS } from '../constants/AppConst';
 // ============================================
 
 export type RfidTagStatus = 'active' | 'expired' | 'suspended' | 'lost';
-export type GuestAccessStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'checked_in' | 'checked_out';
+export type GuestAccessStatus = 'active' | 'pending' | 'approved' | 'denied' | 'expired' | 'checked_in' | 'checked_out';
 export type ParkingEntryStatus = 'active' | 'completed' | 'cancelled';
 export type ScanStatus = 'valid' | 'invalid' | 'expired' | 'unknown';
 export type ReaderStatus = 'online' | 'offline' | 'error';
@@ -279,7 +279,7 @@ export const isScanStatus = (value: string): value is ScanStatus => {
 };
 
 export const isGuestAccessStatus = (value: string): value is GuestAccessStatus => {
-  return ['pending', 'approved', 'denied', 'expired', 'checked_in', 'checked_out'].includes(value);
+  return ['active', 'pending', 'approved', 'denied', 'expired', 'checked_in', 'checked_out'].includes(value);
 };
 
 export const isAlertType = (value: string): value is AlertType => {
@@ -307,6 +307,7 @@ export const getStatusColor = (status: RfidTagStatus | ScanStatus | GuestAccessS
     denied: '#FF6B6B',
     checked_in: COLORS.blue,
     checked_out: '#9E9E9E',
+    // active maps same as approved (web uses 'active')
   };
   return colorMap[status] || '#9E9E9E';
 };
