@@ -6,7 +6,6 @@ import Svg, { Circle } from 'react-native-svg';
 import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { RfidSecurityService } from '../services/RfidSecurityService';
-import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from './styles/HomeScreen.style';
@@ -37,10 +36,8 @@ interface CircularProgressProps {
   backgroundColor?: string;
   children?: React.ReactNode;
 }
-const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000;
-// Default floors configuration - all start with 0 total (no data)
-// Real data comes from API and overrides these defaults
-// Floors with no assigned sensors will remain at total: 0 and show "NO DATA"
+const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000; //5mins
+
 const DEFAULT_FLOORS: {
   floor: number;
   total: number;
@@ -142,6 +139,7 @@ const HomeScreen: React.FC = () => {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [lastParkingData, setLastParkingData] = useState<ParkingStats | null>(null);
   const isMountedRef = useRef(true);
+
   const unsubscribeFunctionsRef = useRef<{
     parkingUpdates?: () => void;
     connectionStatus?: () => void;
@@ -252,11 +250,8 @@ const HomeScreen: React.FC = () => {
   const subscribeToParkingData = useCallback(() => {
     if (!isAuthenticated || unsubscribeFunctionsRef.current.parkingUpdates) return;
 
-    console.log('Setting up parking data subscription');
-
     const unsubscribeParkingUpdates = RealTimeParkingService.onParkingUpdate((data: ParkingStats) => {
       if (!isMountedRef.current) return;
-
       console.log('Received parking update:', data.lastUpdated);
       checkParkingChanges(data);
       setParkingData(data);
@@ -274,7 +269,6 @@ const HomeScreen: React.FC = () => {
 
     if (!unsubscribeFunctionsRef.current.rfidScans) {
       const unsubscribeRfid = RfidSecurityService.onScanUpdate(() => {
-        // entry/exit detection for current user happens inside RfidSecurityService
       });
       unsubscribeFunctionsRef.current.rfidScans = unsubscribeRfid;
     }

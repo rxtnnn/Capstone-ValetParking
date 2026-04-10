@@ -274,13 +274,15 @@ const AdminDashboard: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowVerifyModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowVerifyModal(false)}>
+        <View style={{ flex: 1 }}>
+          <TouchableWithoutFeedback onPress={() => setShowVerifyModal(false)}>
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+          </TouchableWithoutFeedback>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.5)' }}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, pointerEvents: 'box-none' }}
           >
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, overflow: 'hidden' }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, overflow: 'hidden' }}>
 
                 {/* Header */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', gap: 10 }}>
@@ -385,9 +387,8 @@ const AdminDashboard: React.FC = () => {
                   </View>
                 </View>
               </View>
-            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
     </View>
   );

@@ -32,7 +32,6 @@ import NotificationService from './src/services/NotificationService';
 import { RealTimeParkingService } from './src/services/RealtimeParkingService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
-
 // Admin Screens
 import {
   AdminDashboard,
@@ -86,6 +85,8 @@ export type RootStackParamList = {
   AlertsScreen: undefined;
   GuestManagement: undefined;
   ScanHistory: undefined;
+  IncidentReport: undefined;
+  IncidentLog: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -834,7 +835,6 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
     });
   }
 
-  // Remote push tokens are not supported in Expo Go SDK 53+
   const isExpoGo = Constants.appOwnership === 'expo';
 
   if (Device.isDevice && !isExpoGo) {

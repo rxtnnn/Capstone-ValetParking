@@ -498,267 +498,9 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 
-  const PasswordChangeModal = () => {
-    const passwordRules = validatePassword(passwords.new);
+  const passwordRules = validatePassword(passwords.new);
 
-    return (
-      <Modal
-        transparent
-        visible={showPasswordModal}
-        onRequestClose={() => setShowPasswordModal(false)}
-        animationType="fade"
-      >
-        <View style={styles.passwordModalOverlay}>
-          <TouchableOpacity 
-            style={styles.passwordModalBackdrop}
-            activeOpacity={1}
-            onPress={() => setShowPasswordModal(false)}
-          />
-          
-          <View style={styles.passwordModalContainer}>
-            {/* Header */}
-            <LinearGradient
-              colors={[COLORS.primary, COLORS.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 2 }}
-              style={styles.passModalHeader}
-            >
-              <View style={styles.passModal}>
-                <View style={styles.passContainer}>
-                  <MaterialIcons name="lock" size={24} color="#FFFFFF" />
-                </View>
-                <View style={styles.passHeader}>
-                  <Text style={styles.passTitle}>Change Password</Text>
-                  <Text style={styles.passSubtext}>Keep your account secure</Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                onPress={() => setShowPasswordModal(false)}
-                style={styles.passCloseBtn}
-              >
-                <MaterialIcons name="close" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </LinearGradient>
-
-            <ScrollView style={styles.passBody} showsVerticalScrollIndicator={false}>
-              {/* Current Password */}
-              <View style={styles.passInput}>
-                <Text style={styles.passLabel}>Current Password</Text>
-                <View style={[
-                  styles.passInputWrap,
-                  passwordErrors.current ? styles.passError : null
-                ]}>
-                  <TextInput
-                    style={styles.passwordInput}
-                    value={passwords.current}
-                    onChangeText={(text) => handlePasswordChange('current', text)}
-                    placeholder="Enter current password"
-                    placeholderTextColor="#999"
-                    secureTextEntry={!showCurrentPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity 
-                    onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-                    style={styles.passwordToggle}
-                  >
-                    <MaterialIcons 
-                      name={showCurrentPassword ? 'visibility-off' : 'visibility'} 
-                      size={20} 
-                      color="#666" 
-                    />
-                  </TouchableOpacity>
-                </View>
-                {passwordErrors.current ? (
-                  <View style={styles.passwordErrorContainer}>
-                    <MaterialIcons name="error" size={14} color="#F44336" />
-                    <Text style={styles.passwordErrorText}>{passwordErrors.current}</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {/* New Password */}
-              <View style={styles.passInput}>
-                <Text style={styles.passLabel}>New Password</Text>
-                <View style={[
-                  styles.passInputWrap,
-                  passwordErrors.new ? styles.passError : null
-                ]}>
-                  <TextInput
-                    style={styles.passwordInput}
-                    value={passwords.new}
-                    onChangeText={(text) => handlePasswordChange('new', text)}
-                    placeholder="Enter new password"
-                    placeholderTextColor="#999"
-                    secureTextEntry={!showNewPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity 
-                    onPress={() => setShowNewPassword(!showNewPassword)}
-                    style={styles.passwordToggle}
-                  >
-                    <MaterialIcons 
-                      name={showNewPassword ? 'visibility-off' : 'visibility'} 
-                      size={20} 
-                      color="#666" 
-                    />
-                  </TouchableOpacity>
-                </View>
-                {passwordErrors.new ? (
-                  <View style={styles.passwordErrorContainer}>
-                    <MaterialIcons name="error" size={14} color="#F44336" />
-                    <Text style={styles.passwordErrorText}>{passwordErrors.new}</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {/* Password Requirements */}
-              {passwords.new ? (
-                <View style={styles.passReq}>
-                  <Text style={styles.passReqtitle}>Password Requirements:</Text>
-                  <PasswordRequirement met={passwordRules.length} text="At least 8 characters" />
-                  <PasswordRequirement met={passwordRules.uppercase} text="One uppercase letter" />
-                  <PasswordRequirement met={passwordRules.lowercase} text="One lowercase letter" />
-                  <PasswordRequirement met={passwordRules.number} text="One number" />
-                  <PasswordRequirement met={passwordRules.special} text="One special character" />
-                </View>
-              ) : null}
-
-              {/* Confirm Password */}
-              <View style={styles.passInput}>
-                <Text style={styles.passLabel}>Confirm New Password</Text>
-                <View style={[
-                  styles.passInputWrap,
-                  passwordErrors.confirm ? styles.passError : null
-                ]}>
-                  <TextInput
-                    style={styles.passwordInput}
-                    value={passwords.confirm}
-                    onChangeText={(text) => handlePasswordChange('confirm', text)}
-                    placeholder="Re-enter new password"
-                    placeholderTextColor="#999"
-                    secureTextEntry={!showConfirmPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity 
-                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                    style={styles.passwordToggle}
-                  >
-                    <MaterialIcons 
-                      name={showConfirmPassword ? 'visibility-off' : 'visibility'} 
-                      size={20} 
-                      color="#666" 
-                    />
-                  </TouchableOpacity>
-                </View>
-                {passwordErrors.confirm ? (
-                  <View style={styles.passwordErrorContainer}>
-                    <MaterialIcons name="error" size={14} color="#F44336" />
-                    <Text style={styles.passwordErrorText}>{passwordErrors.confirm}</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {/* Buttons */}
-              <View style={styles.passwordModalButtons}>
-                <TouchableOpacity 
-                  style={styles.passwordCancelButton}
-                  onPress={() => setShowPasswordModal(false)}
-                >
-                  <Text style={styles.passwordCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={[
-                    styles.passwordSubmitButton,
-                    isChangingPassword && styles.passwordSubmitButtonDisabled
-                  ]}
-                  onPress={handleSubmitPasswordChange}
-                  disabled={isChangingPassword}
-                >   
-                  {isChangingPassword ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Text style={styles.passwordSubmitButtonText}>Update Password</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
-
-  const CustomAlert = useCallback(() => {
-    const getIconColor = () => ALERT_COLORS[alert.type];
-
-    return (
-      <Modal
-        transparent
-        visible={alert.visible}
-        onRequestClose={hideAlert}
-        animationType="none"
-      >
-        <Animated.View 
-          style={[styles.alertOverlay, { opacity: fadeAnim }]}
-        >
-          <TouchableOpacity 
-            style={styles.alertBackdrop}
-            activeOpacity={1}
-            onPress={hideAlert}
-          />
-          
-          <Animated.View 
-            style={[
-              styles.alertContainer,
-              { 
-                transform: [{ scale: scaleAnim }],
-                opacity: fadeAnim 
-              }
-            ]}
-          >
-            <View style={styles.alertHeader}>
-              <Text style={styles.alertTitle}>{alert.title}</Text>
-            </View>
-            
-            <Text style={styles.alertMessage}>{alert.message}</Text>
-            
-            <View style={styles.alertButtons}>
-              {alert.type === 'confirm' && (
-                <TouchableOpacity 
-                  style={[styles.alertButton, styles.alertCancelButton]}
-                  onPress={alert.onCancel}
-                >
-                  <Text style={styles.alertCancelText}>
-                    {alert.cancelText || 'Cancel'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              
-              <TouchableOpacity 
-                style={[
-                  styles.alertButton, 
-                  styles.alertConfirmButton,
-                  { backgroundColor: getIconColor() }
-                ]}
-                onPress={() => {
-                  if (alert.onConfirm) {
-                    alert.onConfirm();
-                  } else {
-                    hideAlert();
-                  }
-                }}
-              >
-                <Text style={styles.alertConfirmText}>
-                  {alert.confirmText || 'OK'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
-    );
-  }, [alert, fadeAnim, scaleAnim, hideAlert]);
+  const alertIconColor = ALERT_COLORS[alert.type];
 
   if (!isAuthenticated) return null;
 
@@ -940,8 +682,187 @@ const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         </TouchableOpacity>
       </ScrollView>
 
-      <PasswordChangeModal />
-      <CustomAlert />
+      {/* Password Change Modal */}
+      <Modal
+        transparent
+        visible={showPasswordModal}
+        onRequestClose={() => setShowPasswordModal(false)}
+        animationType="fade"
+      >
+        <View style={styles.passwordModalOverlay}>
+          <TouchableOpacity
+            style={styles.passwordModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowPasswordModal(false)}
+          />
+          <View style={styles.passwordModalContainer}>
+            <LinearGradient
+              colors={[COLORS.primary, COLORS.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 2 }}
+              style={styles.passModalHeader}
+            >
+              <View style={styles.passModal}>
+                <View style={styles.passContainer}>
+                  <MaterialIcons name="lock" size={24} color="#FFFFFF" />
+                </View>
+                <View style={styles.passHeader}>
+                  <Text style={styles.passTitle}>Change Password</Text>
+                  <Text style={styles.passSubtext}>Keep your account secure</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowPasswordModal(false)} style={styles.passCloseBtn}>
+                <MaterialIcons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <ScrollView style={styles.passBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Current Password */}
+              <View style={styles.passInput}>
+                <Text style={styles.passLabel}>Current Password</Text>
+                <View style={[styles.passInputWrap, passwordErrors.current ? styles.passError : null]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    value={passwords.current}
+                    onChangeText={(text) => handlePasswordChange('current', text)}
+                    placeholder="Enter current password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!showCurrentPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)} style={styles.passwordToggle}>
+                    <MaterialIcons name={showCurrentPassword ? 'visibility-off' : 'visibility'} size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                {passwordErrors.current ? (
+                  <View style={styles.passwordErrorContainer}>
+                    <MaterialIcons name="error" size={14} color="#F44336" />
+                    <Text style={styles.passwordErrorText}>{passwordErrors.current}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* New Password */}
+              <View style={styles.passInput}>
+                <Text style={styles.passLabel}>New Password</Text>
+                <View style={[styles.passInputWrap, passwordErrors.new ? styles.passError : null]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    value={passwords.new}
+                    onChangeText={(text) => handlePasswordChange('new', text)}
+                    placeholder="Enter new password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!showNewPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.passwordToggle}>
+                    <MaterialIcons name={showNewPassword ? 'visibility-off' : 'visibility'} size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                {passwordErrors.new ? (
+                  <View style={styles.passwordErrorContainer}>
+                    <MaterialIcons name="error" size={14} color="#F44336" />
+                    <Text style={styles.passwordErrorText}>{passwordErrors.new}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Password Requirements */}
+              {passwords.new ? (
+                <View style={styles.passReq}>
+                  <Text style={styles.passReqtitle}>Password Requirements:</Text>
+                  <PasswordRequirement met={passwordRules.length} text="At least 8 characters" />
+                  <PasswordRequirement met={passwordRules.uppercase} text="One uppercase letter" />
+                  <PasswordRequirement met={passwordRules.lowercase} text="One lowercase letter" />
+                  <PasswordRequirement met={passwordRules.number} text="One number" />
+                  <PasswordRequirement met={passwordRules.special} text="One special character" />
+                </View>
+              ) : null}
+
+              {/* Confirm Password */}
+              <View style={styles.passInput}>
+                <Text style={styles.passLabel}>Confirm New Password</Text>
+                <View style={[styles.passInputWrap, passwordErrors.confirm ? styles.passError : null]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    value={passwords.confirm}
+                    onChangeText={(text) => handlePasswordChange('confirm', text)}
+                    placeholder="Re-enter new password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!showConfirmPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.passwordToggle}>
+                    <MaterialIcons name={showConfirmPassword ? 'visibility-off' : 'visibility'} size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                {passwordErrors.confirm ? (
+                  <View style={styles.passwordErrorContainer}>
+                    <MaterialIcons name="error" size={14} color="#F44336" />
+                    <Text style={styles.passwordErrorText}>{passwordErrors.confirm}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Buttons */}
+              <View style={styles.passwordModalButtons}>
+                <TouchableOpacity style={styles.passwordCancelButton} onPress={() => setShowPasswordModal(false)}>
+                  <Text style={styles.passwordCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.passwordSubmitButton, isChangingPassword && styles.passwordSubmitButtonDisabled]}
+                  onPress={handleSubmitPasswordChange}
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword
+                    ? <ActivityIndicator color="#FFFFFF" size="small" />
+                    : <Text style={styles.passwordSubmitButtonText}>Update Password</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Alert Modal */}
+      <Modal
+        transparent
+        visible={alert.visible}
+        onRequestClose={hideAlert}
+        animationType="none"
+      >
+        <Animated.View style={[styles.alertOverlay, { opacity: fadeAnim }]}>
+          <TouchableOpacity
+            style={styles.alertBackdrop}
+            activeOpacity={1}
+            onPress={hideAlert}
+          />
+          <Animated.View
+            style={[styles.alertContainer, { transform: [{ scale: scaleAnim }], opacity: fadeAnim }]}
+          >
+            <View style={styles.alertHeader}>
+              <Text style={styles.alertTitle}>{alert.title}</Text>
+            </View>
+            <Text style={styles.alertMessage}>{alert.message}</Text>
+            <View style={styles.alertButtons}>
+              {alert.type === 'confirm' && (
+                <TouchableOpacity
+                  style={[styles.alertButton, styles.alertCancelButton]}
+                  onPress={alert.onCancel}
+                >
+                  <Text style={styles.alertCancelText}>{alert.cancelText || 'Cancel'}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.alertButton, styles.alertConfirmButton, { backgroundColor: alertIconColor }]}
+                onPress={() => { if (alert.onConfirm) { alert.onConfirm(); } else { hideAlert(); } }}
+              >
+                <Text style={styles.alertConfirmText}>{alert.confirmText || 'OK'}</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     </View>
   );
 };
