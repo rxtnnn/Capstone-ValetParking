@@ -113,14 +113,39 @@ class RfidSecurityServiceClass {
     this.isFetching = true;
 
     try {
-      const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, {
-        params: { minutes: 60 },
-      });
-
-      const data = response.data;
-      const scans: any[] = data?.scans || [];
+      const [scansResponse, guestsResponse] = await Promise.allSettled([
+        apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 60 } }),
+        apiClient.get(API_ENDPOINTS.guests, { params: { status: 'active' } }),
+      ]);
 
       if (this.shouldStop || !this.isRunning) return;
+
+      const scans: any[] = scansResponse.status === 'fulfilled'
+        ? (scansResponse.value.data?.scans || [])
+        : [];
+
+      if (guestsResponse.status === 'fulfilled') {
+        const raw = guestsResponse.value.data;
+        const list: any[] = Array.isArray(raw) ? raw : (raw?.data ?? []);
+        this.guests = list.map((g: any): GuestAccess => ({
+          id: g.id,
+          guest_id: g.guest_id ?? g.pass_id ?? String(g.id),
+          name: g.name ?? g.guest_name ?? '',
+          vehicle_plate: g.vehicle_plate ?? '',
+          phone: g.phone ?? '',
+          purpose: g.purpose ?? '',
+          valid_from: g.valid_from ?? g.created_at ?? '',
+          valid_until: g.valid_until ?? '',
+          status: g.status ?? 'active',
+          approved_by: g.approved_by ?? null,
+          approved_by_name: g.approved_by_name ?? g.created_by_name ?? undefined,
+          notes: g.notes ?? null,
+          created_by: g.created_by ?? 0,
+          created_by_name: g.created_by_name ?? undefined,
+          created_at: g.created_at ?? '',
+          updated_at: g.updated_at ?? '',
+        }));
+      }
 
       this.processNewScans(scans);
       this.updateStatsFromScans(scans);
