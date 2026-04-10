@@ -222,12 +222,7 @@ const RfidTagListScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>RFID Tags</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('RfidTagForm', {})}
-          >
-            <Ionicons name="add" size={24} color="#FFF" />
-          </TouchableOpacity>
+          <View style={styles.addButton} />
         </View>
 
         {/* Search Bar */}

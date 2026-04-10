@@ -233,22 +233,10 @@ const AdminDashboard: React.FC = () => {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
             <QuickActionButton
-              title="Add New Tag"
-              icon="add-circle"
-              color={COLORS.primary}
-              onPress={() => navigation.navigate('RfidTagForm', {})}
-            />
-            <QuickActionButton
               title="View All Tags"
               icon="list"
               color={COLORS.blue}
               onPress={() => navigation.navigate('RfidTagList')}
-            />
-            <QuickActionButton
-              title="Reader Status"
-              icon="hardware-chip-outline"
-              color={COLORS.green}
-              onPress={() => navigation.navigate('RfidReaderStatus')}
             />
             <QuickActionButton
               title="Verify Vehicle"
