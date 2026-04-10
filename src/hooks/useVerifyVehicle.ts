@@ -20,6 +20,7 @@ export type VerifyResult = {
   purpose?: string;
   valid_from?: string;
   valid_until?: string;
+  entry_time?: string;
 };
 
 export function useVerifyVehicle() {
@@ -36,9 +37,23 @@ export function useVerifyVehicle() {
     setVerifyResult(null);
     try {
       if (verifyMode === 'plate') {
-        // Guest plate lookup — uses dedicated guest verify endpoint
-        const res = await apiClient.post(API_ENDPOINTS.publicGuestVerify, { plate: value });
-        setVerifyResult({ ...res.data, is_guest: true });
+        // Guest lookup by Guest ID — POST /public/guest/verify
+        const res = await apiClient.post(API_ENDPOINTS.publicGuestVerify, {
+          guest_id: value.toUpperCase(),
+          gate_mac: '',
+        });
+        const d = res.data;
+        // Flatten the nested guest object into VerifyResult
+        setVerifyResult({
+          found: d.valid === true,
+          valid: d.valid,
+          message: d.message,
+          is_guest: true,
+          user_name: d.guest?.name,
+          vehicle_plate: d.guest?.vehicle_plate,
+          purpose: d.guest?.purpose,
+          entry_time: d.guest?.entry_time,
+        });
       } else {
         // RFID lookup — uses general vehicle verify endpoint
         const res = await apiClient.post(API_ENDPOINTS.publicVerifyVehicle, { mode: 'rfid', value });
