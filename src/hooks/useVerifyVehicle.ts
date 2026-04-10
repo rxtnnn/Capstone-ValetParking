@@ -37,22 +37,26 @@ export function useVerifyVehicle() {
     setVerifyResult(null);
     try {
       if (verifyMode === 'plate') {
-        // Guest lookup by Guest ID — POST /public/guest/verify
-        const res = await apiClient.post(API_ENDPOINTS.publicGuestVerify, {
-          guest_id: value.toUpperCase(),
-          gate_mac: '',
-        });
+        // Guest lookup by plate — GET /api/guest-access/verify/{plate} (auth, no status change)
+        const res = await apiClient.get(API_ENDPOINTS.guestAccessVerify(value.toUpperCase()));
         const d = res.data;
-        // Flatten the nested guest object into VerifyResult
+        const guest = d?.data ?? d;
+        const found = d?.success !== false && !!guest?.id;
         setVerifyResult({
-          found: d.valid === true,
-          valid: d.valid,
-          message: d.message,
+          found,
+          valid: found && guest?.status === 'active',
+          message: found
+            ? guest?.status === 'active'
+              ? 'Active guest pass found'
+              : `Guest pass is ${guest?.status}`
+            : 'No guest pass found for this plate',
           is_guest: true,
-          user_name: d.guest?.name,
-          vehicle_plate: d.guest?.vehicle_plate,
-          purpose: d.guest?.purpose,
-          entry_time: d.guest?.entry_time,
+          user_name: guest?.name,
+          vehicle_plate: guest?.vehicle_plate,
+          purpose: guest?.purpose,
+          valid_from: guest?.valid_from,
+          valid_until: guest?.valid_until,
+          status: guest?.status,
         });
       } else {
         // RFID lookup — uses general vehicle verify endpoint
