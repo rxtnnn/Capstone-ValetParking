@@ -32,6 +32,8 @@ import { NotificationManager } from '../services/NotifManager';
 import { TokenManager } from '../config/api';
 import apiClient from '../config/api';
 import { API_ENDPOINTS } from '../constants/AppConst';
+import { IncidentService } from '../services/IncidentService';
+import { IncidentCategory, INCIDENT_CATEGORY_LABELS, FLOOR_LEVELS } from '../types/incident';
 
 
 type RootStackParamList = {
@@ -111,6 +113,17 @@ const ParkingMapScreen: React.FC = () => {
   const isAdminRole = userRole === 'admin' || userRole === 'ssd';
   const canAccessSpotActions = isSecurityRole || isAdminRole;
   const [spotActionsResult, setSpotActionsResult] = useState<{ type: 'success' | 'warning' | 'error'; title: string; message: string } | null>(null);
+
+  // Incident form modal
+  const [showIncidentModal, setShowIncidentModal] = useState(false);
+  const [incidentTarget, setIncidentTarget] = useState<ParkingSpot | null>(null);
+  const [incidentCategory, setIncidentCategory] = useState<IncidentCategory | ''>('');
+  const [incidentCategoryOpen, setIncidentCategoryOpen] = useState(false);
+  const [incidentAt, setIncidentAt] = useState('');
+  const [incidentInvolvedParty, setIncidentInvolvedParty] = useState('');
+  const [incidentNotes, setIncidentNotes] = useState('');
+  const [incidentActionTaken, setIncidentActionTaken] = useState('');
+  const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
 
 
   const isMountedRef = useRef(true);
@@ -553,7 +566,7 @@ const ParkingMapScreen: React.FC = () => {
     if (!spot.hasSensor) return;
 
     if (canAccessSpotActions) {
-      if (isSecurityRole && !spot.malfunctioned) {
+      if (!spot.malfunctioned) {
         setSpotPickerTarget(spot);
         setShowSpotPickerModal(true);
       } else {
@@ -1340,7 +1353,9 @@ const ParkingMapScreen: React.FC = () => {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Spot {spotPickerTarget?.id}</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontFamily: FONTS.regular, fontSize: 12 }}>Available</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontFamily: FONTS.regular, fontSize: 12 }}>
+                      {spotPickerTarget?.isOccupied ? 'Occupied' : 'Available'}
+                    </Text>
                   </View>
                   <TouchableOpacity
                     onPress={() => setShowSpotPickerModal(false)}
@@ -1350,26 +1365,65 @@ const ParkingMapScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
+                {/* Status badge */}
+                <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                  <Text style={{ fontSize: 12, color: '#888', fontFamily: FONTS.regular }}>
+                    Floor: <Text style={{ fontFamily: FONTS.semiBold, color: '#333' }}>
+                      {floorNumber === 1 ? '1st' : floorNumber === 2 ? '2nd' : floorNumber === 3 ? '3rd' : `${floorNumber}th`} Floor
+                    </Text>
+                    {'  |  '}Status: <Text style={{ fontFamily: FONTS.semiBold, color: spotPickerTarget?.isOccupied ? COLORS.primary : COLORS.green }}>
+                      {spotPickerTarget?.isOccupied ? 'Occupied' : 'Available'}
+                    </Text>
+                  </Text>
+                </View>
+
                 {/* Options */}
                 <View style={{ padding: 16, gap: 10 }}>
-                  {/* Show Route */}
+                  {/* Show Route — only for available spots */}
+                  {!spotPickerTarget?.isOccupied && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.green, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                      onPress={() => {
+                        setShowSpotPickerModal(false);
+                        const spot = spotPickerTarget;
+                        if (!spot) return;
+                        setSelectedSpot(spot.id);
+                        setSelectedSpotForNav(spot.id);
+                        setHighlightedSpots([]);
+                        setShowNavigationModal(true);
+                      }}
+                    >
+                      <Ionicons name="navigate" size={22} color="#fff" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Show Route to Spot</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Display navigation on map</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Log Incident */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.green, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FF9801', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
                     onPress={() => {
                       setShowSpotPickerModal(false);
-                      const spot = spotPickerTarget;
-                      if (!spot) return;
-                      setSelectedSpot(spot.id);
-                      setSelectedSpotForNav(spot.id);
-                      setHighlightedSpots([]);
-                      setShowNavigationModal(true);
+                      if (!spotPickerTarget) return;
+                      setIncidentTarget(spotPickerTarget);
+                      setIncidentCategory('');
+                      setIncidentCategoryOpen(false);
+                      setIncidentAt('');
+                      setIncidentInvolvedParty('');
+                      setIncidentNotes('');
+                      setIncidentActionTaken('');
+                      setShowIncidentModal(true);
                     }}
                   >
-                    <Ionicons name="navigate" size={22} color="#fff" />
+                    <Ionicons name="clipboard" size={22} color="#fff" />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Show Route</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Display navigation on map</Text>
+                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Log Incident</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Report an incident at this spot</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
                   </TouchableOpacity>
@@ -1377,7 +1431,7 @@ const ParkingMapScreen: React.FC = () => {
                   {/* Report Malfunction */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderWidth: 1.5, borderColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
                     onPress={() => {
                       setShowSpotPickerModal(false);
                       if (!spotPickerTarget) return;
@@ -1388,12 +1442,21 @@ const ParkingMapScreen: React.FC = () => {
                       setShowSpotActionsModal(true);
                     }}
                   >
-                    <Ionicons name="warning" size={22} color={COLORS.primary} />
+                    <Ionicons name="warning" size={22} color="#fff" />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: COLORS.primary, fontFamily: FONTS.semiBold, fontSize: 14 }}>Report Malfunction</Text>
-                      <Text style={{ color: '#888', fontFamily: FONTS.regular, fontSize: 12 }}>Flag this spot as malfunctioned</Text>
+                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Report Malfunction</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Flag this spot as malfunctioned</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
+
+                  {/* Cancel */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6c757d', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    onPress={() => setShowSpotPickerModal(false)}
+                  >
+                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1409,12 +1472,14 @@ const ParkingMapScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowSpotActionsModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowSpotActionsModal(false)}>
+        <View style={{ flex: 1 }}>
+          <TouchableWithoutFeedback onPress={() => setShowSpotActionsModal(false)}>
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }} />
+          </TouchableWithoutFeedback>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, pointerEvents: 'box-none' }}
           >
-            <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.spotActionsModalContainer}>
 
             {/* Red header */}
@@ -1642,9 +1707,8 @@ const ParkingMapScreen: React.FC = () => {
               )}
             </ScrollView>
               </View>
-            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
 
       {/* Spot Actions Result Modal */}
@@ -1671,6 +1735,213 @@ const ParkingMapScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Log Incident Modal */}
+      <Modal
+        visible={showIncidentModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowIncidentModal(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', maxWidth: 380 }}
+          >
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+              {/* Orange header */}
+              <View style={{ backgroundColor: '#FF9801', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="clipboard" size={20} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Log Incident — {incidentTarget?.id}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowIncidentModal(false)}
+                  style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <Ionicons name="close" size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ padding: 16, gap: 12 }}
+              >
+                {/* Floor / Status row */}
+                <Text style={{ fontSize: 12, color: '#888', fontFamily: FONTS.regular, marginBottom: 4 }}>
+                  Floor: <Text style={{ fontFamily: FONTS.semiBold, color: '#333' }}>
+                    {floorNumber === 1 ? '1st' : floorNumber === 2 ? '2nd' : floorNumber === 3 ? '3rd' : `${floorNumber}th`} Floor
+                  </Text>
+                  {'  |  '}Status: <Text style={{ fontFamily: FONTS.semiBold, color: incidentTarget?.isOccupied ? COLORS.primary : COLORS.green }}>
+                    {incidentTarget?.isOccupied ? 'Occupied' : 'Available'}
+                  </Text>
+                </Text>
+
+                {/* Category */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>
+                    Category <Text style={{ color: '#FF9801' }}>*</Text>
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setIncidentCategoryOpen(o => !o)}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      borderWidth: 1.5, borderColor: incidentCategory ? '#FF9801' : '#ddd',
+                      borderRadius: incidentCategoryOpen ? 8 : 8,
+                      borderBottomLeftRadius: incidentCategoryOpen ? 0 : 8,
+                      borderBottomRightRadius: incidentCategoryOpen ? 0 : 8,
+                      paddingHorizontal: 14, paddingVertical: 12,
+                      backgroundColor: '#fafafa',
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: incidentCategory ? '#1a1a1a' : '#aaa', fontFamily: FONTS.regular, flex: 1 }} numberOfLines={1}>
+                      {incidentCategory ? INCIDENT_CATEGORY_LABELS[incidentCategory as IncidentCategory] : '— Select category —'}
+                    </Text>
+                    <Ionicons name={incidentCategoryOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#888" />
+                  </TouchableOpacity>
+                  {incidentCategoryOpen && (
+                    <View style={{
+                      borderWidth: 1.5, borderColor: '#FF9801', borderTopWidth: 0,
+                      borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
+                      backgroundColor: '#fff', overflow: 'hidden',
+                    }}>
+                      {(Object.keys(INCIDENT_CATEGORY_LABELS) as IncidentCategory[]).map((cat, idx) => (
+                        <TouchableOpacity
+                          key={cat}
+                          activeOpacity={0.7}
+                          onPress={() => { setIncidentCategory(cat); setIncidentCategoryOpen(false); }}
+                          style={{
+                            paddingHorizontal: 14, paddingVertical: 12,
+                            backgroundColor: incidentCategory === cat ? '#fff3e0' : '#fff',
+                            borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: '#f0f0f0',
+                            flexDirection: 'row', alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ flex: 1, fontSize: 14, color: incidentCategory === cat ? '#FF9801' : '#333', fontFamily: FONTS.regular }}>
+                            {INCIDENT_CATEGORY_LABELS[cat]}
+                          </Text>
+                          {incidentCategory === cat && <Ionicons name="checkmark" size={16} color="#FF9801" />}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                {/* When did it happen */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>When did it happen?</Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a' }}
+                    placeholder="e.g. 2026-04-10 14:30"
+                    placeholderTextColor="#aaa"
+                    value={incidentAt}
+                    onChangeText={setIncidentAt}
+                  />
+                </View>
+
+                {/* Involved party */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>
+                    Involved party <Text style={{ fontFamily: FONTS.regular, color: '#888', fontSize: 12 }}>(plate no., person, etc.)</Text>
+                  </Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a' }}
+                    placeholder="e.g. ABC 1234, unknown pedestrian"
+                    placeholderTextColor="#aaa"
+                    value={incidentInvolvedParty}
+                    onChangeText={setIncidentInvolvedParty}
+                  />
+                </View>
+
+                {/* Description / Notes */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>Description / Notes</Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a', minHeight: 80, textAlignVertical: 'top' }}
+                    placeholder="What happened?"
+                    placeholderTextColor="#aaa"
+                    multiline
+                    value={incidentNotes}
+                    onChangeText={setIncidentNotes}
+                  />
+                </View>
+
+                {/* Action taken */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>Action taken</Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a' }}
+                    placeholder="e.g. Cordoned area, notified admin"
+                    placeholderTextColor="#aaa"
+                    value={incidentActionTaken}
+                    onChangeText={setIncidentActionTaken}
+                  />
+                </View>
+
+                {/* Buttons */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{ flex: 1, backgroundColor: '#6c757d', borderRadius: 10, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                    onPress={() => setShowIncidentModal(false)}
+                  >
+                    <Ionicons name="arrow-back" size={16} color="#fff" />
+                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Back</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={isSubmittingIncident}
+                    style={{ flex: 1.4, backgroundColor: '#FF9801', borderRadius: 10, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                    onPress={async () => {
+                      if (!incidentCategory) {
+                        setSpotActionsResult({ type: 'warning', title: 'Category Required', message: 'Please select an incident category.' });
+                        return;
+                      }
+                      setIsSubmittingIncident(true);
+                      try {
+                        const floorLabel = `${floorNumber === 1 ? '1st' : floorNumber === 2 ? '2nd' : floorNumber === 3 ? '3rd' : `${floorNumber}th`} Floor`;
+                        const result = await IncidentService.create({
+                          floor_level: floorLabel,
+                          category: incidentCategory,
+                          space_code: incidentTarget?.id,
+                          incident_at: incidentAt || undefined,
+                          involved_party: incidentInvolvedParty || undefined,
+                          notes: incidentNotes || undefined,
+                          action_taken: incidentActionTaken || undefined,
+                        });
+                        setShowIncidentModal(false);
+                        if (result.success) {
+                          setSpotActionsResult({ type: 'success', title: 'Incident Logged', message: `Incident at spot ${incidentTarget?.id} has been recorded.` });
+                        } else {
+                          setSpotActionsResult({ type: 'error', title: 'Failed', message: result.message ?? 'Could not log incident. Try again.' });
+                        }
+                      } catch {
+                        setShowIncidentModal(false);
+                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to submit incident report.' });
+                      } finally {
+                        setIsSubmittingIncident(false);
+                      }
+                    }}
+                  >
+                    {isSubmittingIncident
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <>
+                          <Ionicons name="save" size={16} color="#fff" />
+                          <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Submit Log</Text>
+                        </>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>

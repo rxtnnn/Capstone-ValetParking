@@ -93,7 +93,6 @@ class RealTimeParkingServiceClass {
   }
 
   stop(): void {
-    console.log('Stopping RealTimeParkingService');
     this.shouldStop = true;
     this.isRunning = false;
     
@@ -172,13 +171,13 @@ class RealTimeParkingServiceClass {
       }
     };
   }
-
+  //fetch parking data
   private async fetchAndUpdate(): Promise<void> {
     if (this.isFetching || this.shouldStop || !this.isRunning) return;
 
     const now = Date.now();
     
-    if (now - this.lastFetchTime < 2000) return;
+    if (now - this.lastFetchTime < 2000) return; // fetch every 2secs
 
     if (this.consecErrors >= this.maxConsecutiveErrors) {
       const extendedDelay = Math.min(30000, this.updateIntervalMs * 3);
