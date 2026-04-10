@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -19,7 +18,6 @@ import { COLORS } from '../../constants/AppConst';
 type RootStackParamList = {
   RfidTagList: undefined;
   RfidTagDetail: { tagId: number };
-  RfidTagForm: { tagId?: number };
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'RfidTagDetail'>;
@@ -46,57 +44,6 @@ const RfidTagDetailScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDeactivate = () => {
-    if (!tag) return;
-
-    Alert.alert(
-      'Deactivate Tag',
-      `Are you sure you want to deactivate tag ${tag.uid}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await RfidAdminService.deactivateTag(tag.id);
-            if (result.success) {
-              loadTag();
-              Alert.alert('Success', 'Tag deactivated successfully');
-            } else {
-              Alert.alert('Error', result.message || 'Failed to deactivate tag');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDelete = () => {
-    if (!tag) return;
-
-    Alert.alert(
-      'Delete Tag',
-      `Are you sure you want to permanently delete tag ${tag.uid}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await RfidAdminService.deleteTag(tag.id);
-            if (result.success) {
-              Alert.alert('Success', 'Tag deleted successfully', [
-                { text: 'OK', onPress: () => navigation.goBack() },
-              ]);
-            } else {
-              Alert.alert('Error', result.message || 'Failed to delete tag');
-            }
-          },
-        },
-      ]
-    );
   };
 
   const InfoRow: React.FC<{
@@ -156,12 +103,7 @@ const RfidTagDetailScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Tag Details</Text>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => navigation.navigate('RfidTagForm', { tagId: tag.id })}
-          >
-            <Ionicons name="create-outline" size={24} color="#FFF" />
-          </TouchableOpacity>
+          <View style={styles.editButton} />
         </View>
       </LinearGradient>
 
@@ -225,38 +167,6 @@ const RfidTagDetailScreen: React.FC = () => {
                 <Text style={styles.notesText}>{tag.notes}</Text>
               </View>
             )}
-          </View>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions</Text>
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editActionButton]}
-              onPress={() => navigation.navigate('RfidTagForm', { tagId: tag.id })}
-            >
-              <Ionicons name="create-outline" size={20} color="#FFF" />
-              <Text style={styles.actionButtonText}>Edit Tag</Text>
-            </TouchableOpacity>
-
-            {tag.status === 'active' && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.deactivateButton]}
-                onPress={handleDeactivate}
-              >
-                <Ionicons name="ban-outline" size={20} color="#FFF" />
-                <Text style={styles.actionButtonText}>Deactivate</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={handleDelete}
-            >
-              <Ionicons name="trash-outline" size={20} color="#FFF" />
-              <Text style={styles.actionButtonText}>Delete Tag</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -404,31 +314,6 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 8,
     lineHeight: 20,
-  },
-  actionsContainer: {
-    gap: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 10,
-  },
-  editActionButton: {
-    backgroundColor: COLORS.blue,
-  },
-  deactivateButton: {
-    backgroundColor: COLORS.limited,
-  },
-  deleteButton: {
-    backgroundColor: '#FF6B6B',
-  },
-  actionButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   bottomPadding: {
     height: 100,
