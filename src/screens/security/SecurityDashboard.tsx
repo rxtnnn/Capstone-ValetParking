@@ -19,10 +19,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidSecurityService } from '../../services/RfidSecurityService';
-import { SecurityDashboardStats, RfidScanEvent, GuestAccess, getStatusColor } from '../../types/rfid';
-import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
+import { SecurityDashboardStats, RfidScanEvent, getStatusColor } from '../../types/rfid';
+import { COLORS } from '../../constants/AppConst';
 import { useVerifyVehicle } from '../../hooks/useVerifyVehicle';
-import apiClient from '../../config/api';
 
 type RootStackParamList = {
   SecurityDashboard: undefined;
@@ -41,7 +40,6 @@ const SecurityDashboard: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { width } = useWindowDimensions();
   const [stats, setStats] = useState<SecurityDashboardStats | null>(null);
-  const [activeGuests, setActiveGuests] = useState<GuestAccess[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,36 +53,6 @@ const SecurityDashboard: React.FC = () => {
     verifyResult, setVerifyResult,
     handleVerify,
   } = useVerifyVehicle();
-
-  const loadActiveGuests = async () => {
-    try {
-      const res = await apiClient.get(API_ENDPOINTS.guests, { params: { status: 'active' } });
-      const raw = res.data;
-      const list: any[] = Array.isArray(raw) ? raw : (raw?.data ?? []);
-      if (isMountedRef.current) {
-        setActiveGuests(list.map((g: any): GuestAccess => ({
-          id: g.id,
-          guest_id: g.guest_id ?? g.pass_id ?? String(g.id),
-          name: g.name ?? g.guest_name ?? '',
-          vehicle_plate: g.vehicle_plate ?? '',
-          phone: g.phone ?? '',
-          purpose: g.purpose ?? '',
-          valid_from: g.valid_from ?? g.created_at ?? '',
-          valid_until: g.valid_until ?? '',
-          status: g.status ?? 'active',
-          approved_by: g.approved_by ?? null,
-          approved_by_name: g.approved_by_name ?? undefined,
-          notes: g.notes ?? null,
-          created_by: g.created_by ?? 0,
-          created_by_name: g.created_by_name ?? undefined,
-          created_at: g.created_at ?? '',
-          updated_at: g.updated_at ?? '',
-        })));
-      }
-    } catch {
-      // silent fail — guests list stays empty
-    }
-  };
 
   useFocusEffect(
     useCallback(() => {
@@ -104,8 +72,6 @@ const SecurityDashboard: React.FC = () => {
         }
       });
 
-      loadActiveGuests();
-
       return () => {
         isMountedRef.current = false;
         unsubscribeStats();
@@ -121,7 +87,6 @@ const SecurityDashboard: React.FC = () => {
       setStats(newStats);
       setRefreshing(false);
     }
-    await loadActiveGuests();
   };
 
   const StatCard: React.FC<{
@@ -324,66 +289,14 @@ const SecurityDashboard: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Active Guests</Text>
             <TouchableOpacity onPress={() => navigation.navigate('GuestManagement')}>
-              <Text style={styles.seeAllText}>See All</Text>
+              <Text style={styles.seeAllText}>Manage</Text>
             </TouchableOpacity>
           </View>
-          {activeGuests.length === 0 ? (
-            <View style={styles.emptyGuests}>
-              <Ionicons name="people-outline" size={32} color="#CCC" />
-              <Text style={styles.emptyGuestsText}>No active guests</Text>
-            </View>
-          ) : (
-            activeGuests.map((guest) => {
-              const until = guest.valid_until ? new Date(guest.valid_until) : null;
-              const timeLeft = until
-                ? Math.max(0, Math.round((until.getTime() - Date.now()) / 60000))
-                : null;
-              const timeLabel = timeLeft !== null
-                ? timeLeft >= 60
-                  ? `${Math.floor(timeLeft / 60)}h ${timeLeft % 60}m remaining`
-                  : `${timeLeft}m remaining`
-                : null;
-
-              return (
-                <View key={guest.id} style={styles.guestCard}>
-                  <View style={styles.guestCardHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.guestName}>{guest.name}</Text>
-                      {guest.phone ? (
-                        <Text style={styles.guestPhone}>{guest.phone}</Text>
-                      ) : null}
-                    </View>
-                    <View style={[styles.guestStatusBadge, { backgroundColor: COLORS.green + '22' }]}>
-                      <Text style={[styles.guestStatusText, { color: COLORS.green }]}>Active</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.guestRow}>
-                    <Ionicons name="car-outline" size={14} color="#888" />
-                    <Text style={styles.guestMeta}>{guest.vehicle_plate}</Text>
-                    <Text style={styles.guestPassId}>{guest.guest_id}</Text>
-                  </View>
-
-                  {guest.purpose ? (
-                    <View style={styles.guestRow}>
-                      <Ionicons name="information-circle-outline" size={14} color="#888" />
-                      <Text style={styles.guestMeta}>{guest.purpose}</Text>
-                    </View>
-                  ) : null}
-
-                  {until ? (
-                    <View style={styles.guestRow}>
-                      <Ionicons name="time-outline" size={14} color="#888" />
-                      <Text style={styles.guestMeta}>
-                        Until {until.toLocaleDateString()} {until.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {timeLabel ? `  ·  ${timeLabel}` : ''}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })
-          )}
+          <View style={styles.emptyGuests}>
+            <Ionicons name="people-outline" size={32} color="#CCC" />
+            <Text style={styles.emptyGuestsText}>Guest list coming soon</Text>
+            <Text style={styles.emptyGuestsSubtext}>Pending web API from the team</Text>
+          </View>
         </View>
 
         {/* Quick Actions */}
@@ -496,11 +409,11 @@ const SecurityDashboard: React.FC = () => {
 
                   {/* Input */}
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 6 }}>
-                    {verifyMode === 'rfid' ? 'RFID Tag' : 'Plate Number'}
+                    {verifyMode === 'rfid' ? 'RFID Tag' : 'Guest ID'}
                   </Text>
                   <TextInput
                     style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#333', marginBottom: 12 }}
-                    placeholder={verifyMode === 'rfid' ? 'Enter RFID tag to verify...' : 'Enter plate number'}
+                    placeholder={verifyMode === 'rfid' ? 'Enter RFID tag to verify...' : 'e.g. GUEST-2026-0001'}
                     placeholderTextColor="#aaa"
                     value={verifyInput}
                     onChangeText={t => { setVerifyInput(t); setVerifyResult(null); }}
@@ -801,62 +714,18 @@ const styles = StyleSheet.create({
   emptyGuests: {
     alignItems: 'center',
     paddingVertical: 24,
-    gap: 8,
+    gap: 6,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
   },
   emptyGuestsText: {
     fontSize: 14,
     color: '#AAA',
+    fontWeight: '500',
   },
-  guestCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 2,
-    gap: 6,
-  },
-  guestCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 2,
-  },
-  guestName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#333',
-  },
-  guestPhone: {
+  emptyGuestsSubtext: {
     fontSize: 12,
-    color: '#888',
-    marginTop: 1,
-  },
-  guestStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  guestStatusText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  guestRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  guestMeta: {
-    fontSize: 13,
-    color: '#555',
-    flex: 1,
-  },
-  guestPassId: {
-    fontSize: 11,
-    color: '#AAA',
-    fontWeight: '600',
+    color: '#CCC',
   },
   quickActionsGrid: {
     flexDirection: 'row',
