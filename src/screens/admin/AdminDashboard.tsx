@@ -308,11 +308,11 @@ const AdminDashboard: React.FC = () => {
 
                   {/* Input */}
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 6 }}>
-                    {verifyMode === 'rfid' ? 'RFID Tag' : 'Guest ID'}
+                    {verifyMode === 'rfid' ? 'RFID Tag' : 'Plate Number'}
                   </Text>
                   <TextInput
                     style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#333', marginBottom: 12 }}
-                    placeholder={verifyMode === 'rfid' ? 'Enter RFID tag to verify...' : 'e.g. GUEST-2026-0001'}
+                    placeholder={verifyMode === 'rfid' ? 'Enter RFID tag to verify...' : 'Enter plate number'}
                     placeholderTextColor="#aaa"
                     value={verifyInput}
                     onChangeText={t => { setVerifyInput(t); setVerifyResult(null); }}
