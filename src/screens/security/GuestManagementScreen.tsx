@@ -8,6 +8,11 @@ import {
   Alert,
   Modal,
   TextInput,
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -15,8 +20,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { RfidSecurityService } from '../../services/RfidSecurityService';
 import { GuestAccess, getStatusColor } from '../../types/rfid';
-import { COLORS } from '../../constants/AppConst';
+import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
 import { styles } from '../styles/GuestManagementScreen.style';
+import apiClient from '../../config/api';
 
 type RootStackParamList = {
   SecurityDashboard: undefined;
@@ -35,6 +41,17 @@ const GuestManagementScreen: React.FC = () => {
     guest: null,
   });
   const [denyReason, setDenyReason] = useState('');
+  const [newGuestModal, setNewGuestModal] = useState(false);
+  const [newGuestLoading, setNewGuestLoading] = useState(false);
+  const [newGuest, setNewGuest] = useState({
+    name: '',
+    vehicle_plate: '',
+    phone: '',
+    purpose: '',
+    valid_hours: '24',
+    notes: '',
+    _purposeOpen: false,
+  });
   const isMountedRef = useRef(true);
 
   const loadGuests = async () => {
@@ -99,6 +116,39 @@ const GuestManagementScreen: React.FC = () => {
     }
   };
 
+  const handleCreateGuest = async () => {
+    if (!newGuest.name.trim() || !newGuest.vehicle_plate.trim()) {
+      Alert.alert('Required', 'Guest name and vehicle plate are required.');
+      return;
+    }
+    const hours = parseInt(newGuest.valid_hours, 10);
+    if (isNaN(hours) || hours < 1 || hours > 168) {
+      Alert.alert('Invalid Duration', 'Valid duration must be between 1 and 168 hours.');
+      return;
+    }
+    setNewGuestLoading(true);
+    try {
+      const valid_from = new Date();
+      const valid_until = new Date(valid_from.getTime() + hours * 60 * 60 * 1000);
+      await apiClient.post(API_ENDPOINTS.guestAccess, {
+        name: newGuest.name.trim(),
+        vehicle_plate: newGuest.vehicle_plate.trim().toUpperCase(),
+        phone: newGuest.phone.trim() || null,
+        purpose: newGuest.purpose.trim() || null,
+        valid_from: valid_from.toISOString(),
+        valid_until: valid_until.toISOString(),
+        notes: newGuest.notes.trim() || null,
+      });
+      setNewGuestModal(false);
+      setNewGuest({ name: '', vehicle_plate: '', phone: '', purpose: '', valid_hours: '24', notes: '', _purposeOpen: false });
+      loadGuests();
+    } catch {
+      Alert.alert('Error', 'Failed to create guest pass. Please try again.');
+    } finally {
+      setNewGuestLoading(false);
+    }
+  };
+
   const getStatusLabel = (status: GuestAccess['status']): string => {
     const labels: Record<GuestAccess['status'], string> = {
       pending: 'Pending',
@@ -107,6 +157,9 @@ const GuestManagementScreen: React.FC = () => {
       expired: 'Expired',
       checked_in: 'Checked In',
       checked_out: 'Checked Out',
+      active: 'Active',
+      used: 'Used',
+      cancelled: 'Cancelled',
     };
     return labels[status] || status;
   };
@@ -204,11 +257,12 @@ const GuestManagementScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Guest Management</Text>
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>
-              {guests.filter(g => g.status === 'pending').length}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.headerBadge}
+            onPress={() => setNewGuestModal(true)}
+          >
+            <Ionicons name="add" size={20} color="#FFF" />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -262,6 +316,161 @@ const GuestManagementScreen: React.FC = () => {
           />
         }
       />
+
+      {/* New Guest Pass Modal */}
+      <Modal
+        visible={newGuestModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setNewGuestModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
+        >
+          <TouchableWithoutFeedback onPress={() => setNewGuestModal(false)}>
+            <View style={styles.newGuestOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.newGuestSheet}>
+                  {/* Header */}
+                  <View style={styles.newGuestHeader}>
+                    <Ionicons name="person-add-outline" size={20} color="#333" />
+                    <Text style={styles.newGuestTitle}>New Guest Pass</Text>
+                    <TouchableOpacity onPress={() => setNewGuestModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Ionicons name="close" size={22} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ paddingBottom: 8 }}
+                  >
+                    {/* Guest Name */}
+                    <Text style={styles.fieldLabel}>Guest Name <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
+                    <TextInput
+                      style={styles.fieldInput}
+                      placeholder="Enter guest name"
+                      placeholderTextColor="#aaa"
+                      value={newGuest.name}
+                      onChangeText={v => setNewGuest(p => ({ ...p, name: v }))}
+                    />
+
+                    {/* Vehicle Plate + Phone */}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Vehicle Plate <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
+                        <TextInput
+                          style={styles.fieldInput}
+                          placeholder="ABC 1234"
+                          placeholderTextColor="#aaa"
+                          value={newGuest.vehicle_plate}
+                          onChangeText={v => setNewGuest(p => ({ ...p, vehicle_plate: v }))}
+                          autoCapitalize="characters"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Phone Number</Text>
+                        <TextInput
+                          style={styles.fieldInput}
+                          placeholder="Optional"
+                          placeholderTextColor="#aaa"
+                          value={newGuest.phone}
+                          onChangeText={v => setNewGuest(p => ({ ...p, phone: v }))}
+                          keyboardType="phone-pad"
+                        />
+                      </View>
+                    </View>
+
+                    {/* Purpose */}
+                    <Text style={styles.fieldLabel}>Purpose of Visit</Text>
+                    <TouchableOpacity
+                      style={[styles.fieldInput, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                      onPress={() => setNewGuest(p => ({ ...p, _purposeOpen: !p._purposeOpen } as any))}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 14, color: newGuest.purpose ? '#333' : '#aaa' }}>
+                        {newGuest.purpose || '-- Select Purpose --'}
+                      </Text>
+                      <Ionicons name={(newGuest as any)._purposeOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#666" />
+                    </TouchableOpacity>
+                    {(newGuest as any)._purposeOpen && (
+                      <View style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginTop: -8, marginBottom: 12, backgroundColor: '#fff', overflow: 'hidden' }}>
+                        {(['Student Drop-off / Pick-up', 'Parent-Teacher Meeting', 'School Event / Program', 'Meeting with Faculty / Staff', 'Job Interview', 'Delivery / Service', 'Campus Tour / Inquiry', 'Maintenance / Repair', 'Other'] as const).map((opt, i) => (
+                          <TouchableOpacity
+                            key={opt}
+                            onPress={() => setNewGuest(p => ({ ...p, purpose: opt, _purposeOpen: false } as any))}
+                            style={{
+                              paddingVertical: 11,
+                              paddingHorizontal: 12,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              borderTopWidth: i === 0 ? 0 : 1,
+                              borderTopColor: '#F0F0F0',
+                              backgroundColor: newGuest.purpose === opt ? COLORS.primary + '10' : '#fff',
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, color: newGuest.purpose === opt ? COLORS.primary : '#333' }}>{opt}</Text>
+                            {newGuest.purpose === opt && <Ionicons name="checkmark" size={16} color={COLORS.primary} />}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Valid Duration */}
+                    <Text style={styles.fieldLabel}>Valid Duration <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <TextInput
+                        style={[styles.fieldInput, { flex: 1 }]}
+                        placeholder="24"
+                        placeholderTextColor="#aaa"
+                        value={newGuest.valid_hours}
+                        onChangeText={v => setNewGuest(p => ({ ...p, valid_hours: v.replace(/[^0-9]/g, '') }))}
+                        keyboardType="numeric"
+                      />
+                      <Text style={{ fontSize: 14, color: '#666' }}>hours</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>Max: 168 hours (1 week)</Text>
+
+                    {/* Notes */}
+                    <Text style={styles.fieldLabel}>Notes</Text>
+                    <TextInput
+                      style={[styles.fieldInput, { minHeight: 70, textAlignVertical: 'top' }]}
+                      placeholder="Additional notes..."
+                      placeholderTextColor="#aaa"
+                      value={newGuest.notes}
+                      onChangeText={v => setNewGuest(p => ({ ...p, notes: v }))}
+                      multiline
+                    />
+                  </ScrollView>
+
+                  {/* Buttons */}
+                  <View style={styles.newGuestFooter}>
+                    <TouchableOpacity
+                      style={styles.newGuestCancelBtn}
+                      onPress={() => setNewGuestModal(false)}
+                    >
+                      <Text style={styles.newGuestCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.newGuestCreateBtn, { opacity: newGuestLoading ? 0.7 : 1 }]}
+                      onPress={handleCreateGuest}
+                      disabled={newGuestLoading}
+                    >
+                      {newGuestLoading
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Ionicons name="save-outline" size={16} color="#fff" />}
+                      <Text style={styles.newGuestCreateText}>Create Pass</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Deny Modal */}
       <Modal

@@ -171,7 +171,6 @@ const IncidentLogScreen: React.FC = () => {
           </TouchableOpacity>
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>Incident Log</Text>
-            <Text style={styles.headerSubtitle}>Guard's logbook</Text>
           </View>
           <TouchableOpacity
             style={styles.addButton}

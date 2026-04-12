@@ -21,8 +21,10 @@ import { RfidSecurityService } from '../../services/RfidSecurityService';
 import { SecurityDashboardStats, RfidScanEvent, GuestAccess, getStatusColor } from '../../types/rfid';
 import { useVerifyVehicle } from '../../hooks/useVerifyVehicle';
 import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
+import { getQuickActionsForRole } from '../../constants/quickActions';
 import { styles } from '../styles/SecurityDashboard.style';
 import apiClient from '../../config/api';
+import { useAuth } from '../../context/AuthContext';
 
 type RootStackParamList = {
   SecurityDashboard: undefined;
@@ -39,6 +41,8 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'SecurityDashboard
 
 const SecurityDashboard: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
+  const userRole = (user?.role === 'ssd' ? 'ssd' : 'security') as 'ssd' | 'security';
   const { width } = useWindowDimensions();
   const [stats, setStats] = useState<SecurityDashboardStats | null>(null);
   const [activeGuests, setActiveGuests] = useState<GuestAccess[]>([]);
@@ -217,7 +221,7 @@ const SecurityDashboard: React.FC = () => {
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.headerTitle}>Security Dashboard</Text>
+            <Text style={styles.headerTitle}>{userRole === 'ssd' ? 'SSD Dashboard' : 'Security Dashboard'}</Text>
             <View style={styles.connectionIndicator}>
               <View style={[
                 styles.connectionDot,
@@ -377,53 +381,24 @@ const SecurityDashboard: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
-            <QuickActionButton
-              title="Live Monitor"
-              icon="radio"
-              color={COLORS.primary}
-              onPress={() => navigation.navigate('ScanMonitor')}
-            />
-            <QuickActionButton
-              title="View Alerts"
-              icon="alert-circle"
-              color="#FF6B6B"
-              onPress={() => navigation.navigate('AlertsScreen')}
-            />
-            <QuickActionButton
-              title="Guest Requests"
-              icon="people"
-              color={COLORS.limited}
-              onPress={() => navigation.navigate('GuestManagement')}
-            />
-            <QuickActionButton
-              title="Scan History"
-              icon="time"
-              color={COLORS.blue}
-              onPress={() => navigation.navigate('ScanHistory')}
-            />
-            <QuickActionButton
-              title="Verify Vehicle"
-              icon="search"
-              color="#9C27B0"
-              onPress={() => {
-                setVerifyMode('rfid');
-                setVerifyInput('');
-                setVerifyResult(null);
-                setShowVerifyModal(true);
-              }}
-            />
-            <QuickActionButton
-              title="File Incident"
-              icon="warning"
-              color="#E65100"
-              onPress={() => navigation.navigate('IncidentReport')}
-            />
-            <QuickActionButton
-              title="Incident Log"
-              icon="document-text"
-              color="#5C6BC0"
-              onPress={() => navigation.navigate('IncidentLog')}
-            />
+            {getQuickActionsForRole(userRole).map((action) => (
+              <QuickActionButton
+                key={action.key}
+                title={action.title}
+                icon={action.icon}
+                color={action.color}
+                onPress={
+                  action.isVerify
+                    ? () => {
+                        setVerifyMode('rfid');
+                        setVerifyInput('');
+                        setVerifyResult(null);
+                        setShowVerifyModal(true);
+                      }
+                    : () => navigation.navigate(action.screen as any)
+                }
+              />
+            ))}
           </View>
         </View>
 

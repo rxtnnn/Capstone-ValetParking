@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,10 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidAdminService } from '../../services/RfidAdminService';
-import { RfidDashboardStats, getReaderStatusColor } from '../../types/rfid';
-import { COLORS } from '../../constants/AppConst';
+import { RfidDashboardStats, GuestAccess, getReaderStatusColor } from '../../types/rfid';
+import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
+import apiClient from '../../config/api';
+import { getQuickActionsForRole } from '../../constants/quickActions';
 import { useVerifyVehicle } from '../../hooks/useVerifyVehicle';
 
 type RootStackParamList = {
@@ -28,6 +30,12 @@ type RootStackParamList = {
   RfidTagList: undefined;
   RfidTagForm: { tagId?: number };
   RfidReaderStatus: undefined;
+  ScanMonitor: undefined;
+  AlertsScreen: undefined;
+  GuestManagement: undefined;
+  ScanHistory: undefined;
+  IncidentReport: undefined;
+  IncidentLog: undefined;
   Profile: undefined;
 };
 
@@ -37,8 +45,10 @@ const AdminDashboard: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { width } = useWindowDimensions();
   const [stats, setStats] = useState<RfidDashboardStats | null>(null);
+  const [activeGuests, setActiveGuests] = useState<GuestAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isMountedRef = useRef(true);
 
   const {
     showVerifyModal, setShowVerifyModal,
@@ -61,15 +71,47 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const loadActiveGuests = async () => {
+    try {
+      const res = await apiClient.get(API_ENDPOINTS.guestAccess, { params: { status: 'active' } });
+      const list: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      if (isMountedRef.current) {
+        setActiveGuests(list.map((g: any): GuestAccess => ({
+          id: g.id,
+          guest_id: g.guest_id ?? String(g.id),
+          name: g.name ?? '',
+          vehicle_plate: g.vehicle_plate ?? '',
+          phone: g.phone ?? '',
+          purpose: g.purpose ?? '',
+          valid_from: g.valid_from ?? '',
+          valid_until: g.valid_until ?? '',
+          status: g.status ?? 'active',
+          approved_by: g.approved_by ?? null,
+          notes: g.notes ?? null,
+          created_by: g.created_by ?? 0,
+          created_by_name: g.created_by ?? undefined,
+          created_at: g.created_at ?? '',
+          updated_at: g.updated_at ?? g.created_at ?? '',
+        })));
+      }
+    } catch {
+      // silent fail
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
+      isMountedRef.current = true;
       loadStats();
+      loadActiveGuests();
+      return () => { isMountedRef.current = false; };
     }, [])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
     loadStats();
+    loadActiveGuests();
   };
 
   const StatCard: React.FC<{
@@ -228,27 +270,85 @@ const AdminDashboard: React.FC = () => {
           </View>
         </View>
 
+        {/* Active Guests */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Active Guests</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('GuestManagement')}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {activeGuests.length === 0 ? (
+            <View style={styles.emptyGuests}>
+              <Ionicons name="people-outline" size={32} color="#CCC" />
+              <Text style={styles.emptyGuestsText}>No active guests</Text>
+            </View>
+          ) : (
+            activeGuests.map((guest) => {
+              const until = guest.valid_until ? new Date(guest.valid_until) : null;
+              const minsLeft = until ? Math.max(0, Math.round((until.getTime() - Date.now()) / 60000)) : null;
+              const timeLabel = minsLeft !== null
+                ? minsLeft >= 60 ? `${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m left` : `${minsLeft}m left`
+                : null;
+              return (
+                <View key={guest.id} style={styles.guestCard}>
+                  <View style={styles.guestCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.guestName}>{guest.name}</Text>
+                      {guest.phone ? <Text style={styles.guestPhone}>{guest.phone}</Text> : null}
+                    </View>
+                    <View style={[styles.guestStatusBadge, { backgroundColor: COLORS.green + '22' }]}>
+                      <Text style={[styles.guestStatusText, { color: COLORS.green }]}>Active</Text>
+                    </View>
+                  </View>
+                  <View style={styles.guestRow}>
+                    <Ionicons name="car-outline" size={14} color="#888" />
+                    <Text style={styles.guestMeta}>{guest.vehicle_plate}</Text>
+                    <Text style={styles.guestPassId}>{guest.guest_id}</Text>
+                  </View>
+                  {guest.purpose ? (
+                    <View style={styles.guestRow}>
+                      <Ionicons name="information-circle-outline" size={14} color="#888" />
+                      <Text style={styles.guestMeta}>{guest.purpose}</Text>
+                    </View>
+                  ) : null}
+                  {until ? (
+                    <View style={styles.guestRow}>
+                      <Ionicons name="time-outline" size={14} color="#888" />
+                      <Text style={styles.guestMeta}>
+                        Until {until.toLocaleDateString()} {until.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {timeLabel ? `  ·  ${timeLabel}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
+          )}
+        </View>
+
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
-            <QuickActionButton
-              title="View All Tags"
-              icon="list"
-              color={COLORS.blue}
-              onPress={() => navigation.navigate('RfidTagList')}
-            />
-            <QuickActionButton
-              title="Verify Vehicle"
-              icon="search"
-              color="#9C27B0"
-              onPress={() => {
-                setVerifyMode('rfid');
-                setVerifyInput('');
-                setVerifyResult(null);
-                setShowVerifyModal(true);
-              }}
-            />
+            {getQuickActionsForRole('admin').map((action) => (
+              <QuickActionButton
+                key={action.key}
+                title={action.title}
+                icon={action.icon}
+                color={action.color}
+                onPress={
+                  action.isVerify
+                    ? () => {
+                        setVerifyMode('rfid');
+                        setVerifyInput('');
+                        setVerifyResult(null);
+                        setShowVerifyModal(true);
+                      }
+                    : () => navigation.navigate(action.screen as any)
+                }
+              />
+            ))}
           </View>
         </View>
 
@@ -598,6 +698,66 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333',
     flex: 1,
+  },
+  emptyGuests: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 8,
+  },
+  emptyGuestsText: {
+    fontSize: 14,
+    color: '#999',
+  },
+  guestCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  guestCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  guestName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  guestPhone: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  guestStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  guestStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  guestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  guestMeta: {
+    fontSize: 12,
+    color: '#666',
+    flex: 1,
+  },
+  guestPassId: {
+    fontSize: 11,
+    color: '#aaa',
+    fontFamily: 'monospace',
   },
   bottomPadding: {
     height: 100,

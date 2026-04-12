@@ -7,7 +7,7 @@ import { COLORS } from '../constants/AppConst';
 // ============================================
 
 export type RfidTagStatus = 'active' | 'expired' | 'suspended' | 'lost';
-export type GuestAccessStatus = 'active' | 'expired' | 'used' | 'cancelled';
+export type GuestAccessStatus = 'active' | 'expired' | 'used' | 'cancelled' | 'pending' | 'approved' | 'denied' | 'checked_in' | 'checked_out';
 export type ParkingEntryStatus = 'active' | 'completed' | 'cancelled';
 export type ScanStatus = 'valid' | 'invalid' | 'expired' | 'unknown';
 export type ReaderStatus = 'online' | 'offline' | 'error';
