@@ -86,7 +86,6 @@ class ParkingConfigServiceClass {
 
       return config;
     } catch (error) {
-      console.error('Failed to fetch parking config from API:', error);
       throw error;
     }
   }

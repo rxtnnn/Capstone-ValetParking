@@ -1,4 +1,5 @@
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
+import { API_TOKEN as ENV_API_TOKEN } from '@env';
 
 export const COLORS = {
   primary: '#B22020',
@@ -61,7 +62,7 @@ export const API_ENDPOINTS = {
   incidentById: (id: number) => `/incidents/${id}`,
 };
 
-export const API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
+export const API_TOKEN = ENV_API_TOKEN ?? '';
 
 export const FONTS = {
   regular: 'Poppins_400Regular',
