@@ -249,6 +249,66 @@ export const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
   },
+  emptyGuests: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 8,
+  },
+  emptyGuestsText: {
+    fontSize: 14,
+    color: '#999',
+  },
+  guestCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  guestCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  guestName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  guestPhone: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  guestStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  guestStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  guestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  guestMeta: {
+    fontSize: 12,
+    color: '#666',
+    flex: 1,
+  },
+  guestPassId: {
+    fontSize: 11,
+    color: '#aaa',
+    fontFamily: 'monospace',
+  },
   bottomPadding: {
     height: 100,
   },

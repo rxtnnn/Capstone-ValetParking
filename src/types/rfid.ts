@@ -7,7 +7,7 @@ import { COLORS } from '../constants/AppConst';
 // ============================================
 
 export type RfidTagStatus = 'active' | 'expired' | 'suspended' | 'lost';
-export type GuestAccessStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'checked_in' | 'checked_out';
+export type GuestAccessStatus = 'active' | 'expired' | 'used' | 'cancelled';
 export type ParkingEntryStatus = 'active' | 'completed' | 'cancelled';
 export type ScanStatus = 'valid' | 'invalid' | 'expired' | 'unknown';
 export type ReaderStatus = 'online' | 'offline' | 'error';
@@ -279,7 +279,7 @@ export const isScanStatus = (value: string): value is ScanStatus => {
 };
 
 export const isGuestAccessStatus = (value: string): value is GuestAccessStatus => {
-  return ['pending', 'approved', 'denied', 'expired', 'checked_in', 'checked_out'].includes(value);
+  return ['active', 'expired', 'used', 'cancelled'].includes(value);
 };
 
 export const isAlertType = (value: string): value is AlertType => {
@@ -302,11 +302,8 @@ export const getStatusColor = (status: RfidTagStatus | ScanStatus | GuestAccessS
     invalid: '#FF6B6B',
     unknown: '#9E9E9E',
     // GuestAccessStatus
-    pending: COLORS.limited,
-    approved: COLORS.green,
-    denied: '#FF6B6B',
-    checked_in: COLORS.blue,
-    checked_out: '#9E9E9E',
+    used: '#9E9E9E',
+    cancelled: '#FF6B6B',
   };
   return colorMap[status] || '#9E9E9E';
 };
