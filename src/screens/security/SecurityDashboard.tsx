@@ -18,10 +18,11 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidSecurityService } from '../../services/RfidSecurityService';
-import { SecurityDashboardStats, RfidScanEvent, getStatusColor } from '../../types/rfid';
+import { SecurityDashboardStats, RfidScanEvent, GuestAccess, getStatusColor } from '../../types/rfid';
 import { useVerifyVehicle } from '../../hooks/useVerifyVehicle';
-import { COLORS } from '../../constants/AppConst';
+import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
 import { styles } from '../styles/SecurityDashboard.style';
+import apiClient from '../../config/api';
 
 type RootStackParamList = {
   SecurityDashboard: undefined;
@@ -40,6 +41,7 @@ const SecurityDashboard: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { width } = useWindowDimensions();
   const [stats, setStats] = useState<SecurityDashboardStats | null>(null);
+  const [activeGuests, setActiveGuests] = useState<GuestAccess[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,9 +56,38 @@ const SecurityDashboard: React.FC = () => {
     handleVerify,
   } = useVerifyVehicle();
 
+  const loadActiveGuests = async () => {
+    try {
+      const res = await apiClient.get(API_ENDPOINTS.guestAccess, { params: { status: 'active' } });
+      const list: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      if (isMountedRef.current) {
+        setActiveGuests(list.map((g: any): GuestAccess => ({
+          id: g.id,
+          guest_id: g.guest_id ?? String(g.id),
+          name: g.name ?? '',
+          vehicle_plate: g.vehicle_plate ?? '',
+          phone: g.phone ?? '',
+          purpose: g.purpose ?? '',
+          valid_from: g.valid_from ?? '',
+          valid_until: g.valid_until ?? '',
+          status: g.status ?? 'active',
+          approved_by: g.approved_by ?? null,
+          notes: g.notes ?? null,
+          created_by: g.created_by ?? 0,
+          created_by_name: g.created_by ?? undefined,
+          created_at: g.created_at ?? '',
+          updated_at: g.updated_at ?? g.created_at ?? '',
+        })));
+      }
+    } catch {
+      // silent fail — list stays empty
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       isMountedRef.current = true;
+      loadActiveGuests();
 
       const unsubscribeStats = RfidSecurityService.onStatsUpdate((newStats) => {
         if (isMountedRef.current) {
@@ -87,6 +118,7 @@ const SecurityDashboard: React.FC = () => {
       setStats(newStats);
       setRefreshing(false);
     }
+    loadActiveGuests();
   };
 
   const StatCard: React.FC<{
@@ -284,6 +316,63 @@ const SecurityDashboard: React.FC = () => {
           </View>
         )}
 
+        {/* Active Guests */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Active Guests</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('GuestManagement')}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {activeGuests.length === 0 ? (
+            <View style={styles.emptyGuests}>
+              <Ionicons name="people-outline" size={32} color="#CCC" />
+              <Text style={styles.emptyGuestsText}>No active guests</Text>
+            </View>
+          ) : (
+            activeGuests.map((guest) => {
+              const until = guest.valid_until ? new Date(guest.valid_until) : null;
+              const minsLeft = until ? Math.max(0, Math.round((until.getTime() - Date.now()) / 60000)) : null;
+              const timeLabel = minsLeft !== null
+                ? minsLeft >= 60 ? `${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m left` : `${minsLeft}m left`
+                : null;
+              return (
+                <View key={guest.id} style={styles.guestCard}>
+                  <View style={styles.guestCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.guestName}>{guest.name}</Text>
+                      {guest.phone ? <Text style={styles.guestPhone}>{guest.phone}</Text> : null}
+                    </View>
+                    <View style={[styles.guestStatusBadge, { backgroundColor: COLORS.green + '22' }]}>
+                      <Text style={[styles.guestStatusText, { color: COLORS.green }]}>Active</Text>
+                    </View>
+                  </View>
+                  <View style={styles.guestRow}>
+                    <Ionicons name="car-outline" size={14} color="#888" />
+                    <Text style={styles.guestMeta}>{guest.vehicle_plate}</Text>
+                    <Text style={styles.guestPassId}>{guest.guest_id}</Text>
+                  </View>
+                  {guest.purpose ? (
+                    <View style={styles.guestRow}>
+                      <Ionicons name="information-circle-outline" size={14} color="#888" />
+                      <Text style={styles.guestMeta}>{guest.purpose}</Text>
+                    </View>
+                  ) : null}
+                  {until ? (
+                    <View style={styles.guestRow}>
+                      <Ionicons name="time-outline" size={14} color="#888" />
+                      <Text style={styles.guestMeta}>
+                        Until {until.toLocaleDateString()} {until.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {timeLabel ? `  ·  ${timeLabel}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
+          )}
+        </View>
+
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -427,13 +516,26 @@ const SecurityDashboard: React.FC = () => {
                       </View>
                       {verifyResult.found && (
                         <>
-                          {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Owner: {verifyResult.user_name} {verifyResult.user_role ? `(${verifyResult.user_role})` : ''}</Text>}
-                          {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
-                          {(verifyResult.vehicle_make || verifyResult.vehicle_model) && (
-                            <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Vehicle: {[verifyResult.vehicle_make, verifyResult.vehicle_model].filter(Boolean).join(' ')}</Text>
+                          {verifyResult.is_guest ? (
+                            <>
+                              {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Guest: {verifyResult.user_name}</Text>}
+                              {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
+                              {verifyResult.purpose && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Purpose: {verifyResult.purpose}</Text>}
+                              {verifyResult.valid_from && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>From: {new Date(verifyResult.valid_from).toLocaleString()}</Text>}
+                              {verifyResult.valid_until && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Until: {new Date(verifyResult.valid_until).toLocaleString()}</Text>}
+                              {verifyResult.status && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Status: {verifyResult.status}</Text>}
+                            </>
+                          ) : (
+                            <>
+                              {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Owner: {verifyResult.user_name} {verifyResult.user_role ? `(${verifyResult.user_role})` : ''}</Text>}
+                              {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
+                              {(verifyResult.vehicle_make || verifyResult.vehicle_model) && (
+                                <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Vehicle: {[verifyResult.vehicle_make, verifyResult.vehicle_model].filter(Boolean).join(' ')}</Text>
+                              )}
+                              {verifyResult.uid && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>RFID UID: {verifyResult.uid}</Text>}
+                              {verifyResult.expiry_date && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Expiry: {new Date(verifyResult.expiry_date).toLocaleDateString()}</Text>}
+                            </>
                           )}
-                          {verifyResult.uid && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>RFID UID: {verifyResult.uid}</Text>}
-                          {verifyResult.expiry_date && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Expiry: {new Date(verifyResult.expiry_date).toLocaleDateString()}</Text>}
                         </>
                       )}
                     </View>
@@ -467,5 +569,7 @@ const SecurityDashboard: React.FC = () => {
     </View>
   );
 };
+
+
 
 export default SecurityDashboard;

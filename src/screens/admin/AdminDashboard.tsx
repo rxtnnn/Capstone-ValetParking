@@ -341,13 +341,26 @@ const AdminDashboard: React.FC = () => {
                       </View>
                       {verifyResult.found && (
                         <>
-                          {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Owner: {verifyResult.user_name} {verifyResult.user_role ? `(${verifyResult.user_role})` : ''}</Text>}
-                          {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
-                          {(verifyResult.vehicle_make || verifyResult.vehicle_model) && (
-                            <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Vehicle: {[verifyResult.vehicle_make, verifyResult.vehicle_model].filter(Boolean).join(' ')}</Text>
+                          {verifyResult.is_guest ? (
+                            <>
+                              {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Guest: {verifyResult.user_name}</Text>}
+                              {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
+                              {verifyResult.purpose && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Purpose: {verifyResult.purpose}</Text>}
+                              {verifyResult.valid_from && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>From: {new Date(verifyResult.valid_from).toLocaleString()}</Text>}
+                              {verifyResult.valid_until && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Until: {new Date(verifyResult.valid_until).toLocaleString()}</Text>}
+                              {verifyResult.status && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Status: {verifyResult.status}</Text>}
+                            </>
+                          ) : (
+                            <>
+                              {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Owner: {verifyResult.user_name} {verifyResult.user_role ? `(${verifyResult.user_role})` : ''}</Text>}
+                              {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
+                              {(verifyResult.vehicle_make || verifyResult.vehicle_model) && (
+                                <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Vehicle: {[verifyResult.vehicle_make, verifyResult.vehicle_model].filter(Boolean).join(' ')}</Text>
+                              )}
+                              {verifyResult.uid && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>RFID UID: {verifyResult.uid}</Text>}
+                              {verifyResult.expiry_date && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Expiry: {new Date(verifyResult.expiry_date).toLocaleDateString()}</Text>}
+                            </>
                           )}
-                          {verifyResult.uid && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>RFID UID: {verifyResult.uid}</Text>}
-                          {verifyResult.expiry_date && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Expiry: {new Date(verifyResult.expiry_date).toLocaleDateString()}</Text>}
                         </>
                       )}
                     </View>

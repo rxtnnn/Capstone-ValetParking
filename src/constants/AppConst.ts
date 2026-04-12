@@ -57,6 +57,11 @@ export const API_ENDPOINTS = {
   rfidReaderById: (id: number) => `/rfid/readers/${id}`,
   rfidReaderRestart: (id: number) => `/rfid/readers/${id}/restart`,
 
+  // Guest Access
+  guestAccess: '/guest-access',
+  guestAccessVerify: (plate: string) => `/guest-access/verify/${encodeURIComponent(plate)}`,
+  guestAccessById: (id: number) => `/guest-access/${id}`,
+
   // Incidents (security)
   incidents: '/incidents',
   incidentById: (id: number) => `/incidents/${id}`,
