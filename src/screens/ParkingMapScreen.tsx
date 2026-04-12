@@ -87,6 +87,7 @@ const ParkingMapScreen: React.FC = () => {
   const [showFloorModal, setShowFloorModal] = useState(false);
   const [showParkingConfirmModal, setShowParkingConfirmModal] = useState(false);
   const [showNavigationModal, setShowNavigationModal] = useState(false);
+  const [navigationFromPicker, setNavigationFromPicker] = useState(false);
   const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null);
   const [navigatingToSpot, setNavigatingToSpot] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -102,6 +103,7 @@ const ParkingMapScreen: React.FC = () => {
 
   // Spot actions modal
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
+  const [spotActionsFromPicker, setSpotActionsFromPicker] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
   const [reportIssue, setReportIssue] = useState('');
   const [reportCustomReason, setReportCustomReason] = useState('');
@@ -124,7 +126,6 @@ const ParkingMapScreen: React.FC = () => {
   const [incidentNotes, setIncidentNotes] = useState('');
   const [incidentActionTaken, setIncidentActionTaken] = useState('');
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
-
 
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
@@ -209,14 +210,12 @@ const ParkingMapScreen: React.FC = () => {
 
     // check if the spot just became occupied (was not occupied before, now is occupied)
     if (targetSpot && previousSpot && !previousSpot.isOccupied && targetSpot.isOccupied) {
-      // show confirmation modal asking if user parked
       setShowParkingConfirmModal(true);
     }
 
     previousParkingDataRef.current = parkingData;
   }, [parkingData, navigatingToSpot, showNavigation]);
 
-  // Derived values from floor config
   const sensorToSpotMapping = useMemo(() => {
     if (!floorConfig) return {};
     return ParkingConfigService.getSensorToSpotMapping(floorConfig);
@@ -224,7 +223,6 @@ const ParkingMapScreen: React.FC = () => {
 
   const gestureLimits = useMemo(() => {
     if (!floorConfig?.gesture_limits) {
-      // Default gesture limits
       return {
         maxTranslateX: 300,
         minTranslateX: -300,
@@ -571,6 +569,7 @@ const ParkingMapScreen: React.FC = () => {
         setShowSpotPickerModal(true);
       } else {
         setSpotActionsTarget(spot);
+        setSpotActionsFromPicker(false);
         setReportIssue('');
         setReportCustomReason('');
         setIssueDropdownOpen(false);
@@ -592,6 +591,7 @@ const ParkingMapScreen: React.FC = () => {
     setSelectedSpot(spot.id);
     setSelectedSpotForNav(spot.id);
     setHighlightedSpots([]);
+    setNavigationFromPicker(false);
     setShowNavigationModal(true);
   }, [canAccessSpotActions]);
 
@@ -986,19 +986,21 @@ const ParkingMapScreen: React.FC = () => {
 
       {showNavigation && (
         <View style={{ position: 'absolute', top: 180, right: 20, gap: 10, zIndex: 2000 }}>
-          <TouchableOpacity
-            style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: NotificationManager.isRfidEntryDetected() ? COLORS.green : '#A0A0A0' }]}
-            onPress={() => {
-              if (!NotificationManager.isRfidEntryDetected()) {
-                Alert.alert('Not Inside Parking', 'Your RFID must be detected at the entrance before you can mark as parked.');
-                return;
-              }
-              setShowParkingConfirmModal(true);
-            }}
-          >
-            <Ionicons name="checkmark-circle" size={20} color="white" />
-            <Text style={styles.clearRouteText}>I've Parked</Text>
-          </TouchableOpacity>
+          {!canAccessSpotActions && (
+            <TouchableOpacity
+              style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: NotificationManager.isRfidEntryDetected() ? COLORS.green : '#A0A0A0' }]}
+              onPress={() => {
+                if (!NotificationManager.isRfidEntryDetected()) {
+                  Alert.alert('Not Inside Parking', 'Your RFID must be detected at the entrance before you can mark as parked.');
+                  return;
+                }
+                setShowParkingConfirmModal(true);
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="white" />
+              <Text style={styles.clearRouteText}>I've Parked</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.primary }]} onPress={clearNavigation}>
             <Ionicons name="close-circle" size={20} color="white" />
             <Text style={styles.clearRouteText}>Clear Route</Text>
@@ -1153,6 +1155,17 @@ const ParkingMapScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.navigationModalContainer}>
             <View style={styles.navigationModalHeader}>
+              {navigationFromPicker && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowNavigationModal(false);
+                    setShowSpotPickerModal(true);
+                  }}
+                  style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
               <View style={styles.navigationHeaderText}>
                 <Text style={styles.navigationModalTitle}>Navigate to Spot</Text>
                 <Text style={styles.navigationModalSubtitle}>
@@ -1335,7 +1348,8 @@ const ParkingMapScreen: React.FC = () => {
         </View>
       </View>
     </Modal>
-      {/* Spot Picker Modal — Show Route or Report Malfunction */}
+
+      {/* Spot Picker Modal — Show Route, Log Incident or Report Malfunction */}
       <Modal
         visible={showSpotPickerModal}
         transparent
@@ -1348,9 +1362,6 @@ const ParkingMapScreen: React.FC = () => {
               <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 340, overflow: 'hidden' }}>
                 {/* Header */}
                 <View style={{ backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="location" size={20} color="#fff" />
-                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Spot {spotPickerTarget?.id}</Text>
                     <Text style={{ color: 'rgba(255,255,255,0.8)', fontFamily: FONTS.regular, fontSize: 12 }}>
@@ -1391,10 +1402,10 @@ const ParkingMapScreen: React.FC = () => {
                         setSelectedSpot(spot.id);
                         setSelectedSpotForNav(spot.id);
                         setHighlightedSpots([]);
+                        setNavigationFromPicker(true);
                         setShowNavigationModal(true);
                       }}
                     >
-                      <Ionicons name="navigate" size={22} color="#fff" />
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Show Route to Spot</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Display navigation on map</Text>
@@ -1408,7 +1419,6 @@ const ParkingMapScreen: React.FC = () => {
                     activeOpacity={0.8}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FF9801', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
                     onPress={() => {
-                      setShowSpotPickerModal(false);
                       if (!spotPickerTarget) return;
                       setIncidentTarget(spotPickerTarget);
                       setIncidentCategory('');
@@ -1417,10 +1427,10 @@ const ParkingMapScreen: React.FC = () => {
                       setIncidentInvolvedParty('');
                       setIncidentNotes('');
                       setIncidentActionTaken('');
+                      setShowSpotPickerModal(false);
                       setShowIncidentModal(true);
                     }}
                   >
-                    <Ionicons name="clipboard" size={22} color="#fff" />
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Log Incident</Text>
                       <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Report an incident at this spot</Text>
@@ -1433,16 +1443,16 @@ const ParkingMapScreen: React.FC = () => {
                     activeOpacity={0.8}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
                     onPress={() => {
-                      setShowSpotPickerModal(false);
                       if (!spotPickerTarget) return;
                       setSpotActionsTarget(spotPickerTarget);
+                      setSpotActionsFromPicker(true);
                       setReportIssue('');
                       setReportCustomReason('');
                       setIssueDropdownOpen(false);
+                      setShowSpotPickerModal(false);
                       setShowSpotActionsModal(true);
                     }}
                   >
-                    <Ionicons name="warning" size={22} color="#fff" />
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Report Malfunction</Text>
                       <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Flag this spot as malfunctioned</Text>
@@ -1484,9 +1494,17 @@ const ParkingMapScreen: React.FC = () => {
 
             {/* Red header */}
             <View style={styles.spotActionsModalHeader}>
-              <View style={styles.spotActionsIconContainer}>
-                <Ionicons name="warning" size={28} color="#fff" />
-              </View>
+              {spotActionsFromPicker && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowSpotActionsModal(false);
+                    setShowSpotPickerModal(true);
+                  }}
+                  style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 6 }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
               <View style={styles.spotActionsHeaderText}>
                 <Text style={styles.spotActionsModalTitle} numberOfLines={1}>Flag as Malfunctioned</Text>
                 <Text style={styles.spotActionsModalSubtitle}>Spot {spotActionsTarget?.id}</Text>
@@ -1753,9 +1771,15 @@ const ParkingMapScreen: React.FC = () => {
             <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden' }}>
               {/* Orange header */}
               <View style={{ backgroundColor: '#FF9801', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 }}>
-                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="clipboard" size={20} color="#fff" />
-                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowIncidentModal(false);
+                    setShowSpotPickerModal(true);
+                  }}
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#fff" />
+                </TouchableOpacity>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Log Incident — {incidentTarget?.id}</Text>
                 </View>
@@ -1891,8 +1915,7 @@ const ParkingMapScreen: React.FC = () => {
                     style={{ flex: 1, backgroundColor: '#6c757d', borderRadius: 10, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
                     onPress={() => setShowIncidentModal(false)}
                   >
-                    <Ionicons name="arrow-back" size={16} color="#fff" />
-                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Back</Text>
+                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Cancel</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1933,7 +1956,6 @@ const ParkingMapScreen: React.FC = () => {
                     {isSubmittingIncident
                       ? <ActivityIndicator color="#fff" size="small" />
                       : <>
-                          <Ionicons name="save" size={16} color="#fff" />
                           <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Submit Log</Text>
                         </>
                     }

@@ -175,7 +175,7 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: false, // Mobile apps don't use cookies for Sanctum
+  withCredentials: false, 
 });
 
 // Request Interceptor - Add Sanctum token
