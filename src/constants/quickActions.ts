@@ -9,7 +9,7 @@ export type QuickActionConfig = {
   color: string;
   screen: string;
   roles: UserRole[];
-  isVerify?: boolean; // opens verify modal instead of navigating
+  isVerify?: boolean;
 };
 
 export const QUICK_ACTIONS: QuickActionConfig[] = [

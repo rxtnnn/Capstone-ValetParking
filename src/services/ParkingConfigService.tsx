@@ -168,7 +168,6 @@ class ParkingConfigServiceClass {
   }
 
   private getHardcodedFallbackConfig(locationId: string): ParkingLocationConfig {
-    console.warn('Using hardcoded fallback configuration');
 
     const createFloorConfig = (floorNumber: number, floorName: string): FloorConfig => ({
       floor_number: floorNumber,

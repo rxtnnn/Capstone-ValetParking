@@ -37,7 +37,6 @@ class NotificationServiceClass {
 
   async initialize(): Promise<void> {
     try {
-      // FIX 1: Add missing properties to NotificationBehavior
       Notifications.setNotificationHandler({
         handleNotification: async (notification) => {
           const settings = await this.getNotificationSettings();
@@ -93,7 +92,7 @@ class NotificationServiceClass {
         lightColor: '#4CAF50',
         vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         enableVibrate: settings.vibration,
-        sound: settings.sound ? 'default' : undefined, // FIX: Proper sound setting
+        sound: settings.sound ? 'default' : undefined, 
         enableLights: true,
       },
       {

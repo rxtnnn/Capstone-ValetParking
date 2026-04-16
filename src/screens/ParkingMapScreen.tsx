@@ -61,21 +61,13 @@ interface ParkingSection {
   availableSlots: number;
   isFull: boolean;
 }
-
-// These constants are now deprecated - kept for backwards compatibility
-// Configuration is now loaded dynamically from ParkingConfigService
-
 const ParkingMapScreen: React.FC = () => {
   const navigation = useNavigation<ParkingMapScreenNavigationProp>();
   const route = useRoute<ParkingMapScreenRouteProp>();
   const floorNumber = route.params?.floor ?? 4;
-
-  // Dynamic configuration state
   const [floorConfig, setFloorConfig] = useState<FloorConfig | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
-
-  // Existing state
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [parkingData, setParkingData] = useState<ParkingSpot[]>([]);
@@ -96,12 +88,8 @@ const ParkingMapScreen: React.FC = () => {
   const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); 
   const previousParkingDataRef = useRef<ParkingSpot[]>([]); 
   const optimisticMalfunctionRef = useRef<{ [spotId: string]: boolean }>({});
-
-  // Spot picker modal (for security/admin on available spots)
   const [showSpotPickerModal, setShowSpotPickerModal] = useState(false);
   const [spotPickerTarget, setSpotPickerTarget] = useState<ParkingSpot | null>(null);
-
-  // Spot actions modal
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
   const [spotActionsFromPicker, setSpotActionsFromPicker] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
@@ -115,8 +103,6 @@ const ParkingMapScreen: React.FC = () => {
   const isAdminRole = userRole === 'admin' || userRole === 'ssd';
   const canAccessSpotActions = isSecurityRole || isAdminRole;
   const [spotActionsResult, setSpotActionsResult] = useState<{ type: 'success' | 'warning' | 'error'; title: string; message: string } | null>(null);
-
-  // Incident form modal
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [incidentTarget, setIncidentTarget] = useState<ParkingSpot | null>(null);
   const [incidentCategory, setIncidentCategory] = useState<IncidentCategory | ''>('');

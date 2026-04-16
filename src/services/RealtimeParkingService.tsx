@@ -55,9 +55,9 @@ class RealTimeParkingServiceClass {
   private consecErrors = 0;
   private maxConsecutiveErrors = 8;
   private isInitialized = false;
-  private selfFlaggedSpots = new Set<string>(); // spots flagged by current user
-  private notifiedAvailableSpots = new Set<string>(); // spots already notified as available
-  private notifiedAvailableFloors = new Set<string>(); // floors already notified as available
+  private selfFlaggedSpots = new Set<string>();
+  private notifiedAvailableSpots = new Set<string>(); 
+  private notifiedAvailableFloors = new Set<string>();
 
   constructor() {
     this.initializeService();
