@@ -624,19 +624,20 @@ const AppNavigator: React.FC = () => {
               })}
             />
             
-            <Stack.Screen 
-              name="ParkingMap" 
+            <Stack.Screen
+              name="ParkingMap"
               component={ParkingMapScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Parking Map" 
+                  <GradientHeader
+                    title="Parking Map"
                     navigation={navigation}
                     canGoBack={true}
                   />
                 ),
                 gestureEnabled: true,
+                animationEnabled: true,
               })}
             />
             
@@ -838,15 +839,15 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
   const isExpoGo = Constants.appOwnership === 'expo';
 
   if (Device.isDevice && !isExpoGo) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    const existingPerm = await Notifications.getPermissionsAsync();
+    let isGranted = (existingPerm as any).granted ?? (existingPerm as any).status === 'granted';
 
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+    if (!isGranted) {
+      const newPerm = await Notifications.requestPermissionsAsync();
+      isGranted = (newPerm as any).granted ?? (newPerm as any).status === 'granted';
     }
 
-    if (finalStatus !== 'granted') {
+    if (!isGranted) {
       console.warn('Push notification permissions not granted');
       return;
     }

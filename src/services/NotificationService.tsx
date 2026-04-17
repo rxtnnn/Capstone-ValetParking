@@ -51,21 +51,21 @@ class NotificationServiceClass {
       });
 
       if (Platform.OS === 'android' || Device.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync({
+        const existingPerm = await Notifications.getPermissionsAsync();
+        let isGranted = (existingPerm as any).granted ?? (existingPerm as any).status === 'granted';
+
+        if (!isGranted) {
+          const newPerm = await Notifications.requestPermissionsAsync({
             android: {
               allowAlert: true,
               allowBadge: true,
               allowSound: true,
             },
           });
-          finalStatus = status;
+          isGranted = (newPerm as any).granted ?? (newPerm as any).status === 'granted';
         }
-        
-        if (finalStatus !== 'granted') {
+
+        if (!isGranted) {
           console.warn('Push notification permissions not granted');
           return;
         }
@@ -185,12 +185,13 @@ class NotificationServiceClass {
     }
 
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      const finalStatus = existingStatus !== 'granted'
-        ? (await Notifications.requestPermissionsAsync()).status
-        : existingStatus;
+      const checkGranted = (perm: any): boolean => perm.granted ?? perm.status === 'granted';
+      const existingPerm = await Notifications.getPermissionsAsync();
+      const finalGranted = checkGranted(existingPerm)
+        ? true
+        : checkGranted(await Notifications.requestPermissionsAsync());
 
-      if (finalStatus !== 'granted') {
+      if (!finalGranted) {
         console.warn('Push notification permissions not granted');
         return null;
       }
@@ -541,8 +542,8 @@ class NotificationServiceClass {
     settings: NotificationSettings
   ): Promise<void> {
     try {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== 'granted') {
+      const perm = await Notifications.getPermissionsAsync() as any;
+      if (!(perm.granted ?? perm.status === 'granted')) {
         console.warn('Notification permissions not granted');
         return;
       }
@@ -595,12 +596,13 @@ class NotificationServiceClass {
     }
 
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      const finalStatus = existingStatus !== 'granted' 
-        ? (await Notifications.requestPermissionsAsync()).status 
-        : existingStatus;
-      
-      return finalStatus === 'granted';
+      const checkGranted = (p: any): boolean => p.granted ?? p.status === 'granted';
+      const existingPerm = await Notifications.getPermissionsAsync();
+      const finalGranted = checkGranted(existingPerm)
+        ? true
+        : checkGranted(await Notifications.requestPermissionsAsync());
+
+      return finalGranted;
     } catch (error) {
       console.log('Error requesting permissions:', error);
       return false;
@@ -618,10 +620,11 @@ class NotificationServiceClass {
       importance: number;
     };
   }> {
-    const { status, android } = await Notifications.getPermissionsAsync();
-    
+    const perm = await Notifications.getPermissionsAsync() as any;
+    const { android } = perm;
+
     return {
-      granted: status === 'granted',
+      granted: perm.granted ?? perm.status === 'granted',
       canPlaySound: Platform.OS === 'android' ? false : true,
       android: Platform.OS === 'android' ? {
         importance: android?.importance ?? 0,

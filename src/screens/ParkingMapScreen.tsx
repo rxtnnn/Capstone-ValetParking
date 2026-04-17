@@ -17,11 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NavigationProp, useNavigation, useFocusEffect, RouteProp, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { Animated as RNAnimated } from 'react-native';
 import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { COLORS, FONTS} from '../constants/AppConst';
@@ -119,10 +115,14 @@ const ParkingMapScreen: React.FC = () => {
     connectionStatus?: () => void;
   }>({});
 
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const bottomPanelY = useSharedValue(0);
+  const scaleAnim = useRef(new RNAnimated.Value(1)).current;
+  const translateXAnim = useRef(new RNAnimated.Value(0)).current;
+  const translateYAnim = useRef(new RNAnimated.Value(0)).current;
+  const bottomPanelYAnim = useRef(new RNAnimated.Value(0)).current;
+  const scaleRef = useRef(1);
+  const translateXRef = useRef(0);
+  const translateYRef = useRef(0);
+  const bottomPanelYRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -154,9 +154,12 @@ const ParkingMapScreen: React.FC = () => {
         setParkingData(initialSpots);
 
         if (config.initial_view) {
-          translateX.value = config.initial_view.translateX;
-          translateY.value = config.initial_view.translateY;
-          scale.value = config.initial_view.scale;
+          translateXRef.current = config.initial_view.translateX;
+          translateYRef.current = config.initial_view.translateY;
+          scaleRef.current = config.initial_view.scale;
+          translateXAnim.setValue(config.initial_view.translateX);
+          translateYAnim.setValue(config.initial_view.translateY);
+          scaleAnim.setValue(config.initial_view.scale);
         }
 
         console.log('Parking configuration loaded successfully');
@@ -373,8 +376,10 @@ const ParkingMapScreen: React.FC = () => {
   }, [updateParkingSpotsFromService]);
 
   useEffect(() => {
-    translateX.value = 90;
-    translateY.value = 70;
+    translateXRef.current = 90;
+    translateYRef.current = 70;
+    translateXAnim.setValue(90);
+    translateYAnim.setValue(70);
     subscribeToParkingData();
     return () => {
       Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
@@ -402,77 +407,84 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, []);
   
-  const startX = useSharedValue(0);
-  const startY = useSharedValue(0);
-  const startScale = useSharedValue(1);
-  const startPanelY = useSharedValue(0);
+  const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY,
+          minScale, maxScale, clampMinScale, clampMaxScale } = gestureLimits;
 
-  const panGesture = Gesture.Pan()
+  const panGesture = useMemo(() => Gesture.Pan()
+    .runOnJS(true)
     .onStart(() => {
-      startX.value = translateX.value;
-      startY.value = translateY.value;
+      // snapshot current values at gesture start
     })
     .onUpdate((event) => {
-      translateX.value = startX.value + event.translationX;
-      translateY.value = startY.value + event.translationY;
+      const newX = Math.max(minTranslateX, Math.min(maxTranslateX, translateXRef.current + event.translationX));
+      const newY = Math.max(minTranslateY, Math.min(maxTranslateY, translateYRef.current + event.translationY));
+      translateXAnim.setValue(newX);
+      translateYAnim.setValue(newY);
     })
-    .onEnd(() => {
-      const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = gestureLimits;
-      if (translateX.value > maxTranslateX) translateX.value = maxTranslateX;
-      else if (translateX.value < minTranslateX) translateX.value = minTranslateX;
-      if (translateY.value > maxTranslateY) translateY.value = maxTranslateY;
-      else if (translateY.value < minTranslateY) translateY.value = minTranslateY;
+    .onEnd((event) => {
+      translateXRef.current = Math.max(minTranslateX, Math.min(maxTranslateX, translateXRef.current + event.translationX));
+      translateYRef.current = Math.max(minTranslateY, Math.min(maxTranslateY, translateYRef.current + event.translationY));
     })
     .minPointers(1)
-    .maxPointers(1);
+    .maxPointers(1),
+  [minTranslateX, maxTranslateX, minTranslateY, maxTranslateY]);
 
-  const pinchGesture = Gesture.Pinch()
-    .onStart(() => {
-      startScale.value = scale.value;
-    })
+  const pinchGesture = useMemo(() => Gesture.Pinch()
+    .runOnJS(true)
     .onUpdate((event) => {
-      const { minScale, maxScale } = gestureLimits;
-      scale.value = Math.max(minScale, Math.min(maxScale, startScale.value * event.scale));
+      const newScale = Math.max(minScale, Math.min(maxScale, scaleRef.current * event.scale));
+      scaleAnim.setValue(newScale);
     })
-    .onEnd(() => {
-      const { clampMinScale, clampMaxScale } = gestureLimits;
-      if (scale.value < clampMinScale) scale.value = clampMinScale;
-      else if (scale.value > clampMaxScale) scale.value = clampMaxScale;
-    });
+    .onEnd((event) => {
+      const raw = scaleRef.current * event.scale;
+      scaleRef.current = Math.max(clampMinScale, Math.min(clampMaxScale, raw));
+      scaleAnim.setValue(scaleRef.current);
+    }),
+  [minScale, maxScale, clampMinScale, clampMaxScale]);
 
-  const mapGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+  const mapGesture = useMemo(
+    () => Gesture.Simultaneous(panGesture, pinchGesture),
+    [panGesture, pinchGesture]
+  );
 
-  const bottomPanelGesture = Gesture.Pan()
-    .onStart(() => {
-      startPanelY.value = bottomPanelY.value;
-    })
+  const bottomPanelGesture = useMemo(() => Gesture.Pan()
+    .runOnJS(true)
     .onUpdate((event) => {
-      const newY = startPanelY.value + event.translationY;
-      bottomPanelY.value = Math.max(-50, Math.min(150, newY));
+      const newY = Math.max(-50, Math.min(150, bottomPanelYRef.current + event.translationY));
+      bottomPanelYAnim.setValue(newY);
     })
     .onEnd((event) => {
       const velocity = event.velocityY;
-      const currentY = bottomPanelY.value;
+      const currentY = bottomPanelYRef.current + event.translationY;
+      let targetY: number;
       if (velocity > 500 || currentY > 75) {
-        bottomPanelY.value = withSpring(120);
+        targetY = 120;
       } else if (velocity < -500 || currentY < 25) {
-        bottomPanelY.value = withSpring(0);
+        targetY = 0;
       } else {
-        bottomPanelY.value = withSpring(currentY > 50 ? 120 : 0);
+        targetY = currentY > 50 ? 120 : 0;
       }
-    });
+      bottomPanelYRef.current = targetY;
+      RNAnimated.spring(bottomPanelYAnim, {
+        toValue: targetY,
+        useNativeDriver: true,
+        friction: 7,
+        tension: 40,
+      }).start();
+    }),
+  []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
+  const animatedStyle = {
     transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
+      { translateX: translateXAnim },
+      { translateY: translateYAnim },
+      { scale: scaleAnim },
     ],
-  }));
+  };
 
-  const bottomPanelAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: bottomPanelY.value }],
-  }));
+  const bottomPanelAnimatedStyle = {
+    transform: [{ translateY: bottomPanelYAnim }],
+  };
 
   const handleRefresh = useCallback(async () => {
     if (!isMountedRef.current) return;
@@ -913,19 +925,19 @@ const ParkingMapScreen: React.FC = () => {
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
           <GestureDetector gesture={mapGesture}>
-            <Animated.View style={styles.mapWrapper}>
-              <Animated.View style={[styles.parkingLayout, animatedStyle]}>
+            <RNAnimated.View style={styles.mapWrapper}>
+              <RNAnimated.View style={[styles.parkingLayout, animatedStyle]}>
                 <MapLayout styles={styles} />
                 {parkingData.map(renderParkingSpot)}
                 {renderNavigationPath()}
-              </Animated.View>
-            </Animated.View>
+              </RNAnimated.View>
+            </RNAnimated.View>
           </GestureDetector>
         </View>
       </View>
 
       <GestureDetector gesture={bottomPanelGesture}>
-        <Animated.View style={[bottomPanelAnimatedStyle]}>
+        <RNAnimated.View style={[bottomPanelAnimatedStyle]}>
           <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.bottomPanel}>
             <View style={styles.dragHandle} />
             
@@ -967,7 +979,7 @@ const ParkingMapScreen: React.FC = () => {
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </LinearGradient>
-        </Animated.View>
+        </RNAnimated.View>
       </GestureDetector>
 
       {showNavigation && (
