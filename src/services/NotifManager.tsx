@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { TokenManager } from '../config/api';
 import { AppNotification, CreateNotificationInput, createSpotAvailableNotification, createFeedbackReplyNotification,
   getNotificationUserId, setNotificationUserId, SpotMalfunctionData,
-  RfidAlertData, GuestRequestData } from '../types/NotifTypes';
+  RfidAlertData, GuestRequestData, LongParkedData } from '../types/NotifTypes';
 import { FeedbackData } from '../types/feedback';
 
 const STORAGE_KEYS = {
@@ -15,7 +15,7 @@ const STORAGE_KEYS = {
 } as const;
 
 const MAX_NOTIFICATIONS = 100;
-const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_malfunction', 'rfid_alert', 'guest_request'] as const;
+const ALLOWED_TYPES = ['spot_available', 'feedback_reply', 'spot_malfunction', 'rfid_alert', 'guest_request', 'long_parked'] as const;
 const BLOCKED_TITLES = ['VALET Connected!', 'Connection Established', 'Welcome to VALET', 'System Ready', 'App Initialized'];
 
 type NotificationListener = (notifications: AppNotification[]) => void;
@@ -415,6 +415,30 @@ class NotificationManagerClass {
       type: 'guest_request',
       title: 'New Guest Access Request',
       message: `${data.guestName} (${data.vehiclePlate}) — ${data.purpose}`,
+      timestamp: Date.now(),
+      isRead: false,
+      priority: 'high',
+      data: { ...data, userId: this.currentUserId },
+    } as AppNotification;
+
+    this.notifications.unshift(newNotification);
+    await this.saveNotifications();
+    this.notifyListeners();
+  }
+
+  async addLongParkedNotification(data: LongParkedData): Promise<void> {
+    if (!this.currentUserId) return;
+
+    const preview = data.vehicles.slice(0, 2).map(v => `${v.vehicle_plate} (${v.hours}h)`).join(', ');
+    const message = data.count === 1
+      ? `${data.vehicles[0].vehicle_plate} has been parked for ${data.vehicles[0].hours}h`
+      : `${data.count} vehicles over 12h: ${preview}${data.count > 2 ? '...' : ''}`;
+
+    const newNotification: AppNotification = {
+      id: `long_parked_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      type: 'long_parked',
+      title: `Long-Parked Vehicle${data.count > 1 ? 's' : ''} Detected`,
+      message,
       timestamp: Date.now(),
       isRead: false,
       priority: 'high',

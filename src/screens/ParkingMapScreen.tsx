@@ -450,19 +450,19 @@ const ParkingMapScreen: React.FC = () => {
   const bottomPanelGesture = useMemo(() => Gesture.Pan()
     .runOnJS(true)
     .onUpdate((event) => {
-      const newY = Math.max(-50, Math.min(150, bottomPanelYRef.current + event.translationY));
+      const newY = Math.max(-50, Math.min(200, bottomPanelYRef.current + event.translationY));
       bottomPanelYAnim.setValue(newY);
     })
     .onEnd((event) => {
       const velocity = event.velocityY;
       const currentY = bottomPanelYRef.current + event.translationY;
       let targetY: number;
-      if (velocity > 500 || currentY > 75) {
-        targetY = 120;
-      } else if (velocity < -500 || currentY < 25) {
+      if (velocity > 500 || currentY > 100) {
+        targetY = 200;
+      } else if (velocity < -500 || currentY < 50) {
         targetY = 0;
       } else {
-        targetY = currentY > 50 ? 120 : 0;
+        targetY = currentY > 100 ? 200 : 0;
       }
       bottomPanelYRef.current = targetY;
       RNAnimated.spring(bottomPanelYAnim, {

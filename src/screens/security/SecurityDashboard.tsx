@@ -84,7 +84,6 @@ const SecurityDashboard: React.FC = () => {
         })));
       }
     } catch {
-      // silent fail — list stays empty
     }
   };
 

@@ -284,7 +284,7 @@ const AdminDashboard: React.FC = () => {
               <Text style={styles.emptyGuestsText}>No active guests</Text>
             </View>
           ) : (
-            activeGuests.map((guest) => {
+            activeGuests.slice(0, 3).map((guest) => {
               const until = guest.valid_until ? new Date(guest.valid_until) : null;
               const minsLeft = until ? Math.max(0, Math.round((until.getTime() - Date.now()) / 60000)) : null;
               const timeLabel = minsLeft !== null

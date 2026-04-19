@@ -86,12 +86,24 @@ export interface GenericNotification extends BaseNotification {
   data: GenericNotificationData;
 }
 
+export interface LongParkedData {
+  count: number;
+  vehicles: { vehicle_plate: string; hours: number }[];
+  userId?: number;
+}
+
+export interface LongParkedNotification extends BaseNotification {
+  type: 'long_parked';
+  data: LongParkedData;
+}
+
 export type AppNotification =
   | SpotAvailableNotification
   | FeedbackReplyNotification
   | SpotMalfunctionNotification
   | RfidAlertNotification
   | GuestRequestNotification
+  | LongParkedNotification
   | GenericNotification;
 
 // guards for safe type checking

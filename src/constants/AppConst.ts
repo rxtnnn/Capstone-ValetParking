@@ -42,6 +42,7 @@ export const API_ENDPOINTS = {
   publicRfidVerify: '/public/rfid/verify',
   publicRfidExit: '/public/rfid/exit',
   publicRfidParked: '/public/rfid/parked',
+  publicLongParked: '/public/rfid/long-parked',
   publicGuestVerify: '/public/guest/verify',
   publicVerifyVehicle: '/public/verify-vehicle',
 

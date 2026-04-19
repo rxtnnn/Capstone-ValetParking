@@ -43,36 +43,12 @@ const DEFAULT_FLOORS: {
   total: number;
   available: number;
   occupancyRate: number;
-  status: 'available';
+  status: 'available' | 'full' | 'limited' | 'no_data';
 }[] = [
-  {
-    floor: 1,
-    total: 0,
-    available: 0,
-    occupancyRate: 0,
-    status: 'available' as const
-  },
-  {
-    floor: 2,
-    total: 0,
-    available: 0,
-    occupancyRate: 0,
-    status: 'available' as const
-  },
-  {
-    floor: 3,
-    total: 0,
-    available: 0,
-    occupancyRate: 0,
-    status: 'available' as const
-  },
-  {
-    floor: 4,
-    total: 0,
-    available: 0,
-    occupancyRate: 0,
-    status: 'available' as const
-  }
+  { floor: 1, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
+  { floor: 2, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
+  { floor: 3, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
+  { floor: 4, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
 ];
 
 const CircularProgress: React.FC<CircularProgressProps> = ({
@@ -152,7 +128,7 @@ const HomeScreen: React.FC = () => {
     const lastDigit = floorNum % 10;
     let suffix = 'th';
 
-    if(checkLastTwo >= 11 && checkLastTwo <= 13){
+    if(checkLastTwo >= 11 && checkLastTwo <= 13){ //special numbers
       return `${floorNum}th Floor`;
     }
 
@@ -196,6 +172,7 @@ const HomeScreen: React.FC = () => {
     return fixedFloors.sort((a, b) => b.available - a.available);
   }, [parkingData.floors]);
 
+  //check for parking spot changes to trigger notifs
   const checkParkingChanges = useCallback((newData: ParkingStats) => {
     if (!lastParkingData || !isMountedRef.current || !currentUserId) {
       setLastParkingData(newData);

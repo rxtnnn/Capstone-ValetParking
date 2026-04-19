@@ -29,6 +29,7 @@ const CHANNELS = {
   FEEDBACK_REPLIES: 'feedback-replies',
   RFID_ALERTS: 'rfid-alerts',
   GUEST_REQUESTS: 'guest-requests',
+  LONG_PARKED: 'long-parked',
   DEFAULT: 'default'
 } as const;
 
@@ -134,6 +135,17 @@ class NotificationServiceClass {
         description: 'New guest access requests pending approval',
         importance: Notifications.AndroidImportance.HIGH,
         lightColor: '#FF9800',
+        vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined,
+        enableLights: true,
+      },
+      {
+        id: CHANNELS.LONG_PARKED,
+        name: 'Long-Parked Vehicle Alerts',
+        description: 'Alerts for vehicles parked longer than 12 hours',
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: '#FF6F00',
         vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
         enableVibrate: settings.vibration,
         sound: settings.sound ? 'default' : undefined,
@@ -571,6 +583,43 @@ class NotificationServiceClass {
       
     } catch (error) {
       console.log('Error scheduling notification:', error);
+    }
+  }
+  // long parked notif
+  async showLongParkedNotification(count: number, vehicles: { vehicle_plate: string; hours: number }[]): Promise<void> {
+    try {
+      const userRole = TokenManager.getUser()?.role;
+      if (!userRole || !['security', 'admin', 'ssd'].includes(userRole)) return;
+
+      const settings = await this.getNotificationSettings();
+      const title = `Long-Parked Vehicle${count > 1 ? 's' : ''} Detected`;
+      let message: string;
+      if (count === 1) {
+        message = `${vehicles[0].vehicle_plate} has been parked for ${vehicles[0].hours}h`;
+      } else if (count <= 3) {
+        message = vehicles.map(v => `${v.vehicle_plate} (${v.hours}h)`).join(', ');
+      } else {
+        const preview = vehicles.slice(0, 2).map(v => v.vehicle_plate).join(', ');
+        message = `${count} vehicles parked over 12h (${preview}...)`;
+      }
+
+      await this.showLocalNotification(
+        title,
+        message,
+        {
+          type: 'long-parked',
+          count,
+          vehicles,
+          timestamp: Date.now(),
+          userId: TokenManager.getUser()?.id,
+        },
+        CHANNELS.LONG_PARKED,
+        settings
+      );
+
+      await NotificationManager.addLongParkedNotification({ count, vehicles });
+    } catch (error) {
+      console.log('Error showing long-parked notification:', error);
     }
   }
 
