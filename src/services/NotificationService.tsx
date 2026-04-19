@@ -575,12 +575,6 @@ class NotificationServiceClass {
         identifier: `valet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       });
 
-      console.log('Notification scheduled with settings:', {
-        sound: settings.sound,
-        vibration: settings.vibration,
-        channel: channelId
-      });
-      
     } catch (error) {
       console.log('Error scheduling notification:', error);
     }
@@ -653,7 +647,6 @@ class NotificationServiceClass {
 
       return finalGranted;
     } catch (error) {
-      console.log('Error requesting permissions:', error);
       return false;
     }
   }
