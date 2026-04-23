@@ -29,6 +29,7 @@ const CHANNELS = {
   FEEDBACK_REPLIES: 'feedback-replies',
   RFID_ALERTS: 'rfid-alerts',
   GUEST_REQUESTS: 'guest-requests',
+  LONG_PARKED: 'long-parked',
   DEFAULT: 'default'
 } as const;
 
@@ -51,21 +52,21 @@ class NotificationServiceClass {
       });
 
       if (Platform.OS === 'android' || Device.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync({
+        const existingPerm = await Notifications.getPermissionsAsync();
+        let isGranted = (existingPerm as any).granted ?? (existingPerm as any).status === 'granted';
+
+        if (!isGranted) {
+          const newPerm = await Notifications.requestPermissionsAsync({
             android: {
               allowAlert: true,
               allowBadge: true,
               allowSound: true,
             },
           });
-          finalStatus = status;
+          isGranted = (newPerm as any).granted ?? (newPerm as any).status === 'granted';
         }
-        
-        if (finalStatus !== 'granted') {
+
+        if (!isGranted) {
           console.warn('Push notification permissions not granted');
           return;
         }
@@ -138,6 +139,17 @@ class NotificationServiceClass {
         enableVibrate: settings.vibration,
         sound: settings.sound ? 'default' : undefined,
         enableLights: true,
+      },
+      {
+        id: CHANNELS.LONG_PARKED,
+        name: 'Long-Parked Vehicle Alerts',
+        description: 'Alerts for vehicles parked longer than 12 hours',
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: '#FF6F00',
+        vibrationPattern: settings.vibration ? DEFAULT_VIBRATION : [0],
+        enableVibrate: settings.vibration,
+        sound: settings.sound ? 'default' : undefined,
+        enableLights: true,
       }
     ];
 
@@ -185,12 +197,13 @@ class NotificationServiceClass {
     }
 
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      const finalStatus = existingStatus !== 'granted'
-        ? (await Notifications.requestPermissionsAsync()).status
-        : existingStatus;
+      const checkGranted = (perm: any): boolean => perm.granted ?? perm.status === 'granted';
+      const existingPerm = await Notifications.getPermissionsAsync();
+      const finalGranted = checkGranted(existingPerm)
+        ? true
+        : checkGranted(await Notifications.requestPermissionsAsync());
 
-      if (finalStatus !== 'granted') {
+      if (!finalGranted) {
         console.warn('Push notification permissions not granted');
         return null;
       }
@@ -541,8 +554,8 @@ class NotificationServiceClass {
     settings: NotificationSettings
   ): Promise<void> {
     try {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== 'granted') {
+      const perm = await Notifications.getPermissionsAsync() as any;
+      if (!(perm.granted ?? perm.status === 'granted')) {
         console.warn('Notification permissions not granted');
         return;
       }
@@ -562,14 +575,45 @@ class NotificationServiceClass {
         identifier: `valet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       });
 
-      console.log('Notification scheduled with settings:', {
-        sound: settings.sound,
-        vibration: settings.vibration,
-        channel: channelId
-      });
-      
     } catch (error) {
       console.log('Error scheduling notification:', error);
+    }
+  }
+  // long parked notif
+  async showLongParkedNotification(count: number, vehicles: { vehicle_plate: string; hours: number }[]): Promise<void> {
+    try {
+      const userRole = TokenManager.getUser()?.role;
+      if (!userRole || !['security', 'admin', 'ssd'].includes(userRole)) return;
+
+      const settings = await this.getNotificationSettings();
+      const title = `Long-Parked Vehicle${count > 1 ? 's' : ''} Detected`;
+      let message: string;
+      if (count === 1) {
+        message = `${vehicles[0].vehicle_plate} has been parked for ${vehicles[0].hours}h`;
+      } else if (count <= 3) {
+        message = vehicles.map(v => `${v.vehicle_plate} (${v.hours}h)`).join(', ');
+      } else {
+        const preview = vehicles.slice(0, 2).map(v => v.vehicle_plate).join(', ');
+        message = `${count} vehicles parked over 12h (${preview}...)`;
+      }
+
+      await this.showLocalNotification(
+        title,
+        message,
+        {
+          type: 'long-parked',
+          count,
+          vehicles,
+          timestamp: Date.now(),
+          userId: TokenManager.getUser()?.id,
+        },
+        CHANNELS.LONG_PARKED,
+        settings
+      );
+
+      await NotificationManager.addLongParkedNotification({ count, vehicles });
+    } catch (error) {
+      console.log('Error showing long-parked notification:', error);
     }
   }
 
@@ -595,14 +639,14 @@ class NotificationServiceClass {
     }
 
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      const finalStatus = existingStatus !== 'granted' 
-        ? (await Notifications.requestPermissionsAsync()).status 
-        : existingStatus;
-      
-      return finalStatus === 'granted';
+      const checkGranted = (p: any): boolean => p.granted ?? p.status === 'granted';
+      const existingPerm = await Notifications.getPermissionsAsync();
+      const finalGranted = checkGranted(existingPerm)
+        ? true
+        : checkGranted(await Notifications.requestPermissionsAsync());
+
+      return finalGranted;
     } catch (error) {
-      console.log('Error requesting permissions:', error);
       return false;
     }
   }
@@ -618,10 +662,11 @@ class NotificationServiceClass {
       importance: number;
     };
   }> {
-    const { status, android } = await Notifications.getPermissionsAsync();
-    
+    const perm = await Notifications.getPermissionsAsync() as any;
+    const { android } = perm;
+
     return {
-      granted: status === 'granted',
+      granted: perm.granted ?? perm.status === 'granted',
       canPlaySound: Platform.OS === 'android' ? false : true,
       android: Platform.OS === 'android' ? {
         importance: android?.importance ?? 0,

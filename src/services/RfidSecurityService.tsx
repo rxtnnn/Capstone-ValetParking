@@ -46,12 +46,16 @@ const STATUS_TO_SEVERITY: Record<string, RfidAlert['severity']> = {
   unknown: 'medium',
 };
 
+const LONG_PARKED_THRESHOLD_HOURS = 12;
+const LONG_PARKED_POLL_MS = 60_000;
+
 class RfidSecurityServiceClass {
   private scanCallbacks: ScanUpdateCallback[] = [];
   private alertCallbacks: AlertCallback[] = [];
   private connectionCallbacks: ConnectionStatusCallback[] = [];
   private statsCallbacks: StatsUpdateCallback[] = [];
   private updateInterval: ReturnType<typeof setInterval> | null = null;
+  private longParkedInterval: ReturnType<typeof setInterval> | null = null;
   private isRunning: boolean = false;
   private shouldStop: boolean = false;
   private pollingIntervalMs: number = 10000;
@@ -64,6 +68,7 @@ class RfidSecurityServiceClass {
   private guests: GuestAccess[] = [];
   private lastStats: SecurityDashboardStats | null = null;
   private processedScanIds: Set<number> = new Set();
+  private notifiedLongParkedIds: Set<string> = new Set();
 
   start(): void {
     if (this.updateInterval) return;
@@ -73,12 +78,19 @@ class RfidSecurityServiceClass {
     this.consecutiveErrors = 0;
 
     this.fetchAndUpdate();
+    this.checkLongParked();
 
     this.updateInterval = setInterval(() => {
       if (!this.shouldStop && this.isRunning && !this.isFetching) {
         this.fetchAndUpdate();
       }
     }, this.pollingIntervalMs);
+
+    this.longParkedInterval = setInterval(() => {
+      if (!this.shouldStop && this.isRunning) {
+        this.checkLongParked();
+      }
+    }, LONG_PARKED_POLL_MS);
   }
 
   stop(): void {
@@ -90,7 +102,13 @@ class RfidSecurityServiceClass {
       this.updateInterval = null;
     }
 
+    if (this.longParkedInterval) {
+      clearInterval(this.longParkedInterval);
+      this.longParkedInterval = null;
+    }
+
     this.isFetching = false;
+    this.notifiedLongParkedIds.clear();
     this.setConnectionStatus('disconnected');
   }
 
@@ -166,6 +184,34 @@ class RfidSecurityServiceClass {
       }
     } finally {
       this.isFetching = false;
+    }
+  }
+
+  private async checkLongParked(): Promise<void> {
+    try {
+      const user = TokenManager.getUser();
+      if (!user || !['security', 'admin', 'ssd'].includes(user.role)) return;
+
+      const response = await apiClient.get(API_ENDPOINTS.publicLongParked, {
+        params: { threshold_hours: LONG_PARKED_THRESHOLD_HOURS },
+      });
+
+      const entries: any[] = response.data?.long_parked ?? [];
+      if (!Array.isArray(entries) || entries.length === 0) return;
+
+      const newEntries = entries.filter(e => !this.notifiedLongParkedIds.has(e.plate));
+      if (newEntries.length === 0) return;
+
+      newEntries.forEach(e => this.notifiedLongParkedIds.add(e.plate));
+
+      const vehicles = newEntries.map(e => ({
+        vehicle_plate: e.plate,
+        hours: Math.floor(e.hours_parked ?? 0),
+      }));
+
+      await NotificationService.showLongParkedNotification(newEntries.length, vehicles);
+    } catch {
+      // silent fail
     }
   }
 

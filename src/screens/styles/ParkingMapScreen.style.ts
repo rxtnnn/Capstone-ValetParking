@@ -250,7 +250,7 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
-    height: 370,
+    height: 340,
   },
   buildingName: {
     color: 'white',

@@ -1,5 +1,5 @@
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold } from '@expo-google-fonts/poppins';
-import { API_TOKEN as ENV_API_TOKEN } from '@env';
+import Constants from 'expo-constants';
 
 export const COLORS = {
   primary: '#B22020',
@@ -42,6 +42,7 @@ export const API_ENDPOINTS = {
   publicRfidVerify: '/public/rfid/verify',
   publicRfidExit: '/public/rfid/exit',
   publicRfidParked: '/public/rfid/parked',
+  publicLongParked: '/public/rfid/long-parked',
   publicGuestVerify: '/public/guest/verify',
   publicVerifyVehicle: '/public/verify-vehicle',
 
@@ -67,7 +68,7 @@ export const API_ENDPOINTS = {
   incidentById: (id: number) => `/incidents/${id}`,
 };
 
-export const API_TOKEN = ENV_API_TOKEN ?? '';
+export const API_TOKEN = Constants.expoConfig?.extra?.apiToken ?? '';
 
 export const FONTS = {
   regular: 'Poppins_400Regular',
