@@ -180,7 +180,7 @@ const ParkingMapScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [floorNumber]);
+  }, [floorNumber]); 
 
   // clear navigation when floor changes
   useEffect(() => {
@@ -198,17 +198,12 @@ const ParkingMapScreen: React.FC = () => {
     const previousSpot = previousParkingDataRef.current.find(spot => spot.id === navigatingToSpot);
 
     // check if the spot just became occupied (was not occupied before, now is occupied)
-    if (targetSpot && previousSpot && !previousSpot.isOccupied && targetSpot.isOccupied) {
+    if (targetSpot && previousSpot && !previousSpot.isOccupied && targetSpot.isOccupied && NotificationManager.isRfidEntryDetected()) {
       setShowParkingConfirmModal(true);
     }
 
-    previousParkingDataRef.current = parkingData;
+    previousParkingDataRef.current = parkingData; //update old data to current
   }, [parkingData, navigatingToSpot, showNavigation]);
-
-  const sensorToSpotMapping = useMemo(() => {
-    if (!floorConfig) return {};
-    return ParkingConfigService.getSensorToSpotMapping(floorConfig);
-  }, [floorConfig]);
 
   const gestureLimits = useMemo(() => {
     if (!floorConfig?.gesture_limits) {
@@ -510,12 +505,12 @@ const ParkingMapScreen: React.FC = () => {
   const handleParkingConfirm = useCallback(async () => { //I've parked button
     await NotificationManager.pauseSpotNotifications();
     try {
-      const tagsRes = await apiClient.get(API_ENDPOINTS.publicRfidTags);
+      const tagsRes = await apiClient.get(API_ENDPOINTS.publicRfidTags); //fetch rfid
       const tags: any[] = tagsRes.data?.tags ?? [];
       const currentUser = TokenManager.getUser();
       const userTag = tags.find(t =>
         t.user_name?.toLowerCase() === currentUser?.name?.toLowerCase() && t.status === 'active'
-      );
+      ); //find tag of currently logged in user
       if (userTag?.uid) {
         await apiClient.post(API_ENDPOINTS.publicRfidParked, { uid: userTag.uid });
       }

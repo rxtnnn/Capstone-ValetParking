@@ -282,7 +282,6 @@ class NotificationManagerClass {
     }
 
     if (!this.currentUserId) {
-      console.warn('No current user - cannot add notification');
       return;
     }
 
@@ -307,7 +306,6 @@ class NotificationManagerClass {
     }
 
     if (!this.currentUserId) {
-      console.warn('No current user - cannot add spot notification');
       return;
     }
 

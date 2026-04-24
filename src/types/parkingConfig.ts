@@ -1,10 +1,3 @@
-// src/types/parkingConfig.ts
-
-/**
- * Core types for dynamic parking configuration system
- * Allows businesses to manage parking layouts without developer intervention
- */
-
 export interface Position {
   x: number;
   y: number;
@@ -16,12 +9,12 @@ export interface Dimensions {
 }
 
 export interface ParkingSpotConfig {
-  spot_id: string;           // e.g., "A1", "B2"
-  sensor_id: number | null;  // Physical sensor ID (null if no sensor assigned)
-  position: Position;        // X,Y coordinates on map
-  dimensions: Dimensions;    // Width and height
-  rotation: string;          // e.g., "0deg", "90deg", "180deg", "270deg"
-  section: string;           // Section letter, e.g., "A", "B"
+  spot_id: string;      
+  sensor_id: number | null; 
+  position: Position;      
+  dimensions: Dimensions;   
+  rotation: string;   
+  section: string;  
 }
 
 export interface NavigationWaypoint {
@@ -30,8 +23,8 @@ export interface NavigationWaypoint {
 }
 
 export interface NavigationRoute {
-  section: string;           // Section this route serves, e.g., "A"
-  waypoints: string[];       // Ordered list of waypoint IDs
+  section: string;          
+  waypoints: string[];     
 }
 
 export interface GestureLimits {
@@ -49,14 +42,14 @@ export interface FloorConfig {
   floor_number: number;
   floor_name: string;
   building_name: string;
-  map_image_url?: string;               // Optional: for custom floor layouts
-  map_component?: string;               // Component name: "MapLayout" or "Floor2Layout"
+  map_image_url?: string;    
+  map_component?: string;   
   entrance_point: Position;
   parking_spots: ParkingSpotConfig[];
   navigation_waypoints: NavigationWaypoint[];
   navigation_routes: NavigationRoute[];
-  gesture_limits?: GestureLimits;       // Optional: custom pan/zoom limits
-  initial_view?: {                      // Optional: initial camera position
+  gesture_limits?: GestureLimits;       
+  initial_view?: {                     
     translateX: number;
     translateY: number;
     scale: number;
@@ -72,26 +65,18 @@ export interface ParkingLocationConfig {
 }
 
 export interface SensorToSpotMapping {
-  [sensorId: number]: string;  // sensor_id -> spot_id
+  [sensorId: number]: string;
 }
 
 export interface SpotToSensorMapping {
-  [spotId: string]: number;    // spot_id -> sensor_id
+  [spotId: string]: number;  
 }
-
-/**
- * Cache metadata for configuration data
- */
 export interface ConfigCacheMetadata {
   location_id: string;
   version: string;
   cached_at: string;
   expires_at: string;
 }
-
-/**
- * API Response format
- */
 export interface ParkingConfigApiResponse {
   success: boolean;
   data: ParkingLocationConfig;

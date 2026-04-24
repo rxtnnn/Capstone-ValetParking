@@ -192,7 +192,6 @@ class NotificationServiceClass {
 
     // Remote push tokens are not supported in Expo Go SDK 53+
     if (this.isRunningInExpoGo()) {
-      console.log('Running in Expo Go: skipping remote push token registration. Local notifications will still work.');
       return null;
     }
 

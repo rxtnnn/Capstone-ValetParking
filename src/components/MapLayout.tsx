@@ -5,11 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 interface MapLayoutProps {
   styles: any;
 }
-
-// Spot layout template - positions are shared across all floors
-// To change spot positions, modify the x, y values here
-// To change spot sizes, modify the width, height values
-// To change spot rotation, modify the rotation value
 export const SPOT_LAYOUT = [
   // Section A - near entrance
   { section: 'A', index: 1, position: { x: 690, y: 95 }, dimensions: { width: 40, height: 55 }, rotation: '90deg' },
@@ -74,10 +69,7 @@ export const SPOT_LAYOUT = [
   { section: 'I', index: 1, position: { x: 680, y: 790 }, dimensions: { width: 40, height: 55 }, rotation: '270deg' },
 ];
 
-// Navigation waypoints - adjust x, y to change navigation path positions
-// You can add custom waypoints for each slot (e.g., 'A1_turn', 'B2_turn')
 export const NAVIGATION_WAYPOINTS = [
-  // Default entrance
   { id: 'entrance', position: { x: 650, y: 250 } },
 
   // Section-specific entrances (customize starting point per section)
@@ -314,7 +306,7 @@ export const INITIAL_VIEW = {
 // Entrance point
 export const ENTRANCE_POINT = { x: 650, y: 250 };
 
-// Helper function to generate floor-specific spots from layout template
+// generate floor-specific spots from layout template
 export const generateFloorSpots = (floorNumber: number) => {
   return SPOT_LAYOUT.map(spot => ({
     spot_id: `${floorNumber}${spot.section}${spot.index}`,

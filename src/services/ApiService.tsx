@@ -185,7 +185,6 @@ class ApiService {
         return true;
       });
     } catch (error) {
-      console.log('Error getting new feedback replies:', error);
       return [];
     }
   }
@@ -207,11 +206,8 @@ class ApiService {
       if (feedback?.user_id === targetUserId) {
         return feedback;
       }
-      
-      console.warn(`Feedback ID ${feedbackId} not found or doesn't belong to user ${targetUserId}`);
       return null;
     } catch (error) {
-      console.log(`Error getting feedback by ID ${feedbackId}:`, error);
       return null;
     }
   }
@@ -241,7 +237,6 @@ class ApiService {
   }
 
   async getAllFeedback(perPage: number = 15): Promise<FeedbackData[]> {
-    console.warn('getAllFeedback is deprecated, use getUserFeedback for user-specific data');
     return this.getUserFeedback(undefined, perPage);
   }
 
@@ -259,7 +254,6 @@ class ApiService {
       }
       return { id: null };
     } catch (error) {
-      console.log('Error getting current user info:', error);
       return { id: null };
     }
   }

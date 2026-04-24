@@ -300,8 +300,6 @@ class RealTimeParkingServiceClass {
       space.sensor_id !== undefined
     );
 
-    console.log('Raw API data:', rawData.length, 'records, Active sensors:', activeSpots.length);
-
     const totalSpots = activeSpots.length;
     let availableSpots = 0;
 
@@ -314,7 +312,7 @@ class RealTimeParkingServiceClass {
 
       if (isAvailable) availableSpots++;
 
-      if (!floorGroups[floor]) {
+      if (!floorGroups[floor]) { //if no floor group exists, create one
         floorGroups[floor] = { total: 0, available: 0, spaces: [] };
       }
 
