@@ -391,6 +391,9 @@ const ParkingMapScreen: React.FC = () => {
       if (!unsubscribeFunctionsRef.current.parkingUpdates) {
         subscribeToParkingData();
       }
+      if (NotificationManager.isRfidEntryDetected()) {
+        NotificationManager.resumeSpotNotifications();
+      }
     }, [subscribeToParkingData])
   );
 

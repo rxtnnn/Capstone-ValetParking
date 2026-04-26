@@ -251,7 +251,6 @@ class RfidSecurityServiceClass {
         if (matchesUser) {
           if (scan.scan_type === 'entry') {
             NotificationManager.setRfidEntryDetected(true);
-            await NotificationManager.resumeSpotNotifications();
             RealTimeParkingService.resetNotificationDedup();
             setTimeout(() => RealTimeParkingService.forceUpdate(), 500);
           } else if (scan.scan_type === 'exit') {
@@ -561,7 +560,6 @@ class RfidSecurityServiceClass {
         const latest = userScans[0];
         if (latest.scan_type === 'entry') {
           NotificationManager.setRfidEntryDetected(true);
-          await NotificationManager.resumeSpotNotifications();
           RealTimeParkingService.resetNotificationDedup();
           setTimeout(() => RealTimeParkingService.forceUpdate(), 500);
         } else if (latest.scan_type === 'exit') {
