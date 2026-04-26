@@ -92,7 +92,7 @@ const AdminDashboard: React.FC = () => {
           created_by_name: g.created_by ?? undefined,
           created_at: g.created_at ?? '',
           updated_at: g.updated_at ?? g.created_at ?? '',
-        })));
+        })).filter((g) => !g.valid_until || new Date(g.valid_until).getTime() > Date.now()));
       }
     } catch {
       // silent fail
