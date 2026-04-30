@@ -362,6 +362,19 @@ class NotificationServiceClass {
     }
   }
 
+  async showIncidentNotification(spotId: string, category: string): Promise<void> {
+    try{
+      const settings = await this.getNotificationSettings();
+      await this.showLocalNotification(
+        'Incident Logged',
+        `An incident (${category}) has been reported at spot ${spotId}`,
+        {type: 'incident', spotId, category, timestamp: Date.now()}, 
+        CHANNELS.DEFAULT, settings
+      );
+    } catch{
+    }
+  }
+  
   async showFloorUpdateNotification(
     floor: number,
     availableSpots: number,
