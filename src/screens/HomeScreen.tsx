@@ -14,6 +14,8 @@ import NotificationOverlay from '../components/NotifOverlay';
 import { useFeedback } from '../hooks/useFeedback';
 import {COLORS} from '../constants/AppConst';
 import { TokenManager } from '../config/api';
+import { ParkingConfigService } from '../services/ParkingConfigService';
+import { ParkingLocationConfig } from '../types/parkingConfig';
 
 
 type RootStackParamList = {
@@ -38,18 +40,14 @@ interface CircularProgressProps {
 }
 const FEEDBACK_CHECK_INTERVAL = 5 * 60 * 1000; //5mins
 
-const DEFAULT_FLOORS: {
+type FloorDefault = {
   floor: number;
   total: number;
   available: number;
+  malfunctioned: number;
   occupancyRate: number;
   status: 'available' | 'full' | 'limited' | 'no_data';
-}[] = [
-  { floor: 1, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
-  { floor: 2, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
-  { floor: 3, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
-  { floor: 4, total: 0, available: 0, occupancyRate: 0, status: 'no_data' },
-];
+};
 
 const CircularProgress: React.FC<CircularProgressProps> = ({
   size,
@@ -114,6 +112,7 @@ const HomeScreen: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [lastParkingData, setLastParkingData] = useState<ParkingStats | null>(null);
+  const [defaultFloors, setDefaultFloors] = useState<FloorDefault[]>([1,2,3,4].map(floor => ({ floor, total: 0, available: 0, malfunctioned: 0, occupancyRate: 0, status: 'no_data' as const })));
   const isMountedRef = useRef(true);
 
   const unsubscribeFunctionsRef = useRef<{
@@ -158,9 +157,27 @@ const HomeScreen: React.FC = () => {
     return total === 0 ? 0 : ((total - available) / total) * 100;
   }, []);
 
+  useEffect(() => {
+    ParkingConfigService.getDefaultFloors().then(floors => {
+      if (isMountedRef.current) setDefaultFloors(floors);
+    }).catch(() => {});
+    return ParkingConfigService.subscribe((config: ParkingLocationConfig) => {
+      if (isMountedRef.current) {
+        setDefaultFloors(config.floors.map((f: { floor_number: number }) => ({
+          floor: f.floor_number,
+          total: 0,
+          available: 0,
+          malfunctioned: 0,
+          occupancyRate: 0,
+          status: 'no_data' as const,
+        })));
+      }
+    });
+  }, []);
+
   //display floor cards
   const displayFloors = useMemo(() => {
-    const fixedFloors = [...DEFAULT_FLOORS];
+    const fixedFloors = [...defaultFloors];
 
     fixedFloors.forEach(fixedFloor => {
       const realFloor = parkingData.floors.find(rf => rf.floor === fixedFloor.floor);
@@ -170,7 +187,7 @@ const HomeScreen: React.FC = () => {
     });
     //sort descending order
     return fixedFloors.sort((a, b) => b.available - a.available);
-  }, [parkingData.floors]);
+  }, [parkingData.floors, defaultFloors]);
 
   //check for parking spot changes to trigger notifs
   const checkParkingChanges = useCallback((newData: ParkingStats) => {
@@ -460,13 +477,18 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Select Floor</Text>
           </View>
 
+          // Floor Cards
           {displayFloors.map((floor) => {
             const status = getFloorStatus(floor.available, floor.total);
             const progressPercentage = getProgressPercentage(floor.available, floor.total);
             const noData = status.text === 'NO DATA' || floor.total === 0;
             const isFull = floor.total > 0 && floor.available === 0;
+
             // Floor is disabled if no sensor data OR if floor is full
-            const isDisabled = noData || isFull;
+            const isDisabled = noData;
+            const userRole = TokenManager.getUser()?.role;
+            const canSeeMalfunction = userRole === 'admin' || userRole === 'ssd' || userRole === 'security';
+            const malfunctionedCount = floor.malfunctioned ?? 0;
 
             return (
               <TouchableOpacity
@@ -488,6 +510,12 @@ const HomeScreen: React.FC = () => {
                     {getFloorName(floor.floor)}
                   </Text>
                   <View style={styles.floorHeaderRight}>
+                    {canSeeMalfunction && malfunctionedCount > 0 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6F00', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, marginRight: 6, gap: 3 }}>
+                        <Ionicons name="warning" size={12} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>{malfunctionedCount}</Text>
+                      </View>
+                    )}
                     <View style={[styles.statusBadge, { backgroundColor: status.color }]}>
                       <Text style={styles.statusText}>{status.text}</Text>
                     </View>
@@ -559,7 +587,7 @@ const HomeScreen: React.FC = () => {
                     styles.progressBarText,
                     isDisabled && styles.fullFloorText
                   ]}>
-                    {noData ? 'No sensors' : `${Math.round(progressPercentage)}% Full`}
+                    {noData ? 'No sensors' : `${Math.round(progressPercentage)}% Occupied`}
                   </Text>
                 </View>
               </TouchableOpacity>

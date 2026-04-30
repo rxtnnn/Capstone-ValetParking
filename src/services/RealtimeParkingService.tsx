@@ -25,6 +25,7 @@ export interface ParkingStats {
     floor: number;
     total: number;
     available: number;
+    malfunctioned: number;
     occupancyRate: number;
     status: 'available' | 'limited' | 'full';
   }>;
@@ -114,7 +115,7 @@ class RealTimeParkingServiceClass {
     this.stop();
   }
 
-  setRefreshRate(intervalMs: number): void {
+  public setRefreshRate(intervalMs: number): void {
     intervalMs = Math.max(1000, Math.min(60000, intervalMs));
     
     this.updateIntervalMs = intervalMs;
@@ -132,7 +133,7 @@ class RealTimeParkingServiceClass {
     return this.updateIntervalMs;
   }
 
-  onParkingUpdate(callback: ParkingUpdateCallback): () => void { 
+  public onParkingUpdate(callback: ParkingUpdateCallback): () => void { 
     this.updateCallbacks.push(callback);
     
     if (this.lastData) {
@@ -155,7 +156,7 @@ class RealTimeParkingServiceClass {
     };
   }
 
-  onConnectionStatus(callback: ConnectionStatusCallback): () => void {
+  public onConnectionStatus(callback: ConnectionStatusCallback): () => void {
     this.connectionCallbacks.push(callback);
     
     try {
@@ -201,7 +202,7 @@ class RealTimeParkingServiceClass {
     }, 6000);
 
     try {
-      const response = await fetch(this.apiUrl, {
+      const response = await fetch(this.apiUrl, { //send GET request to API
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -233,11 +234,11 @@ class RealTimeParkingServiceClass {
       
       if (this.shouldStop || !this.isRunning) return;
 
-      const newData = this.transformRawData(rawData);
-      this.checkForChanges(newData);
+      const newData = this.transformRawData(rawData); //transform raw data
+      this.checkForChanges(newData); //check for changes and trigger notifications
       
       this.lastData = newData;
-      this.notifyParkingUpdate(newData);
+      this.notifyParkingUpdate(newData); //notifiy subscribers
       this.setConnectionStatus('connected'); 
       this.retryCount = 0;
       this.consecErrors = 0;
@@ -302,8 +303,7 @@ class RealTimeParkingServiceClass {
 
     const totalSpots = activeSpots.length;
     let availableSpots = 0;
-
-    const floorGroups: { [key: number]: { total: number; available: number; spaces: ParkingSpace[] } } = {};
+    const floorGroups: { [key: number]: { total: number; available: number; malfunctioned: number; spaces: ParkingSpace[] } } = {};
 
     for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
@@ -313,11 +313,12 @@ class RealTimeParkingServiceClass {
       if (isAvailable) availableSpots++;
 
       if (!floorGroups[floor]) { //if no floor group exists, create one
-        floorGroups[floor] = { total: 0, available: 0, spaces: [] };
+        floorGroups[floor] = { total: 0, available: 0, malfunctioned: 0, spaces: [] };
       }
 
       floorGroups[floor].total++;
       if (isAvailable) floorGroups[floor].available++;
+      if (space.malfunctioned) floorGroups[floor].malfunctioned++;
       floorGroups[floor].spaces.push(space);
     }
 
@@ -337,6 +338,7 @@ class RealTimeParkingServiceClass {
         floor: parseInt(floorNum),
         total: data.total,
         available: data.available,
+        malfunctioned: data.malfunctioned,
         occupancyRate,
         status,
       };

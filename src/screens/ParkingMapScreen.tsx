@@ -64,6 +64,7 @@ const ParkingMapScreen: React.FC = () => {
   const [floorConfig, setFloorConfig] = useState<FloorConfig | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [availableFloors, setAvailableFloors] = useState<FloorConfig[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [parkingData, setParkingData] = useState<ParkingSpot[]>([]);
@@ -140,6 +141,10 @@ const ParkingMapScreen: React.FC = () => {
         }
 
         setFloorConfig(config);
+        const fullConfig = await ParkingConfigService.getConfig('usjr_quadricentennial');
+        if (isMounted && fullConfig.floors.length > 0) {
+          setAvailableFloors([...fullConfig.floors].sort((a, b) => a.floor_number - b.floor_number));
+        }
         const initialSpots: ParkingSpot[] = config.parking_spots.map(spot => ({
           id: spot.spot_id,
           isOccupied: false,
@@ -150,9 +155,7 @@ const ParkingMapScreen: React.FC = () => {
           rotation: spot.rotation,
           hasSensor: spot.sensor_id !== null && spot.sensor_id !== undefined, // Check if spot has a sensor
         }));
-
         setParkingData(initialSpots);
-
         if (config.initial_view) {
           translateXRef.current = config.initial_view.translateX;
           translateYRef.current = config.initial_view.translateY;
@@ -161,10 +164,7 @@ const ParkingMapScreen: React.FC = () => {
           translateYAnim.setValue(config.initial_view.translateY);
           scaleAnim.setValue(config.initial_view.scale);
         }
-
-        console.log('Parking configuration loaded successfully');
       } catch (error) {
-        console.error('Failed to load parking configuration:', error);
         if (isMounted) {
           setConfigError(error instanceof Error ? error.message : 'Unknown error');
         }
@@ -174,9 +174,7 @@ const ParkingMapScreen: React.FC = () => {
         }
       }
     };
-
     loadConfiguration();
-
     return () => {
       isMounted = false;
     };
@@ -229,7 +227,7 @@ const ParkingMapScreen: React.FC = () => {
     const mapping = ParkingConfigService.getSensorToSpotMapping(floorConfig);
 
     Object.values(mapping).forEach(spotId => {
-      const section = spotId.charAt(1); // Extract section from '4A1' -> 'A'
+      const section = spotId.charAt(1); // extract section from '4A1' -> 'A'
       sectionMap[section] = (sectionMap[section] || 0) + 1;
     });
 
@@ -242,7 +240,7 @@ const ParkingMapScreen: React.FC = () => {
     })).sort((a, b) => a.id.localeCompare(b.id));
   }, [floorConfig]);
 
-  // Update sections when floor config changes
+  // update sections when floor config changes
   useEffect(() => {
     if (floorConfig) {
       setParkingSections(calculateSection());
@@ -490,7 +488,6 @@ const ParkingMapScreen: React.FC = () => {
     try {
       await RealTimeParkingService.forceUpdate();
     } catch (error) {
-      console.error('Manual refresh failed:', error);
       if (isMountedRef.current) {
         Alert.alert('Refresh Failed', 'Unable to refresh parking data. Please try again.');
       }
@@ -506,15 +503,15 @@ const ParkingMapScreen: React.FC = () => {
   }, []);
 
   const handleParkingConfirm = useCallback(async () => { //I've parked button
-    await NotificationManager.pauseSpotNotifications();
+    await NotificationManager.pauseSpotNotifications(); //stop notif
     try {
-      const tagsRes = await apiClient.get(API_ENDPOINTS.publicRfidTags); //fetch rfid
-      const tags: any[] = tagsRes.data?.tags ?? [];
-      const currentUser = TokenManager.getUser();
-      const userTag = tags.find(t =>
+      const tagsResponse = await apiClient.get(API_ENDPOINTS.publicRfidTags); //fetch rfid tags
+      const tags: any[] = tagsResponse.data?.tags ?? []; //get tags list
+      const currentUser = TokenManager.getUser(); 
+      const userTag = tags.find(t =>  //find tag of currently logged in user
         t.user_name?.toLowerCase() === currentUser?.name?.toLowerCase() && t.status === 'active'
-      ); //find tag of currently logged in user
-      if (userTag?.uid) {
+      );
+      if (userTag?.uid) { //if found, send rfid uid
         await apiClient.post(API_ENDPOINTS.publicRfidParked, { uid: userTag.uid });
       }
     } catch {
@@ -525,19 +522,19 @@ const ParkingMapScreen: React.FC = () => {
     setShowSuccessModal(true);
   }, [clearNavigation]);
 
-  //parking recommendation 
+  //parking recommendation  - Cancel Button
   const handleParkingCancel = useCallback(() => {
     setShowParkingConfirmModal(false);
     // find nearby available spots
     if (navigatingToSpot) {
-      const takenSpotSection = navigatingToSpot.charAt(1);
+      const takenSpotSection = navigatingToSpot.charAt(1); //get the letter 
       // find available spots in same section 
       const availableSpots = parkingData
         .filter(spot => spot.hasSensor && !spot.isOccupied && !spot.malfunctioned && spot.id !== navigatingToSpot)
         .sort((a, b) => {
           const aSection = a.id.charAt(1);
           const bSection = b.id.charAt(1);
-          // Prioritize same section
+          // prioritize same section
           if (aSection === takenSpotSection && bSection !== takenSpotSection) return -1;
           if (bSection === takenSpotSection && aSection !== takenSpotSection) return 1;
           return a.id.localeCompare(b.id);
@@ -583,7 +580,6 @@ const ParkingMapScreen: React.FC = () => {
       Alert.alert('Spot Occupied', 'This parking spot is currently occupied.');
       return;
     }
-
     setSelectedSpot(spot.id);
     setSelectedSpotForNav(spot.id);
     setHighlightedSpots([]);
@@ -605,7 +601,7 @@ const ParkingMapScreen: React.FC = () => {
     const isSelected = selectedSpot === spot.id;
     const spotSection = spot.id.charAt(1); // Extract section from '4A1' -> 'A'
     const isSectionHighlighted = highlightedSection === spotSection;
-    const isSpotHighlighted = highlightedSpots.includes(spot.id); // Check if this specific spot is highlighted
+    const isSpotHighlighted = highlightedSpots.includes(spot.id);
     const rotation = spot.rotation || '0deg';
     const w = spot.width || 30;
     const h = spot.height || 30;
@@ -619,7 +615,6 @@ const ParkingMapScreen: React.FC = () => {
         backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green;
       }
     }
-
     // Security and admin can interact with any sensor-assigned spot; others only available ones
     const isClickable = spot.hasSensor && (canAccessSpotActions || (!spot.isOccupied && !spot.malfunctioned));
 
@@ -900,25 +895,26 @@ const ParkingMapScreen: React.FC = () => {
           {parkingSections.map(renderSectionIndicator)}
         </ScrollView>
       </LinearGradient>
+      
+        <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+          <Ionicons name="refresh" size={20} color="white" />
+          <Text style={styles.refreshText}>Refresh</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-        <Ionicons name="refresh" size={20} color="white" />
-        <Text style={styles.refreshText}>Refresh</Text>
-      </TouchableOpacity>
-
-      <View style={{ position: 'absolute', top: 130, left: 12, right: 12, zIndex: 2000, flexDirection: 'row', justifyContent: 'center', gap: 10, backgroundColor: 'rgb(71, 69, 69)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, elevation: 10 }}>
+      <View style={styles.legendContainer}>
         {[
           { color: COLORS.green, label: 'Available' },
           { color: COLORS.primary, label: 'Occupied' },
           { color: '#FFDE42', label: 'Malfunction' },
           { color: '#CCCCCC', label: 'No Sensor' },
         ].map(({ color, label }) => (
-          <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: color }} />
-            <Text style={{ fontSize: 11, color: 'white', fontFamily: FONTS.regular }}>{label}</Text>
+          <View key={label} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <Text style={styles.legendLabel}>{label}</Text>
           </View>
         ))}
       </View>
+     
 
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
@@ -951,7 +947,7 @@ const ParkingMapScreen: React.FC = () => {
                   <Text style={styles.availableNumber}>{currentFloorAvailableSpots}</Text>
                 </View>
               </View>
-              
+            
               <View style={styles.lastUpdated}>
                 <Text style={styles.lastUpdatedText}>
                   Last updated: {parkingStats?.lastUpdated || 'Loading...'}
@@ -979,7 +975,7 @@ const ParkingMapScreen: React.FC = () => {
           </LinearGradient>
         </RNAnimated.View>
       </GestureDetector>
-
+      // navigation buttons
       {showNavigation && (
         <View style={{ position: 'absolute', top: 180, right: 20, gap: 10, zIndex: 2000 }}>
           {!canAccessSpotActions && (
@@ -1030,17 +1026,19 @@ const ParkingMapScreen: React.FC = () => {
 
           {/* Floor options - sorted by available spots (highest first) */}
           <View style={styles.floorOptionsContainer}>
-            {[1, 2, 3, 4]
-              .map((floor) => {
-                const floorData = parkingStats?.floors?.find(f => f.floor === floor);
+            {availableFloors
+              .map((floorCfg) => {
+                const floorData = parkingStats?.floors?.find(f => f.floor === floorCfg.floor_number);
                 return {
-                  floor,
+                  floor: floorCfg.floor_number,
+                  name: floorCfg.floor_name,
                   available: floorData?.available ?? 0,
                   total: floorData?.total ?? 0,
+                  malfunctioned: floorData?.malfunctioned ?? 0,
                 };
               })
               .sort((a, b) => b.available - a.available)
-              .map(({ floor, available, total }) => {
+              .map(({ floor, name, available, total, malfunctioned }) => {
               const isCurrentFloor = floorNumber === floor;
               const availableSpots = available;
               const totalSpots = total;
@@ -1068,14 +1066,14 @@ const ParkingMapScreen: React.FC = () => {
                       navigation.navigate('ParkingMap', { floor });
                     }
                   }}
-                  activeOpacity={hasData ? 0.7 : 1} // No opacity change if disabled
-                  disabled={!hasData} // Disable touch if no data
+                  activeOpacity={hasData ? 0.7 : 1}
+                  disabled={!hasData}
                 >
                   {/* Floor icon */}
                   <View style={[
                     styles.floorIconContainer,
                     isCurrentFloor ? styles.floorIconCurrent : styles.floorIconInactive,
-                    !hasData && styles.floorIconDisabled // Add disabled style
+                    !hasData && styles.floorIconDisabled 
                   ]}>
                     <Text style={[
                       styles.floorIconText,
@@ -1091,15 +1089,22 @@ const ParkingMapScreen: React.FC = () => {
                       styles.floorLabel1,
                       { color: isCurrentFloor ? 'white' : !hasData ? '#999' : '#333' }
                     ]}>
-                      {floor === 1 ? '1st' : floor === 2 ? '2nd' : floor === 3 ? '3rd' : '4th'} Floor
+                      {name}
                     </Text>
-                    <Text style={[
-                      styles.floorAvailability,
+                    <Text style={[styles.floorAvailability,
                       { color: isCurrentFloor ? 'rgba(255,255,255,0.8)' : !hasData ? '#999' : '#888' }
                     ]}>
                       {hasData ? `${availableSpots} ${availableSpots === 1 ? 'spot' : 'spots'} available` : 'No sensors assigned'}
                     </Text>
                   </View>
+
+                  {/* Malfunction indicator */}
+                  {canAccessSpotActions && malfunctioned > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6F00', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, marginRight: 6, gap: 3 }}>
+                      <Ionicons name="warning" size={12} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>{malfunctioned}</Text>
+                    </View>
+                  )}
 
                   {/* Status indicator */}
                   <View style={styles.floorStatusContainer}>
