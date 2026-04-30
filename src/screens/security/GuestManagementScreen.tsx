@@ -11,6 +11,9 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -137,7 +140,7 @@ const GuestManagementScreen: React.FC = () => {
         valid_until: valid_until.toISOString(),
         notes: newGuest.notes.trim() || null,
       });
-      setNewGuestModal(false);
+      Keyboard.dismiss(); setNewGuestModal(false);
       setNewGuest({ name: '', vehicle_plate: '', phone: '', purpose: '', valid_hours: '24', notes: '', _purposeOpen: false });
       loadGuests();
     } catch {
@@ -319,18 +322,22 @@ const GuestManagementScreen: React.FC = () => {
       <Modal
         visible={newGuestModal}
         transparent
-        animationType="slide"
-        onRequestClose={() => setNewGuestModal(false)}
+        animationType="fade"
+        onRequestClose={() => { Keyboard.dismiss(); setNewGuestModal(false); }}
       >
-        <TouchableWithoutFeedback onPress={() => setNewGuestModal(false)}>
-          <View style={styles.newGuestOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.newGuestSheet}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }}>
+            <View style={styles.newGuestOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.newGuestSheet}>
                   {/* Header */}
                   <View style={styles.newGuestHeader}>
                     <Ionicons name="person-add-outline" size={20} color="#333" />
                     <Text style={styles.newGuestTitle}>New Guest Pass</Text>
-                    <TouchableOpacity onPress={() => setNewGuestModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <Ionicons name="close" size={22} color="#666" />
                     </TouchableOpacity>
                   </View>
@@ -338,6 +345,7 @@ const GuestManagementScreen: React.FC = () => {
                   <ScrollView
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="interactive"
                     contentContainerStyle={{ paddingBottom: 8 }}
                   >
                     {/* Guest Name */}
@@ -443,7 +451,7 @@ const GuestManagementScreen: React.FC = () => {
                   <View style={styles.newGuestFooter}>
                     <TouchableOpacity
                       style={styles.newGuestCancelBtn}
-                      onPress={() => setNewGuestModal(false)}
+                      onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }}
                     >
                       <Text style={styles.newGuestCancelText}>Cancel</Text>
                     </TouchableOpacity>
@@ -458,10 +466,11 @@ const GuestManagementScreen: React.FC = () => {
                       <Text style={styles.newGuestCreateText}>Create Pass</Text>
                     </TouchableOpacity>
                   </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Deny Modal */}

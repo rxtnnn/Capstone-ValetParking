@@ -19,7 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidAdminService } from '../../services/RfidAdminService';
-import { RfidDashboardStats, GuestAccess, getReaderStatusColor } from '../../types/rfid';
+import { RfidDashboardStats, GuestAccess, getReaderStatusColor, RfidScanEvent } from '../../types/rfid';
 import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
 import apiClient from '../../config/api';
 import { getQuickActionsForRole } from '../../constants/quickActions';
@@ -27,7 +27,7 @@ import { useVerifyVehicle } from '../../hooks/useVerifyVehicle';
 
 type RootStackParamList = {
   AdminDashboard: undefined;
-  RfidTagList: undefined;
+  RfidTagList: { filter?: string } | undefined;
   RfidTagForm: { tagId?: number };
   RfidReaderStatus: undefined;
   ScanMonitor: undefined;
@@ -49,6 +49,8 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const isMountedRef = useRef(true);
+  const [activityModal, setActivityModal] = useState<{ visible: boolean; type: 'entry' | 'exit' | 'parked' | 'invalid' | null; scans: RfidScanEvent[] }>({ visible: false, type: null, scans: [] });
+  const [activityLoading, setActivityLoading] = useState(false);
 
   const {
     showVerifyModal, setShowVerifyModal,
@@ -107,6 +109,31 @@ const AdminDashboard: React.FC = () => {
       return () => { isMountedRef.current = false; };
     }, [])
   );
+
+  const openActivityModal = async (type: 'entry' | 'exit' | 'parked' | 'invalid') => {
+    setActivityModal({ visible: true, type, scans: [] });
+    setActivityLoading(true);
+    try {
+      const res = await apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 1440 } });
+      const scans: RfidScanEvent[] = res.data?.scans || [];
+      const today = new Date().toDateString();
+      let filtered: RfidScanEvent[];
+      if (type === 'entry') {
+        filtered = scans.filter(s => s.scan_type === 'entry' && s.status === 'valid' && new Date(s.timestamp).toDateString() === today);
+      } else if (type === 'exit') {
+        filtered = scans.filter(s => s.scan_type === 'exit' && s.status === 'valid' && new Date(s.timestamp).toDateString() === today);
+      } else if (type === 'invalid') {
+        filtered = scans.filter(s => s.status !== 'valid' && new Date(s.timestamp).toDateString() === today);
+      } else {
+        filtered = scans.filter(s => s.scan_type === 'entry' && s.status === 'valid' && new Date(s.timestamp).toDateString() === today);
+      }
+      setActivityModal({ visible: true, type, scans: filtered });
+    } catch {
+      setActivityModal({ visible: true, type, scans: [] });
+    } finally {
+      setActivityLoading(false);
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -212,28 +239,28 @@ const AdminDashboard: React.FC = () => {
               icon="card"
               iconFamily="material"
               color={COLORS.blue}
-              onPress={() => navigation.navigate('RfidTagList')}
+              onPress={() => navigation.navigate('RfidTagList', { filter: 'all' })}
             />
             <StatCard
               title="Active"
               value={stats?.active_tags || 0}
               icon="checkmark-circle"
               color={COLORS.green}
-              onPress={() => navigation.navigate('RfidTagList')}
+              onPress={() => navigation.navigate('RfidTagList', { filter: 'active' })}
             />
             <StatCard
               title="Expired"
               value={stats?.expired_tags || 0}
               icon="time"
               color="#FF6B6B"
-              onPress={() => navigation.navigate('RfidTagList')}
+              onPress={() => navigation.navigate('RfidTagList', { filter: 'expired' })}
             />
             <StatCard
               title="Expiring Soon"
               value={stats?.expiring_soon || 0}
               icon="warning"
               color={COLORS.limited}
-              onPress={() => navigation.navigate('RfidTagList')}
+              onPress={() => navigation.navigate('RfidTagList', { filter: 'expired' })}
             />
           </View>
         </View>
@@ -243,32 +270,65 @@ const AdminDashboard: React.FC = () => {
           <Text style={styles.sectionTitle}>Today's Activity</Text>
           <View style={styles.activityCard}>
             <View style={styles.activityRow}>
-              <View style={styles.activityItem}>
+              <TouchableOpacity style={styles.activityItem} onPress={() => openActivityModal('entry')}>
                 <Ionicons name="enter-outline" size={24} color={COLORS.green} />
                 <Text style={styles.activityValue}>{stats?.today_entries || 0}</Text>
                 <Text style={styles.activityLabel}>Entries</Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.activityDivider} />
-              <View style={styles.activityItem}>
+              <TouchableOpacity style={styles.activityItem} onPress={() => openActivityModal('exit')}>
                 <Ionicons name="exit-outline" size={24} color={COLORS.blue} />
                 <Text style={styles.activityValue}>{stats?.today_exits || 0}</Text>
                 <Text style={styles.activityLabel}>Exits</Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.activityDivider} />
-              <View style={styles.activityItem}>
+              <TouchableOpacity style={styles.activityItem} onPress={() => openActivityModal('invalid')}>
                 <Ionicons name="close-circle-outline" size={24} color="#FF6B6B" />
                 <Text style={styles.activityValue}>{stats?.today_invalid_scans || 0}</Text>
                 <Text style={styles.activityLabel}>Invalid</Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.activityDivider} />
-              <View style={styles.activityItem}>
+              <TouchableOpacity style={styles.activityItem} onPress={() => openActivityModal('parked')}>
                 <Ionicons name="car" size={24} color={COLORS.limited} />
                 <Text style={styles.activityValue}>{stats?.current_parked || 0}</Text>
                 <Text style={styles.activityLabel}>Parked</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
+
+        {/* Activity Detail Modal */}
+        <Modal visible={activityModal.visible} transparent animationType="slide">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '70%' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>
+                  {activityModal.type === 'entry' ? 'Entries Today' : activityModal.type === 'exit' ? 'Exits Today' : activityModal.type === 'invalid' ? 'Invalid Scans Today' : 'Currently Parked'}
+                </Text>
+                <TouchableOpacity onPress={() => setActivityModal({ visible: false, type: null, scans: [] })}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              {activityLoading ? (
+                <ActivityIndicator size="large" color={COLORS.primary} />
+              ) : activityModal.scans.length === 0 ? (
+                <Text style={{ color: '#999', textAlign: 'center', marginTop: 20 }}>No records found.</Text>
+              ) : (
+                <ScrollView>
+                  {activityModal.scans.map((scan, index) => (
+                    <View key={scan.id ?? index} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                      <Text style={{ fontWeight: '700', color: '#333' }}>{scan.user_name ?? 'Unknown User'}</Text>
+                      <Text style={{ color: '#666', fontSize: 12 }}>RFID: {scan.rfid_uid}</Text>
+                      <Text style={{ color: '#666', fontSize: 12 }}>
+                        {new Date(scan.timestamp).toLocaleTimeString()} — {scan.reader_location ?? scan.reader_name ?? ''}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
 
         {/* Active Guests */}
         <View style={styles.section}>

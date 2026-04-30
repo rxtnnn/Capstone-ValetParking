@@ -9,7 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ import { RfidTag, RfidTagStatus, getStatusColor } from '../../types/rfid';
 import { COLORS } from '../../constants/AppConst';
 
 type RootStackParamList = {
-  RfidTagList: undefined;
+  RfidTagList: { filter?: RfidTagStatus | 'all' } | undefined;
   RfidTagDetail: { tagId: number };
 };
 
@@ -34,12 +34,14 @@ const STATUS_FILTERS: { label: string; value: RfidTagStatus | 'all' }[] = [
 
 const RfidTagListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<RootStackParamList, 'RfidTagList'>>();
+  const initialFilter = route.params?.filter ?? 'all';
   const [tags, setTags] = useState<RfidTag[]>([]);
   const [filteredTags, setFilteredTags] = useState<RfidTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<RfidTagStatus | 'all'>('all');
+  const [activeFilter, setActiveFilter] = useState<RfidTagStatus | 'all'>(initialFilter);
 
   const loadTags = async () => {
     try {
