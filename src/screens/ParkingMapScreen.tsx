@@ -43,6 +43,7 @@ interface ParkingSpot {
   spaceId?: number;
   isOccupied: boolean;
   malfunctioned?: boolean;
+  malfunctionReason?: string | null;
   position: { x: number; y: number };
   width?: number;
   height?: number;
@@ -311,6 +312,7 @@ const ParkingMapScreen: React.FC = () => {
     const spotOccupancyMap: { [key: string]: boolean } = {};
     const spotHasSensorMap: { [key: string]: boolean } = {};
     const spotMalfunctionedMap: { [key: string]: boolean } = {};
+    const spotMalfunctionReasonMap: { [key: string]: string | null } = {};
     const spotSpaceIdMap: { [key: string]: number } = {};
 
     if (stats.sensorData && Array.isArray(stats.sensorData)) {
@@ -321,6 +323,7 @@ const ParkingMapScreen: React.FC = () => {
           spotOccupancyMap[sensor.slot_name] = sensor.is_occupied === true || sensor.is_occupied === 1;
           const apiMalfunctioned = sensor.malfunctioned === true;
           spotMalfunctionedMap[sensor.slot_name] = apiMalfunctioned;
+          spotMalfunctionReasonMap[sensor.slot_name] = sensor.malfunction_reason ?? null;
           // Once API confirms the malfunction, release the optimistic lock
           if (apiMalfunctioned && optimisticMalfunctionRef.current[sensor.slot_name] === true) {
             delete optimisticMalfunctionRef.current[sensor.slot_name];
@@ -340,6 +343,7 @@ const ParkingMapScreen: React.FC = () => {
         malfunctioned: optimisticMalfunctionRef.current.hasOwnProperty(spot.id)
           ? optimisticMalfunctionRef.current[spot.id]
           : (spotMalfunctionedMap.hasOwnProperty(spot.id) ? spotMalfunctionedMap[spot.id] : spot.malfunctioned),
+        malfunctionReason: spotMalfunctionReasonMap.hasOwnProperty(spot.id) ? spotMalfunctionReasonMap[spot.id] : spot.malfunctionReason,
       }));
     });
 
@@ -1559,7 +1563,7 @@ const ParkingMapScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Status badge */}
+            {/* Malfuntion Info */}
             <View style={styles.spotActionsSpotInfo}>
               <View style={[styles.spotActionsStatusBadge, {
                 backgroundColor: spotActionsTarget?.malfunctioned
@@ -1570,7 +1574,12 @@ const ParkingMapScreen: React.FC = () => {
                   {spotActionsTarget?.malfunctioned ? 'Malfunctioned'
                     : spotActionsTarget?.isOccupied ? 'Occupied' : 'Available'}
                 </Text>
-              </View>
+              </View>.
+              {spotActionsTarget?.malfunctioned && spotActionsTarget?.malfunctionReason && (
+                <Text style={styles.reasonText}>
+                  {spotActionsTarget.malfunctionReason}
+                </Text>
+              )}
             </View>
 
             <ScrollView
@@ -1579,7 +1588,6 @@ const ParkingMapScreen: React.FC = () => {
               contentContainerStyle={styles.spotActionsContent}
             >
               {spotActionsTarget?.malfunctioned ? (
-                /* ── Already malfunctioned: show info + clear button ── */
                 <>
                   <View style={{ backgroundColor: '#fff3cd', borderWidth: 1, borderColor: '#ffc107', borderRadius: 10, padding: 14, marginBottom: 16 }}>
                     <Text style={{ fontSize: 13, color: '#856404', fontFamily: FONTS.semiBold }}>
