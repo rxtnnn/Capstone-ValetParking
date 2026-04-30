@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"d:/CAPS2/Capstone-ValetParking\" add src/config/api.tsx src/services/RealtimeParkingService.tsx src/services/RfidSecurityService.tsx)"
+    ]
+  }
+}

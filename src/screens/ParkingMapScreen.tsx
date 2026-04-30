@@ -110,6 +110,8 @@ const ParkingMapScreen: React.FC = () => {
   const [incidentActionTaken, setIncidentActionTaken] = useState('');
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
 
+  const [showNavigationReminder, setShowNavigationReminder] = useState(false);
+  const [showNotInsideAlert, setShowNotInsideAlert] = useState(false);
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
     parkingUpdates?: () => void;
@@ -179,6 +181,19 @@ const ParkingMapScreen: React.FC = () => {
       isMounted = false;
     };
   }, [floorNumber]); 
+
+  // navigation timer reminder
+  useEffect(() => {
+    if(!navigatingToSpot) {
+      setShowNavigationReminder(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowNavigationReminder(true);
+      return;
+    }, 1000);
+    return (() => clearTimeout(timer));
+  }, [navigatingToSpot]);
 
   // clear navigation when floor changes
   useEffect(() => {
@@ -831,9 +846,22 @@ const ParkingMapScreen: React.FC = () => {
           );
         })()}
 
+        <Modal visible={showNavigationReminder && navigatingToSpot !== null && userRole === 'user'}
+          transparent animationType="fade">
+          <View style={styles.reminderOverlay}>
+           <View style={styles.reminderModal}>
+             <Text style={styles.reminderText}>
+              Still looking? Tap 'I've Parked' when you're done.
+            </Text>
+            <TouchableOpacity onPress={() => setShowNavigationReminder(false)}>
+              <Text style={styles.reminderDismiss}>Dismiss</Text>
+            </TouchableOpacity>
+           </View>
+          </View>
+        </Modal>
       </View>
     );
-  }, [showNavigation, navigationPath]);
+  }, [showNavigation, navigationPath, showNavigationReminder, navigatingToSpot, userRole]);
 
   // Show loading screen while configuration is being loaded
   if (isLoadingConfig) {
@@ -982,13 +1010,24 @@ const ParkingMapScreen: React.FC = () => {
             <TouchableOpacity
               style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: NotificationManager.isRfidEntryDetected() ? COLORS.green : '#A0A0A0' }]}
               onPress={() => {
-                if (!NotificationManager.isRfidEntryDetected()) {
-                  Alert.alert('Not Inside Parking', 'Your RFID must be detected at the entrance before you can mark as parked.');
+                 if(!NotificationManager.isRfidEntryDetected() && userRole === 'user') {
+                  setShowNotInsideAlert(true);
                   return;
-                }
-                setShowParkingConfirmModal(true);
-              }}
-            >
+                 }
+                setShowParkingConfirmModal(false);
+              }}>
+               <Modal visible = {showNotInsideAlert}
+                    transparent animationType="fade">
+                      <View style={styles.notInsideOverlay}>
+                        <View style={styles.notInsideModal}>
+                          <Text style={styles.notInsizeText1}>Not Inside Parking</Text>
+                          <Text style={styles.notInsizeText2}>Your RFID must be detected at the entrance before you can mark as parked.</Text>
+                          <TouchableOpacity onPress={() => setShowNotInsideAlert(false)}> 
+                            <Text style={styles.OkButton}> OK </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                  </Modal>
               <Ionicons name="checkmark-circle" size={20} color="white" />
               <Text style={styles.clearRouteText}>I've Parked</Text>
             </TouchableOpacity>

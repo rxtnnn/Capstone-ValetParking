@@ -148,6 +148,69 @@ export const styles = StyleSheet.create({
   mapWrapper: {
     flex: 1,
   },
+  reminderOverlay:{
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  reminderModal:{
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    padding: 20,
+    marginHorizontal: 30,
+    alignItems: 'center',
+    gap: 12,
+  },
+  reminderText:{
+    color: 'white',
+    fontSize: 12,
+    fontFamily: FONTS.regular,
+    textAlign: 'center',
+  },
+  reminderDismiss:{
+    color: 'white',
+    fontFamily: FONTS.semiBold,
+    fontSize: 12
+  },
+  notInsideOverlay:{
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  notInsideModal:{
+    position: 'absolute',
+    zIndex: 2000,
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    gap: 12,
+    width: '50%',
+    padding: 20,
+    alignItems: 'center'
+  },
+  OkButton:{
+    color: 'white',
+    fontSize: 20,
+    fontFamily: FONTS.semiBold,
+  },
+  textTitle1: {
+    width:'100%',
+    borderRadius: 10,
+  },
+  notInsizeText1:{
+    color: 'white',
+    fontSize: 16,
+    fontFamily: FONTS.semiBold,
+  },
+  notInsizeText2:{
+    color: 'white',
+    fontSize: 12,
+    fontFamily: FONTS.regular,
+    alignItems: 'center',
+  },
+
+
   arrow1: { position: 'absolute', right: 140, top: 170},
   arrow2: { position: 'absolute', right: 160, top: 120},
   arrow3: { position: 'absolute', right: 230, top: 120},

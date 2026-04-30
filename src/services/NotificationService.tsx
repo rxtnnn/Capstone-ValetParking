@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform, Alert, Linking } from 'react-native';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TokenManager } from '../config/api';
 import apiClient from '../config/api';
@@ -39,7 +39,7 @@ class NotificationServiceClass {
   async initialize(): Promise<void> {
     try {
       Notifications.setNotificationHandler({
-        handleNotification: async (notification) => {
+        handleNotification: async () => {
           const settings = await this.getNotificationSettings();
           return {
             shouldShowAlert: true,
