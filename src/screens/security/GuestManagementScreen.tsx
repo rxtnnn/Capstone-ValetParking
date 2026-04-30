@@ -10,8 +10,6 @@ import {
   TextInput,
   ActivityIndicator,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -324,15 +322,10 @@ const GuestManagementScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setNewGuestModal(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={0}
-        >
-          <TouchableWithoutFeedback onPress={() => setNewGuestModal(false)}>
-            <View style={styles.newGuestOverlay}>
-              <TouchableWithoutFeedback>
-                <View style={styles.newGuestSheet}>
+        <TouchableWithoutFeedback onPress={() => setNewGuestModal(false)}>
+          <View style={styles.newGuestOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.newGuestSheet}>
                   {/* Header */}
                   <View style={styles.newGuestHeader}>
                     <Ionicons name="person-add-outline" size={20} color="#333" />
@@ -465,11 +458,10 @@ const GuestManagementScreen: React.FC = () => {
                       <Text style={styles.newGuestCreateText}>Create Pass</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Deny Modal */}
