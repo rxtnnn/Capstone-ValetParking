@@ -1,7 +1,7 @@
 import NotificationService from './NotificationService';
 import { NotificationManager } from './NotifManager';
 import { TokenManager } from '../config/api';
-import { API_ENDPOINTS } from '../constants/AppConst';
+import { API_ENDPOINTS, API_TOKEN } from '../constants/AppConst';
 
 export interface ParkingSpace {
   id: number;
@@ -25,6 +25,7 @@ export interface ParkingStats {
     floor: number;
     total: number;
     available: number;
+    malfunctioned: number;
     occupancyRate: number;
     status: 'available' | 'limited' | 'full';
   }>;
@@ -38,11 +39,10 @@ type ConnectionStatusCallback = (status: 'connected' | 'disconnected' | 'error')
 
 class RealTimeParkingServiceClass {
   private apiUrl = `${API_ENDPOINTS.baseUrl}${API_ENDPOINTS.publicParking}`;
-  private readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
   
   private updateCallbacks: ParkingUpdateCallback[] = [];
   private connectionCallbacks: ConnectionStatusCallback[] = [];
-  private updateInterval: NodeJS.Timeout | null = null;
+  private updateInterval: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
   private lastData: ParkingStats | null = null;
   private connectionStatus: 'connected' | 'disconnected' | 'error' = 'disconnected';
@@ -66,12 +66,10 @@ class RealTimeParkingServiceClass {
 
   private initializeService(): void {
     if (this.isInitialized) return;
+
     this.isInitialized = true;
-    
     this.isRunning = true;
     this.shouldStop = false;
-    
-    console.log('RealTimeParkingService initialized');
   }
 
   start(): void {
@@ -80,16 +78,12 @@ class RealTimeParkingServiceClass {
     }
     
     if (this.updateInterval) {
-      console.log('Service already running, skipping start');
       return;
     }
-    
-    console.log('Starting RealTimeParkingService data fetching');
     this.isRunning = true;
     this.shouldStop = false;
     this.consecErrors = 0;
     this.retryCount = 0;
-    
     this.fetchAndUpdate();
 
     this.updateInterval = setInterval(() => {
@@ -99,11 +93,7 @@ class RealTimeParkingServiceClass {
     }, this.updateIntervalMs);
   }
 
-
-
   stop(): void {
-    console.log('Stopping RealTimeParkingService');
-    
     this.shouldStop = true;
     this.isRunning = false;
     
@@ -122,11 +112,10 @@ class RealTimeParkingServiceClass {
   }
 
   manualStop(): void {
-    console.log('Manual stop requested - use for logout/app close only');
     this.stop();
   }
 
-  setRefreshRate(intervalMs: number): void {
+  public setRefreshRate(intervalMs: number): void {
     intervalMs = Math.max(1000, Math.min(60000, intervalMs));
     
     this.updateIntervalMs = intervalMs;
@@ -144,7 +133,7 @@ class RealTimeParkingServiceClass {
     return this.updateIntervalMs;
   }
 
-  onParkingUpdate(callback: ParkingUpdateCallback): () => void { 
+  public onParkingUpdate(callback: ParkingUpdateCallback): () => void { 
     this.updateCallbacks.push(callback);
     
     if (this.lastData) {
@@ -167,7 +156,7 @@ class RealTimeParkingServiceClass {
     };
   }
 
-  onConnectionStatus(callback: ConnectionStatusCallback): () => void {
+  public onConnectionStatus(callback: ConnectionStatusCallback): () => void {
     this.connectionCallbacks.push(callback);
     
     try {
@@ -183,16 +172,15 @@ class RealTimeParkingServiceClass {
       }
     };
   }
-
+  //fetch parking data
   private async fetchAndUpdate(): Promise<void> {
     if (this.isFetching || this.shouldStop || !this.isRunning) return;
 
     const now = Date.now();
     
-    if (now - this.lastFetchTime < 2000) return;
+    if (now - this.lastFetchTime < 2000) return; // fetch every 2secs
 
     if (this.consecErrors >= this.maxConsecutiveErrors) {
-      console.log(`Too many consecutive errors (${this.consecErrors}), extending retry delay`);
       const extendedDelay = Math.min(30000, this.updateIntervalMs * 3);
       setTimeout(() => {
         if (this.isRunning && !this.shouldStop) {
@@ -214,12 +202,12 @@ class RealTimeParkingServiceClass {
     }, 6000);
 
     try {
-      const response = await fetch(this.apiUrl, {
+      const response = await fetch(this.apiUrl, { //send GET request to API
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_TOKEN}`,
+          'Authorization': `Bearer ${API_TOKEN}`,
           'Cache-Control': 'no-cache',
           'User-Agent': 'VALET-RealTime/1.0',
         },
@@ -230,7 +218,6 @@ class RealTimeParkingServiceClass {
       if (this.fetchController.signal.aborted) return;
 
       if (response.status === 401 || response.status === 403) {
-        console.log(`API authentication error: ${response.status}`);
         this.setConnectionStatus('error');
         this.consecErrors++;
         return;
@@ -247,11 +234,11 @@ class RealTimeParkingServiceClass {
       
       if (this.shouldStop || !this.isRunning) return;
 
-      const newData = this.transformRawData(rawData);
-      this.checkForChanges(newData);
+      const newData = this.transformRawData(rawData); //transform raw data
+      this.checkForChanges(newData); //check for changes and trigger notifications
       
       this.lastData = newData;
-      this.notifyParkingUpdate(newData);
+      this.notifyParkingUpdate(newData); //notifiy subscribers
       this.setConnectionStatus('connected'); 
       this.retryCount = 0;
       this.consecErrors = 0;
@@ -314,12 +301,9 @@ class RealTimeParkingServiceClass {
       space.sensor_id !== undefined
     );
 
-    console.log('Raw API data:', rawData.length, 'records, Active sensors:', activeSpots.length);
-
     const totalSpots = activeSpots.length;
     let availableSpots = 0;
-
-    const floorGroups: { [key: number]: { total: number; available: number; spaces: ParkingSpace[] } } = {};
+    const floorGroups: { [key: number]: { total: number; available: number; malfunctioned: number; spaces: ParkingSpace[] } } = {};
 
     for (const space of activeSpots) {
       const floor = this.extractFloorFromLocation(space.floor_level);
@@ -328,12 +312,13 @@ class RealTimeParkingServiceClass {
 
       if (isAvailable) availableSpots++;
 
-      if (!floorGroups[floor]) {
-        floorGroups[floor] = { total: 0, available: 0, spaces: [] };
+      if (!floorGroups[floor]) { //if no floor group exists, create one
+        floorGroups[floor] = { total: 0, available: 0, malfunctioned: 0, spaces: [] };
       }
 
       floorGroups[floor].total++;
       if (isAvailable) floorGroups[floor].available++;
+      if (space.malfunctioned) floorGroups[floor].malfunctioned++;
       floorGroups[floor].spaces.push(space);
     }
 
@@ -353,6 +338,7 @@ class RealTimeParkingServiceClass {
         floor: parseInt(floorNum),
         total: data.total,
         available: data.available,
+        malfunctioned: data.malfunctioned,
         occupancyRate,
         status,
       };
@@ -617,7 +603,7 @@ class RealTimeParkingServiceClass {
       retryCount: this.retryCount,
       consecErrors: this.consecErrors,
       apiEndpoint: this.apiUrl,
-      hasValidToken: !!this.API_TOKEN,
+      hasValidToken: !!API_TOKEN,
       sensorCount: this.lastData?.sensorData?.length || 0,
       isInitialized: this.isInitialized,
       hasActiveInterval: !!this.updateInterval,

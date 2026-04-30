@@ -1,13 +1,7 @@
-// RFID Types for VALET Parking App
-// Used by Admin and Security roles for RFID management and monitoring
 import { COLORS } from '../constants/AppConst';
 
-// ============================================
-// Core Data Models
-// ============================================
-
 export type RfidTagStatus = 'active' | 'expired' | 'suspended' | 'lost';
-export type GuestAccessStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'checked_in' | 'checked_out';
+export type GuestAccessStatus = 'active' | 'expired' | 'used' | 'cancelled' | 'pending' | 'approved' | 'denied' | 'checked_in' | 'checked_out';
 export type ParkingEntryStatus = 'active' | 'completed' | 'cancelled';
 export type ScanStatus = 'valid' | 'invalid' | 'expired' | 'unknown';
 export type ReaderStatus = 'online' | 'offline' | 'error';
@@ -23,6 +17,7 @@ export interface RfidTag {
   notes: string | null;
   created_at: string;
   updated_at: string;
+
   // Joined fields from relationships
   user_name?: string;
   user_email?: string;
@@ -66,6 +61,7 @@ export interface ParkingEntry {
   exit_gate_mac: string | null;
   created_at: string;
   updated_at: string;
+
   // Joined fields
   user_name?: string;
   rfid_uid?: string;
@@ -82,7 +78,7 @@ export interface RfidScanEvent {
   scan_type: 'entry' | 'exit';
   status: ScanStatus;
   message: string;
-  duration?: number; // seconds gate stays open
+  duration?: number; 
   // Associated data if found
   tag?: RfidTag;
   user_name?: string;
@@ -116,11 +112,6 @@ export interface RfidAlert {
   notes: string | null;
   created_at: string;
 }
-
-// ============================================
-// Form & Input Types
-// ============================================
-
 export interface RfidTagFormData {
   uid: string;
   user_id?: number;
@@ -145,14 +136,9 @@ export interface ManualEntryFormData {
   entry_type: 'manual';
   notes?: string;
 }
-
-// ============================================
-// Filter & Query Types
-// ============================================
-
 export interface RfidTagFilters {
   status?: RfidTagStatus;
-  search?: string; // Search by UID, user name, or vehicle plate
+  search?: string;
   expiring_soon?: boolean; // Tags expiring within 30 days
   user_id?: number;
 }
@@ -163,13 +149,13 @@ export interface ScanHistoryFilters {
   status?: ScanStatus;
   scan_type?: 'entry' | 'exit';
   reader_id?: string;
-  search?: string; // Search by UID or vehicle plate
+  search?: string; 
 }
 
 export interface GuestFilters {
   status?: GuestAccessStatus;
   search?: string;
-  date?: string; // Filter by validity date
+  date?: string; 
 }
 
 export interface AlertFilters {
@@ -179,18 +165,13 @@ export interface AlertFilters {
   from_date?: string;
   to_date?: string;
 }
-
-// ============================================
-// Statistics & Dashboard Types
-// ============================================
-
 export interface RfidDashboardStats {
   total_tags: number;
   active_tags: number;
   expired_tags: number;
   suspended_tags: number;
   lost_tags: number;
-  expiring_soon: number; // Within 30 days
+  expiring_soon: number; 
   readers_online: number;
   readers_offline: number;
   readers_error: number;
@@ -219,11 +200,6 @@ export interface ReaderStats {
   failed_scans: number;
   uptime_percentage: number;
 }
-
-// ============================================
-// API Response Types
-// ============================================
-
 export interface RfidApiResponse<T = any> {
   success: boolean;
   message?: string;
@@ -257,18 +233,10 @@ export interface VerificationResult {
   };
 }
 
-// ============================================
-// Service Callback Types
-// ============================================
-
 export type ScanUpdateCallback = (scans: RfidScanEvent[]) => void;
 export type AlertCallback = (alerts: RfidAlert[]) => void;
 export type ConnectionStatusCallback = (status: 'connected' | 'disconnected' | 'error') => void;
 export type StatsUpdateCallback = (stats: SecurityDashboardStats) => void;
-
-// ============================================
-// Type Guards
-// ============================================
 
 export const isRfidTagStatus = (value: string): value is RfidTagStatus => {
   return ['active', 'expired', 'suspended', 'lost'].includes(value);
@@ -279,16 +247,12 @@ export const isScanStatus = (value: string): value is ScanStatus => {
 };
 
 export const isGuestAccessStatus = (value: string): value is GuestAccessStatus => {
-  return ['pending', 'approved', 'denied', 'expired', 'checked_in', 'checked_out'].includes(value);
+  return ['active', 'expired', 'used', 'cancelled'].includes(value);
 };
 
 export const isAlertType = (value: string): value is AlertType => {
   return ['invalid_rfid', 'expired_rfid', 'suspended_rfid', 'unknown_rfid', 'suspicious_activity'].includes(value);
 };
-
-// ============================================
-// Utility Functions
-// ============================================
 
 export const getStatusColor = (status: RfidTagStatus | ScanStatus | GuestAccessStatus): string => {
   const colorMap: Record<string, string> = {
@@ -302,11 +266,8 @@ export const getStatusColor = (status: RfidTagStatus | ScanStatus | GuestAccessS
     invalid: '#FF6B6B',
     unknown: '#9E9E9E',
     // GuestAccessStatus
-    pending: COLORS.limited,
-    approved: COLORS.green,
-    denied: '#FF6B6B',
-    checked_in: COLORS.blue,
-    checked_out: '#9E9E9E',
+    used: '#9E9E9E',
+    cancelled: '#FF6B6B',
   };
   return colorMap[status] || '#9E9E9E';
 };

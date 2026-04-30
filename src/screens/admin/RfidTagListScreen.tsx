@@ -8,7 +8,6 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -21,7 +20,6 @@ import { COLORS } from '../../constants/AppConst';
 type RootStackParamList = {
   RfidTagList: undefined;
   RfidTagDetail: { tagId: number };
-  RfidTagForm: { tagId?: number };
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'RfidTagList'>;
@@ -94,28 +92,6 @@ const RfidTagListScreen: React.FC = () => {
     loadTags();
   };
 
-  const handleDeactivate = (tag: RfidTag) => {
-    Alert.alert(
-      'Deactivate Tag',
-      `Are you sure you want to deactivate tag ${tag.uid}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await RfidAdminService.deactivateTag(tag.id);
-            if (result.success) {
-              loadTags();
-            } else {
-              Alert.alert('Error', result.message || 'Failed to deactivate tag');
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const renderTagItem = ({ item }: { item: RfidTag }) => (
     <TouchableOpacity
       style={styles.tagCard}
@@ -157,24 +133,6 @@ const RfidTagListScreen: React.FC = () => {
         )}
       </View>
 
-      <View style={styles.tagActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('RfidTagForm', { tagId: item.id })}
-        >
-          <Ionicons name="create-outline" size={18} color={COLORS.blue} />
-          <Text style={[styles.actionText, { color: COLORS.blue }]}>Edit</Text>
-        </TouchableOpacity>
-        {item.status === 'active' && (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleDeactivate(item)}
-          >
-            <Ionicons name="ban-outline" size={18} color="#FF6B6B" />
-            <Text style={[styles.actionText, { color: '#FF6B6B' }]}>Deactivate</Text>
-          </TouchableOpacity>
-        )}
-      </View>
     </TouchableOpacity>
   );
 
@@ -187,15 +145,6 @@ const RfidTagListScreen: React.FC = () => {
           ? 'Try adjusting your search or filters'
           : 'Add your first RFID tag to get started'}
       </Text>
-      {!searchQuery && activeFilter === 'all' && (
-        <TouchableOpacity
-          style={styles.emptyButton}
-          onPress={() => navigation.navigate('RfidTagForm', {})}
-        >
-          <Ionicons name="add" size={20} color="#FFF" />
-          <Text style={styles.emptyButtonText}>Add New Tag</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 
@@ -222,12 +171,7 @@ const RfidTagListScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>RFID Tags</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('RfidTagForm', {})}
-          >
-            <Ionicons name="add" size={24} color="#FFF" />
-          </TouchableOpacity>
+          <View style={styles.addButton} />
         </View>
 
         {/* Search Bar */}
@@ -447,22 +391,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 8,
   },
-  tagActions: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    paddingTop: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 20,
-  },
-  actionText: {
-    fontSize: 14,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -479,20 +407,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 40,
-  },
-  emptyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
-  },
-  emptyButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
-    marginLeft: 8,
   },
 });
 

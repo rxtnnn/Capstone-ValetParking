@@ -1,4 +1,5 @@
 import { StyleSheet, Dimensions} from 'react-native';
+import { COLORS } from '../../constants/AppConst';
 
 const { width } = Dimensions.get('window');
 
@@ -72,7 +73,7 @@ export const styles = StyleSheet.create({
   loadingProgress: {
     width: '70%',
     height: '100%',
-    backgroundColor: '#B71C1C',
+    backgroundColor: COLORS.primary,
     borderRadius: 2,
   },
   content: {
@@ -267,7 +268,7 @@ export const styles = StyleSheet.create({
   statNumber: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#B71C1C',
+    color: COLORS.primary,
     marginBottom: 4,
   },
   statLabel: {
@@ -536,7 +537,7 @@ export const styles = StyleSheet.create({
     marginLeft: 8,
   },
   passwordRequirementMet: {
-    color: '#4CAF50',
+    color: COLORS.green,
     fontWeight: '500',
   },
   passwordModalButtons: {
@@ -563,11 +564,11 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#B71C1C',
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 3,
-    shadowColor: '#B71C1C',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,

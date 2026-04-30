@@ -46,13 +46,16 @@ const STATUS_TO_SEVERITY: Record<string, RfidAlert['severity']> = {
   unknown: 'medium',
 };
 
+const LONG_PARKED_THRESHOLD_HOURS = 12;
+const LONG_PARKED_POLL_MS = 60_000;
+
 class RfidSecurityServiceClass {
   private scanCallbacks: ScanUpdateCallback[] = [];
   private alertCallbacks: AlertCallback[] = [];
   private connectionCallbacks: ConnectionStatusCallback[] = [];
   private statsCallbacks: StatsUpdateCallback[] = [];
-
-  private updateInterval: NodeJS.Timeout | null = null;
+  private updateInterval: ReturnType<typeof setInterval> | null = null;
+  private longParkedInterval: ReturnType<typeof setInterval> | null = null;
   private isRunning: boolean = false;
   private shouldStop: boolean = false;
   private pollingIntervalMs: number = 10000;
@@ -65,6 +68,7 @@ class RfidSecurityServiceClass {
   private guests: GuestAccess[] = [];
   private lastStats: SecurityDashboardStats | null = null;
   private processedScanIds: Set<number> = new Set();
+  private notifiedLongParkedIds: Set<string> = new Set();
 
   start(): void {
     if (this.updateInterval) return;
@@ -74,12 +78,19 @@ class RfidSecurityServiceClass {
     this.consecutiveErrors = 0;
 
     this.fetchAndUpdate();
+    this.checkLongParked();
 
     this.updateInterval = setInterval(() => {
       if (!this.shouldStop && this.isRunning && !this.isFetching) {
         this.fetchAndUpdate();
       }
     }, this.pollingIntervalMs);
+
+    this.longParkedInterval = setInterval(() => {
+      if (!this.shouldStop && this.isRunning) {
+        this.checkLongParked();
+      }
+    }, LONG_PARKED_POLL_MS);
   }
 
   stop(): void {
@@ -91,7 +102,13 @@ class RfidSecurityServiceClass {
       this.updateInterval = null;
     }
 
+    if (this.longParkedInterval) {
+      clearInterval(this.longParkedInterval);
+      this.longParkedInterval = null;
+    }
+
     this.isFetching = false;
+    this.notifiedLongParkedIds.clear();
     this.setConnectionStatus('disconnected');
   }
 
@@ -114,14 +131,40 @@ class RfidSecurityServiceClass {
     this.isFetching = true;
 
     try {
-      const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, {
-        params: { minutes: 60 },
-      });
-
-      const data = response.data;
-      const scans: any[] = data?.scans || [];
+      const [scansResponse, guestsResponse] = await Promise.allSettled([
+        apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 60 } }),
+        apiClient.get(API_ENDPOINTS.guestAccess, { params: { status: 'active' } }),
+      ]);
 
       if (this.shouldStop || !this.isRunning) return;
+
+      const scans: any[] = scansResponse.status === 'fulfilled'
+        ? (scansResponse.value.data?.scans || [])
+        : [];
+
+      if (guestsResponse.status === 'fulfilled') {
+        const raw = guestsResponse.value.data;
+        const list: any[] = Array.isArray(raw) ? raw : (raw?.data ?? []);
+        this.guests = list.map((g: any): GuestAccess => ({
+          id: g.id,
+          guest_id: g.guest_id ?? String(g.id),
+          name: g.name ?? '',
+          vehicle_plate: g.vehicle_plate ?? '',
+          phone: g.phone ?? '',
+          purpose: g.purpose ?? '',
+          valid_from: g.valid_from ?? '',
+          valid_until: g.valid_until ?? '',
+          status: g.status ?? 'active',
+          approved_by: g.approved_by ?? null,
+          approved_by_name: g.approved_by_name ?? undefined,
+          notes: g.notes ?? null,
+          created_by: g.created_by ?? 0,
+          created_by_name: g.created_by ?? undefined,
+          created_at: g.created_at ?? '',
+          updated_at: g.updated_at ?? g.created_at ?? '',
+        }));
+      }
+
 
       this.processNewScans(scans);
       this.updateStatsFromScans(scans);
@@ -145,19 +188,43 @@ class RfidSecurityServiceClass {
     }
   }
 
+  private async checkLongParked(): Promise<void> {
+    try {
+      const user = TokenManager.getUser();
+      if (!user || !['security', 'admin', 'ssd'].includes(user.role)) return;
+
+      const response = await apiClient.get(API_ENDPOINTS.publicLongParked, {
+        params: { threshold_hours: LONG_PARKED_THRESHOLD_HOURS },
+      });
+
+      const entries: any[] = response.data?.long_parked ?? [];
+      if (!Array.isArray(entries) || entries.length === 0) return;
+
+      const newEntries = entries.filter(e => !this.notifiedLongParkedIds.has(e.plate));
+      if (newEntries.length === 0) return;
+
+      newEntries.forEach(e => this.notifiedLongParkedIds.add(e.plate));
+
+      const vehicles = newEntries.map(e => ({
+        vehicle_plate: e.plate,
+        hours: Math.floor(e.hours_parked ?? 0),
+      }));
+
+      await NotificationService.showLongParkedNotification(newEntries.length, vehicles);
+    } catch {
+      // silent fail
+    }
+  }
+
   private async processNewScans(apiScans: any[]): Promise<void> {
     const newInvalidScans: RfidScanEvent[] = [];
 
     for (const raw of apiScans) {
       const scanId = raw.id;
 
-      // Skip processed scans
       if (this.processedScanIds.has(scanId)) continue;
-
-      // Mark as processed
       this.processedScanIds.add(scanId);
 
-      // Map API response to RfidScanEvent
       const scan: RfidScanEvent = {
         id: `scan-${scanId}`,
         timestamp: raw.timestamp || new Date().toISOString(),
@@ -185,7 +252,6 @@ class RfidSecurityServiceClass {
         if (matchesUser) {
           if (scan.scan_type === 'entry') {
             NotificationManager.setRfidEntryDetected(true);
-            await NotificationManager.resumeSpotNotifications();
             RealTimeParkingService.resetNotificationDedup();
             setTimeout(() => RealTimeParkingService.forceUpdate(), 500);
           } else if (scan.scan_type === 'exit') {
@@ -295,9 +361,7 @@ class RfidSecurityServiceClass {
       }
     }
 
-    if (!this.updateInterval) {
-      this.start();
-    }
+    if (!this.updateInterval) this.start();
 
     return () => {
       const index = this.scanCallbacks.indexOf(callback);
@@ -347,9 +411,8 @@ class RfidSecurityServiceClass {
         console.log('Error in stats callback:', error);
       }
     }
-    if (!this.updateInterval) {
-      this.start();
-    }
+
+    if (!this.updateInterval) this.start();
 
     return () => {
       const index = this.statsCallbacks.indexOf(callback);
@@ -418,8 +481,6 @@ class RfidSecurityServiceClass {
         purpose: guest.purpose,
         guestId: String(guest.id),
       });
-
-      console.log(`Guest request notification sent for: ${guest.name}`);
     } catch (error) {
       console.log('Error sending guest request notification:', error);
     }
@@ -428,7 +489,7 @@ class RfidSecurityServiceClass {
   async getRecentScans(filters?: ScanHistoryFilters): Promise<PaginatedResponse<RfidScanEvent>> {
     try {
       const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, {
-        params: { minutes: 1440 }, // last 24 hours
+        params: { minutes: 1440 },
       });
       const data = response.data;
       const apiScans: any[] = data?.scans || [];
@@ -446,23 +507,19 @@ class RfidSecurityServiceClass {
         user_name: raw.user_name || undefined,
         vehicle_plate: raw.vehicle_plate || undefined,
       }));
+
       const merged = [...mapped];
       const ids = new Set(mapped.map(s => s.id));
       for (const s of this.recentScans) {
         if (!ids.has(s.id)) merged.push(s);
       }
+
       let filteredScans = merged;
 
       if (filters) {
-        if (filters.status) {
-          filteredScans = filteredScans.filter(s => s.status === filters.status);
-        }
-        if (filters.scan_type) {
-          filteredScans = filteredScans.filter(s => s.scan_type === filters.scan_type);
-        }
-        if (filters.reader_id) {
-          filteredScans = filteredScans.filter(s => s.reader_id === filters.reader_id);
-        }
+        if (filters.status) filteredScans = filteredScans.filter(s => s.status === filters.status);
+        if (filters.scan_type) filteredScans = filteredScans.filter(s => s.scan_type === filters.scan_type);
+        if (filters.reader_id) filteredScans = filteredScans.filter(s => s.reader_id === filters.reader_id);
         if (filters.search) {
           const searchLower = filters.search.toLowerCase();
           filteredScans = filteredScans.filter(s =>
@@ -480,15 +537,11 @@ class RfidSecurityServiceClass {
           filteredScans = filteredScans.filter(s => new Date(s.timestamp) <= toDate);
         }
       }
+
       return {
         success: true,
         data: filteredScans,
-        pagination: {
-          current_page: 1,
-          per_page: 50,
-          total: filteredScans.length,
-          total_pages: 1,
-        },
+        pagination: { current_page: 1, per_page: 50, total: filteredScans.length, total_pages: 1 },
       };
     } catch {
       return { success: false, data: [], pagination: { current_page: 1, per_page: 50, total: 0, total_pages: 1 } };
@@ -499,7 +552,7 @@ class RfidSecurityServiceClass {
     try {
       const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 1440 } });
       const scans: any[] = response.data?.scans ?? [];
-      // Find the most recent valid scan for this user
+
       const userScans = scans
         .filter(s => s.status === 'valid' && s.user_name?.toLowerCase() === userName.toLowerCase())
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -508,7 +561,6 @@ class RfidSecurityServiceClass {
         const latest = userScans[0];
         if (latest.scan_type === 'entry') {
           NotificationManager.setRfidEntryDetected(true);
-          await NotificationManager.resumeSpotNotifications();
           RealTimeParkingService.resetNotificationDedup();
           setTimeout(() => RealTimeParkingService.forceUpdate(), 500);
         } else if (latest.scan_type === 'exit') {
@@ -525,15 +577,9 @@ class RfidSecurityServiceClass {
     let filteredAlerts = [...this.alerts];
 
     if (filters) {
-      if (filters.acknowledged !== undefined) {
-        filteredAlerts = filteredAlerts.filter(a => a.acknowledged === filters.acknowledged);
-      }
-      if (filters.alert_type) {
-        filteredAlerts = filteredAlerts.filter(a => a.alert_type === filters.alert_type);
-      }
-      if (filters.severity) {
-        filteredAlerts = filteredAlerts.filter(a => a.severity === filters.severity);
-      }
+      if (filters.acknowledged !== undefined) filteredAlerts = filteredAlerts.filter(a => a.acknowledged === filters.acknowledged);
+      if (filters.alert_type) filteredAlerts = filteredAlerts.filter(a => a.alert_type === filters.alert_type);
+      if (filters.severity) filteredAlerts = filteredAlerts.filter(a => a.severity === filters.severity);
     }
 
     return filteredAlerts;
@@ -541,9 +587,7 @@ class RfidSecurityServiceClass {
 
   async acknowledgeAlert(alertId: string, notes?: string): Promise<RfidApiResponse<void>> {
     const alertIndex = this.alerts.findIndex(a => a.id === alertId);
-    if (alertIndex === -1) {
-      return { success: false, message: 'Alert not found' };
-    }
+    if (alertIndex === -1) return { success: false, message: 'Alert not found' };
 
     this.alerts[alertIndex] = {
       ...this.alerts[alertIndex],
@@ -571,9 +615,7 @@ class RfidSecurityServiceClass {
     let filteredGuests = [...this.guests];
 
     if (filters) {
-      if (filters.status) {
-        filteredGuests = filteredGuests.filter(g => g.status === filters.status);
-      }
+      if (filters.status) filteredGuests = filteredGuests.filter(g => g.status === filters.status);
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         filteredGuests = filteredGuests.filter(g =>
@@ -587,20 +629,13 @@ class RfidSecurityServiceClass {
     return {
       success: true,
       data: filteredGuests,
-      pagination: {
-        current_page: 1,
-        per_page: 50,
-        total: filteredGuests.length,
-        total_pages: 1,
-      },
+      pagination: { current_page: 1, per_page: 50, total: filteredGuests.length, total_pages: 1 },
     };
   }
 
   async approveGuest(guestId: number): Promise<RfidApiResponse<void>> {
     const guestIndex = this.guests.findIndex(g => g.id === guestId);
-    if (guestIndex === -1) {
-      return { success: false, message: 'Guest not found' };
-    }
+    if (guestIndex === -1) return { success: false, message: 'Guest not found' };
 
     this.guests[guestIndex] = {
       ...this.guests[guestIndex],
@@ -621,9 +656,7 @@ class RfidSecurityServiceClass {
 
   async denyGuest(guestId: number, reason?: string): Promise<RfidApiResponse<void>> {
     const guestIndex = this.guests.findIndex(g => g.id === guestId);
-    if (guestIndex === -1) {
-      return { success: false, message: 'Guest not found' };
-    }
+    if (guestIndex === -1) return { success: false, message: 'Guest not found' };
 
     this.guests[guestIndex] = {
       ...this.guests[guestIndex],
@@ -687,9 +720,7 @@ class RfidSecurityServiceClass {
   }
 
   async getDashboardStats(): Promise<SecurityDashboardStats> {
-    if (!this.lastStats) {
-      await this.fetchAndUpdate();
-    }
+    if (!this.lastStats) await this.fetchAndUpdate();
 
     return this.lastStats || {
       today_entries: 0,
@@ -705,6 +736,7 @@ class RfidSecurityServiceClass {
   getLastStats(): SecurityDashboardStats | null {
     return this.lastStats;
   }
+
   getServiceStatus() {
     return {
       isRunning: this.isRunning,
@@ -716,6 +748,7 @@ class RfidSecurityServiceClass {
       processedIds: this.processedScanIds.size,
     };
   }
+
   clearData(): void {
     this.recentScans = [];
     this.alerts = [];

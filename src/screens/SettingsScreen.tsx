@@ -225,11 +225,15 @@ const SettingsScreen: React.FC = () => {
     }, [isAuthenticated, navigation])
   );
 
+  const hasLoadedRef = useRef(false);
+
   useFocusEffect(
     React.useCallback(() => {
-      if (isAuthenticated && user) {
+      if (isAuthenticated && user && !hasLoadedRef.current) {
+        hasLoadedRef.current = true;
         loadNotificationSettings();
       }
+      return () => { hasLoadedRef.current = false; };
     }, [isAuthenticated, user])
   );
 

@@ -32,7 +32,6 @@ import NotificationService from './src/services/NotificationService';
 import { RealTimeParkingService } from './src/services/RealtimeParkingService';
 import AdminRepliesSection from './src/components/AdminRepliesSection';
 import { theme } from './src/theme/theme';
-
 // Admin Screens
 import {
   AdminDashboard,
@@ -86,6 +85,8 @@ export type RootStackParamList = {
   AlertsScreen: undefined;
   GuestManagement: undefined;
   ScanHistory: undefined;
+  IncidentReport: undefined;
+  IncidentLog: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -306,17 +307,6 @@ const GlobalTabBar: React.FC<TabBarProps> = ({ navigation, currentRoute }) => {
         >
           <Ionicons
             name={isRfidScreen ? 'card' : 'card-outline'}
-            size={24}
-            color="white"
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[tabBarStyles.tabItem, isActive('Feedback') && tabBarStyles.activeTab]}
-          onPress={() => navigation.navigate('Feedback')}
-        >
-          <Ionicons
-            name={isActive('Feedback') ? 'chatbubble' : 'chatbubble-outline'}
             size={24}
             color="white"
           />
@@ -634,30 +624,31 @@ const AppNavigator: React.FC = () => {
               })}
             />
             
-            <Stack.Screen 
-              name="ParkingMap" 
+            <Stack.Screen
+              name="ParkingMap"
               component={ParkingMapScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Parking Map" 
+                  <GradientHeader
+                    title="Parking Map"
                     navigation={navigation}
                     canGoBack={true}
                   />
                 ),
                 gestureEnabled: true,
+                animationEnabled: true,
               })}
             />
             
-            <Stack.Screen 
-              name="Feedback" 
+            <Stack.Screen
+              name="Feedback"
               component={FeedbackScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Feedback" 
+                  <GradientHeader
+                    title="Feedback"
                     navigation={navigation}
                     canGoBack={true}
                   />
@@ -665,15 +656,15 @@ const AppNavigator: React.FC = () => {
                 gestureEnabled: true,
               })}
             />
-            
-            <Stack.Screen 
-              name="Settings" 
+
+            <Stack.Screen
+              name="Settings"
               component={SettingsScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Settings" 
+                  <GradientHeader
+                    title="Settings"
                     navigation={navigation}
                     canGoBack={true}
                   />
@@ -681,15 +672,15 @@ const AppNavigator: React.FC = () => {
                 gestureEnabled: true,
               })}
             />
-            
-            <Stack.Screen 
-              name="Profile" 
+
+            <Stack.Screen
+              name="Profile"
               component={ProfileScreen}
               options={({ navigation }) => ({
                 headerShown: false,
                 header: () => (
-                  <GradientHeader 
-                    title="Profile" 
+                  <GradientHeader
+                    title="Profile"
                     navigation={navigation}
                     canGoBack={true}
                   />
@@ -697,7 +688,7 @@ const AppNavigator: React.FC = () => {
                 gestureEnabled: true,
               })}
             />
-            
+
             <Stack.Screen
               name="AdminReplies"
               component={AdminRepliesSection}
@@ -845,19 +836,18 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
     });
   }
 
-  // Remote push tokens are not supported in Expo Go SDK 53+
   const isExpoGo = Constants.appOwnership === 'expo';
 
   if (Device.isDevice && !isExpoGo) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    const existingPerm = await Notifications.getPermissionsAsync();
+    let isGranted = (existingPerm as any).granted ?? (existingPerm as any).status === 'granted';
 
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+    if (!isGranted) {
+      const newPerm = await Notifications.requestPermissionsAsync();
+      isGranted = (newPerm as any).granted ?? (newPerm as any).status === 'granted';
     }
 
-    if (finalStatus !== 'granted') {
+    if (!isGranted) {
       console.warn('Push notification permissions not granted');
       return;
     }

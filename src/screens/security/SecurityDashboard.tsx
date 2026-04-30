@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
@@ -19,9 +18,13 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RfidSecurityService } from '../../services/RfidSecurityService';
-import { SecurityDashboardStats, RfidScanEvent, getStatusColor } from '../../types/rfid';
-import { COLORS } from '../../constants/AppConst';
+import { SecurityDashboardStats, RfidScanEvent, GuestAccess, getStatusColor } from '../../types/rfid';
 import { useVerifyVehicle } from '../../hooks/useVerifyVehicle';
+import { COLORS, API_ENDPOINTS } from '../../constants/AppConst';
+import { getQuickActionsForRole } from '../../constants/quickActions';
+import { styles } from '../styles/SecurityDashboard.style';
+import apiClient from '../../config/api';
+import { useAuth } from '../../context/AuthContext';
 
 type RootStackParamList = {
   SecurityDashboard: undefined;
@@ -38,8 +41,11 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'SecurityDashboard
 
 const SecurityDashboard: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
+  const userRole = (user?.role === 'ssd' ? 'ssd' : 'security') as 'ssd' | 'security';
   const { width } = useWindowDimensions();
   const [stats, setStats] = useState<SecurityDashboardStats | null>(null);
+  const [activeGuests, setActiveGuests] = useState<GuestAccess[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,9 +60,37 @@ const SecurityDashboard: React.FC = () => {
     handleVerify,
   } = useVerifyVehicle();
 
+  const loadActiveGuests = async () => {
+    try {
+      const res = await apiClient.get(API_ENDPOINTS.guestAccess, { params: { status: 'active' } });
+      const list: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      if (isMountedRef.current) {
+        setActiveGuests(list.map((g: any): GuestAccess => ({
+          id: g.id,
+          guest_id: g.guest_id ?? String(g.id),
+          name: g.name ?? '',
+          vehicle_plate: g.vehicle_plate ?? '',
+          phone: g.phone ?? '',
+          purpose: g.purpose ?? '',
+          valid_from: g.valid_from ?? '',
+          valid_until: g.valid_until ?? '',
+          status: g.status ?? 'active',
+          approved_by: g.approved_by ?? null,
+          notes: g.notes ?? null,
+          created_by: g.created_by ?? 0,
+          created_by_name: g.created_by ?? undefined,
+          created_at: g.created_at ?? '',
+          updated_at: g.updated_at ?? g.created_at ?? '',
+        })).filter((g) => !g.valid_until || new Date(g.valid_until).getTime() > Date.now()));
+      }
+    } catch {
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       isMountedRef.current = true;
+      loadActiveGuests();
 
       const unsubscribeStats = RfidSecurityService.onStatsUpdate((newStats) => {
         if (isMountedRef.current) {
@@ -87,6 +121,7 @@ const SecurityDashboard: React.FC = () => {
       setStats(newStats);
       setRefreshing(false);
     }
+    loadActiveGuests();
   };
 
   const StatCard: React.FC<{
@@ -185,7 +220,7 @@ const SecurityDashboard: React.FC = () => {
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.headerTitle}>Security Dashboard</Text>
+            <Text style={styles.headerTitle}>{userRole === 'ssd' ? 'SSD Dashboard' : 'Security Dashboard'}</Text>
             <View style={styles.connectionIndicator}>
               <View style={[
                 styles.connectionDot,
@@ -284,57 +319,85 @@ const SecurityDashboard: React.FC = () => {
           </View>
         )}
 
+        {/* Active Guests */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Active Guests</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('GuestManagement')}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {activeGuests.length === 0 ? (
+            <View style={styles.emptyGuests}>
+              <Ionicons name="people-outline" size={32} color="#CCC" />
+              <Text style={styles.emptyGuestsText}>No active guests</Text>
+            </View>
+          ) : (
+            activeGuests.map((guest) => {
+              const until = guest.valid_until ? new Date(guest.valid_until) : null;
+              const minsLeft = until ? Math.max(0, Math.round((until.getTime() - Date.now()) / 60000)) : null;
+              const timeLabel = minsLeft !== null
+                ? minsLeft >= 60 ? `${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m left` : `${minsLeft}m left`
+                : null;
+              return (
+                <View key={guest.id} style={styles.guestCard}>
+                  <View style={styles.guestCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.guestName}>{guest.name}</Text>
+                      {guest.phone ? <Text style={styles.guestPhone}>{guest.phone}</Text> : null}
+                    </View>
+                    <View style={[styles.guestStatusBadge, { backgroundColor: COLORS.green + '22' }]}>
+                      <Text style={[styles.guestStatusText, { color: COLORS.green }]}>Active</Text>
+                    </View>
+                  </View>
+                  <View style={styles.guestRow}>
+                    <Ionicons name="car-outline" size={14} color="#888" />
+                    <Text style={styles.guestMeta}>{guest.vehicle_plate}</Text>
+                    <Text style={styles.guestPassId}>{guest.guest_id}</Text>
+                  </View>
+                  {guest.purpose ? (
+                    <View style={styles.guestRow}>
+                      <Ionicons name="information-circle-outline" size={14} color="#888" />
+                      <Text style={styles.guestMeta}>{guest.purpose}</Text>
+                    </View>
+                  ) : null}
+                  {until ? (
+                    <View style={styles.guestRow}>
+                      <Ionicons name="time-outline" size={14} color="#888" />
+                      <Text style={styles.guestMeta}>
+                        Until {until.toLocaleDateString()} {until.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {timeLabel ? `  ·  ${timeLabel}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
+          )}
+        </View>
+
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
-            <QuickActionButton
-              title="Live Monitor"
-              icon="radio"
-              color={COLORS.primary}
-              onPress={() => navigation.navigate('ScanMonitor')}
-            />
-            <QuickActionButton
-              title="View Alerts"
-              icon="alert-circle"
-              color="#FF6B6B"
-              onPress={() => navigation.navigate('AlertsScreen')}
-            />
-            <QuickActionButton
-              title="Guest Requests"
-              icon="people"
-              color={COLORS.limited}
-              onPress={() => navigation.navigate('GuestManagement')}
-            />
-            <QuickActionButton
-              title="Scan History"
-              icon="time"
-              color={COLORS.blue}
-              onPress={() => navigation.navigate('ScanHistory')}
-            />
-            <QuickActionButton
-              title="Verify Vehicle"
-              icon="search"
-              color="#9C27B0"
-              onPress={() => {
-                setVerifyMode('rfid');
-                setVerifyInput('');
-                setVerifyResult(null);
-                setShowVerifyModal(true);
-              }}
-            />
-            <QuickActionButton
-              title="File Incident"
-              icon="warning"
-              color="#E65100"
-              onPress={() => navigation.navigate('IncidentReport')}
-            />
-            <QuickActionButton
-              title="Incident Log"
-              icon="document-text"
-              color="#5C6BC0"
-              onPress={() => navigation.navigate('IncidentLog')}
-            />
+            {getQuickActionsForRole(userRole).map((action) => (
+              <QuickActionButton
+                key={action.key}
+                title={action.title}
+                icon={action.icon}
+                color={action.color}
+                onPress={
+                  action.isVerify
+                    ? () => {
+                        setVerifyMode('rfid');
+                        setVerifyInput('');
+                        setVerifyResult(null);
+                        setShowVerifyModal(true);
+                      }
+                    : () => navigation.navigate(action.screen as any)
+                }
+              />
+            ))}
           </View>
         </View>
 
@@ -348,12 +411,14 @@ const SecurityDashboard: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowVerifyModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowVerifyModal(false)}>
+        <View style={{ flex: 1 }}>
+          <TouchableWithoutFeedback onPress={() => setShowVerifyModal(false)}>
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+          </TouchableWithoutFeedback>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.5)' }}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, pointerEvents: 'box-none' }}
           >
-            <TouchableWithoutFeedback onPress={() => {}}>
               <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, overflow: 'hidden' }}>
 
                 {/* Header */}
@@ -425,13 +490,26 @@ const SecurityDashboard: React.FC = () => {
                       </View>
                       {verifyResult.found && (
                         <>
-                          {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Owner: {verifyResult.user_name} {verifyResult.user_role ? `(${verifyResult.user_role})` : ''}</Text>}
-                          {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
-                          {(verifyResult.vehicle_make || verifyResult.vehicle_model) && (
-                            <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Vehicle: {[verifyResult.vehicle_make, verifyResult.vehicle_model].filter(Boolean).join(' ')}</Text>
+                          {verifyResult.is_guest ? (
+                            <>
+                              {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Guest: {verifyResult.user_name}</Text>}
+                              {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
+                              {verifyResult.purpose && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Purpose: {verifyResult.purpose}</Text>}
+                              {verifyResult.valid_from && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>From: {new Date(verifyResult.valid_from).toLocaleString()}</Text>}
+                              {verifyResult.valid_until && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Until: {new Date(verifyResult.valid_until).toLocaleString()}</Text>}
+                              {verifyResult.status && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Status: {verifyResult.status}</Text>}
+                            </>
+                          ) : (
+                            <>
+                              {verifyResult.user_name && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Owner: {verifyResult.user_name} {verifyResult.user_role ? `(${verifyResult.user_role})` : ''}</Text>}
+                              {verifyResult.vehicle_plate && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Plate: {verifyResult.vehicle_plate}</Text>}
+                              {(verifyResult.vehicle_make || verifyResult.vehicle_model) && (
+                                <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Vehicle: {[verifyResult.vehicle_make, verifyResult.vehicle_model].filter(Boolean).join(' ')}</Text>
+                              )}
+                              {verifyResult.uid && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>RFID UID: {verifyResult.uid}</Text>}
+                              {verifyResult.expiry_date && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Expiry: {new Date(verifyResult.expiry_date).toLocaleDateString()}</Text>}
+                            </>
                           )}
-                          {verifyResult.uid && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>RFID UID: {verifyResult.uid}</Text>}
-                          {verifyResult.expiry_date && <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Expiry: {new Date(verifyResult.expiry_date).toLocaleDateString()}</Text>}
                         </>
                       )}
                     </View>
@@ -459,265 +537,13 @@ const SecurityDashboard: React.FC = () => {
                   </View>
                 </View>
               </View>
-            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  connectionIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  connectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  connectionText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  profileButton: {
-    padding: 4,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  section: {
-    marginTop: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  seeAllText: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statTitle: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 4,
-  },
-  statArrow: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-  },
-  parkingCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  parkingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  parkingItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  parkingDivider: {
-    width: 1,
-    height: 60,
-    backgroundColor: '#E0E0E0',
-  },
-  parkingValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
-  },
-  parkingLabel: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 4,
-  },
-  lastScanCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  lastScanHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  lastScanTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  scanStatusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  scanStatusText: {
-    fontSize: 12,
-    color: '#FFF',
-    fontWeight: '500',
-  },
-  lastScanContent: {
-    gap: 8,
-  },
-  lastScanRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lastScanUid: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 10,
-    fontFamily: 'monospace',
-  },
-  lastScanText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 10,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  quickAction: {
-    width: '48%',
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  quickActionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    flex: 1,
-  },
-  bottomPadding: {
-    height: 100,
-  },
-});
+
 
 export default SecurityDashboard;

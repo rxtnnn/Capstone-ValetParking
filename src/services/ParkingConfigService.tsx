@@ -1,36 +1,22 @@
-// src/services/ParkingConfigService.tsx
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  ParkingLocationConfig,
-  FloorConfig,
-  ParkingConfigApiResponse,
-  ConfigCacheMetadata,
-  SensorToSpotMapping,
-  Position,
-} from '../types/parkingConfig';
-import { API_ENDPOINTS } from '../constants/AppConst';
-import {
-  generateFloorSpots,
-  NAVIGATION_WAYPOINTS,
-  NAVIGATION_ROUTES,
-  GESTURE_LIMITS,
-  INITIAL_VIEW,
-  ENTRANCE_POINT,
-} from '../components/MapLayout';
+import {ParkingLocationConfig, FloorConfig, ParkingConfigApiResponse, ConfigCacheMetadata,
+  SensorToSpotMapping, Position } from '../types/parkingConfig';
+import { API_ENDPOINTS, API_TOKEN } from '../constants/AppConst';
+import { generateFloorSpots, NAVIGATION_WAYPOINTS, NAVIGATION_ROUTES, GESTURE_LIMITS,
+  INITIAL_VIEW, ENTRANCE_POINT } from '../components/MapLayout';
 
+type ConfigListener = (config: ParkingLocationConfig) => void;
 
 class ParkingConfigServiceClass {
   private static readonly API_BASE_URL = API_ENDPOINTS.baseUrl;
-  private static readonly API_TOKEN = '1|DTEamW7nsL5lilUBDHf8HsPG13W7ue4wBWj8FzEQ2000b6ad';
-
   private static readonly CACHE_KEY = 'parking_config_cache';
   private static readonly CACHE_METADATA_KEY = 'parking_config_metadata';
-  private static readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; 
+  private static readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000;  //24hrs
 
   private cachedConfig: ParkingLocationConfig | null = null;
   private isLoading = false;
   private loadPromise: Promise<ParkingLocationConfig> | null = null;
+  private listeners: ConfigListener[] = [];
 
   async getConfig(locationId: string = 'usjr_quadricentennial'): Promise<ParkingLocationConfig> {
     if (this.cachedConfig && this.cachedConfig.location_id === locationId) {
@@ -47,6 +33,7 @@ class ParkingConfigServiceClass {
     try {
       const config = await this.loadPromise;
       this.cachedConfig = config;
+      this.notifyListeners(config);
       return config;
     } finally {
       this.isLoading = false;
@@ -65,12 +52,11 @@ class ParkingConfigServiceClass {
         return cachedConfig;
       }
 
-      console.log('Cache miss - fetching parking config from API');
       const apiConfig = await this.fetchAndCacheConfig(locationId);
       return apiConfig;
     } catch (error) {
       console.log('Failed to load config from cache/API, using fallback:', error);
-      return this.getHardcodedFallbackConfig(locationId);
+      return this.getDefaultParkingConfig(locationId);
     }
   }
 
@@ -83,7 +69,7 @@ class ParkingConfigServiceClass {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ParkingConfigServiceClass.API_TOKEN}`,
+          'Authorization': `Bearer ${API_TOKEN}`,
           'Cache-Control': 'no-cache',
         },
       });
@@ -103,7 +89,6 @@ class ParkingConfigServiceClass {
 
       return config;
     } catch (error) {
-      console.error('Failed to fetch parking config from API:', error);
       throw error;
     }
   }
@@ -167,6 +152,35 @@ class ParkingConfigServiceClass {
     return config.floors.find(f => f.floor_number === floorNumber) || null;
   }
 
+  async getFloorNumbers(locationId: string = 'usjr_quadricentennial'): Promise<number[]> {
+    const config = await this.getConfig(locationId);
+    return config.floors.map(f => f.floor_number).sort((a, b) => a - b);
+  }
+
+  async getDefaultFloors(locationId: string = 'usjr_quadricentennial') {
+    const floorNumbers = await this.getFloorNumbers(locationId);
+    return floorNumbers.map(floor => ({
+      floor,
+      total: 0,
+      available: 0,
+      malfunctioned: 0,
+      occupancyRate: 0,
+      status: 'no_data' as const,
+    }));
+  }
+
+  subscribe(listener: ConfigListener): () => void {
+    this.listeners.push(listener);
+    if (this.cachedConfig) listener(this.cachedConfig);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifyListeners(config: ParkingLocationConfig): void {
+    this.listeners.forEach(l => l(config));
+  }
+
   getSensorToSpotMapping(floorConfig: FloorConfig): SensorToSpotMapping {
     const mapping: SensorToSpotMapping = {};
     floorConfig.parking_spots.forEach(spot => {
@@ -185,8 +199,7 @@ class ParkingConfigServiceClass {
     return map;
   }
 
-  private getHardcodedFallbackConfig(locationId: string): ParkingLocationConfig {
-    console.warn('Using hardcoded fallback configuration');
+  private getDefaultParkingConfig(locationId: string): ParkingLocationConfig {
 
     const createFloorConfig = (floorNumber: number, floorName: string): FloorConfig => ({
       floor_number: floorNumber,

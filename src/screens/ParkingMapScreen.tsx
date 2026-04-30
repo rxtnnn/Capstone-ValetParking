@@ -17,11 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NavigationProp, useNavigation, useFocusEffect, RouteProp, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { Animated as RNAnimated } from 'react-native';
 import { styles } from './styles/ParkingMapScreen.style';
 import { RealTimeParkingService, ParkingStats } from '../services/RealtimeParkingService';
 import { COLORS, FONTS} from '../constants/AppConst';
@@ -32,6 +28,8 @@ import { NotificationManager } from '../services/NotifManager';
 import { TokenManager } from '../config/api';
 import apiClient from '../config/api';
 import { API_ENDPOINTS } from '../constants/AppConst';
+import { IncidentService } from '../services/IncidentService';
+import { IncidentCategory, INCIDENT_CATEGORY_LABELS, FLOOR_LEVELS } from '../types/incident';
 
 
 type RootStackParamList = {
@@ -59,21 +57,14 @@ interface ParkingSection {
   availableSlots: number;
   isFull: boolean;
 }
-
-// These constants are now deprecated - kept for backwards compatibility
-// Configuration is now loaded dynamically from ParkingConfigService
-
 const ParkingMapScreen: React.FC = () => {
   const navigation = useNavigation<ParkingMapScreenNavigationProp>();
   const route = useRoute<ParkingMapScreenRouteProp>();
   const floorNumber = route.params?.floor ?? 4;
-
-  // Dynamic configuration state
   const [floorConfig, setFloorConfig] = useState<FloorConfig | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
-
-  // Existing state
+  const [availableFloors, setAvailableFloors] = useState<FloorConfig[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [parkingData, setParkingData] = useState<ParkingSpot[]>([]);
@@ -85,6 +76,7 @@ const ParkingMapScreen: React.FC = () => {
   const [showFloorModal, setShowFloorModal] = useState(false);
   const [showParkingConfirmModal, setShowParkingConfirmModal] = useState(false);
   const [showNavigationModal, setShowNavigationModal] = useState(false);
+  const [navigationFromPicker, setNavigationFromPicker] = useState(false);
   const [selectedSpotForNav, setSelectedSpotForNav] = useState<string | null>(null);
   const [navigatingToSpot, setNavigatingToSpot] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -93,13 +85,10 @@ const ParkingMapScreen: React.FC = () => {
   const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); 
   const previousParkingDataRef = useRef<ParkingSpot[]>([]); 
   const optimisticMalfunctionRef = useRef<{ [spotId: string]: boolean }>({});
-
-  // Spot picker modal (for security/admin on available spots)
   const [showSpotPickerModal, setShowSpotPickerModal] = useState(false);
   const [spotPickerTarget, setSpotPickerTarget] = useState<ParkingSpot | null>(null);
-
-  // Spot actions modal
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
+  const [spotActionsFromPicker, setSpotActionsFromPicker] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
   const [reportIssue, setReportIssue] = useState('');
   const [reportCustomReason, setReportCustomReason] = useState('');
@@ -111,7 +100,15 @@ const ParkingMapScreen: React.FC = () => {
   const isAdminRole = userRole === 'admin' || userRole === 'ssd';
   const canAccessSpotActions = isSecurityRole || isAdminRole;
   const [spotActionsResult, setSpotActionsResult] = useState<{ type: 'success' | 'warning' | 'error'; title: string; message: string } | null>(null);
-
+  const [showIncidentModal, setShowIncidentModal] = useState(false);
+  const [incidentTarget, setIncidentTarget] = useState<ParkingSpot | null>(null);
+  const [incidentCategory, setIncidentCategory] = useState<IncidentCategory | ''>('');
+  const [incidentCategoryOpen, setIncidentCategoryOpen] = useState(false);
+  const [incidentAt, setIncidentAt] = useState('');
+  const [incidentInvolvedParty, setIncidentInvolvedParty] = useState('');
+  const [incidentNotes, setIncidentNotes] = useState('');
+  const [incidentActionTaken, setIncidentActionTaken] = useState('');
+  const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
 
   const isMountedRef = useRef(true);
   const unsubscribeFunctionsRef = useRef<{
@@ -119,10 +116,14 @@ const ParkingMapScreen: React.FC = () => {
     connectionStatus?: () => void;
   }>({});
 
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const bottomPanelY = useSharedValue(0);
+  const scaleAnim = useRef(new RNAnimated.Value(1)).current;
+  const translateXAnim = useRef(new RNAnimated.Value(0)).current;
+  const translateYAnim = useRef(new RNAnimated.Value(0)).current;
+  const bottomPanelYAnim = useRef(new RNAnimated.Value(0)).current;
+  const scaleRef = useRef(1);
+  const translateXRef = useRef(0);
+  const translateYRef = useRef(0);
+  const bottomPanelYRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -140,6 +141,10 @@ const ParkingMapScreen: React.FC = () => {
         }
 
         setFloorConfig(config);
+        const fullConfig = await ParkingConfigService.getConfig('usjr_quadricentennial');
+        if (isMounted && fullConfig.floors.length > 0) {
+          setAvailableFloors([...fullConfig.floors].sort((a, b) => a.floor_number - b.floor_number));
+        }
         const initialSpots: ParkingSpot[] = config.parking_spots.map(spot => ({
           id: spot.spot_id,
           isOccupied: false,
@@ -150,18 +155,16 @@ const ParkingMapScreen: React.FC = () => {
           rotation: spot.rotation,
           hasSensor: spot.sensor_id !== null && spot.sensor_id !== undefined, // Check if spot has a sensor
         }));
-
         setParkingData(initialSpots);
-
         if (config.initial_view) {
-          translateX.value = config.initial_view.translateX;
-          translateY.value = config.initial_view.translateY;
-          scale.value = config.initial_view.scale;
+          translateXRef.current = config.initial_view.translateX;
+          translateYRef.current = config.initial_view.translateY;
+          scaleRef.current = config.initial_view.scale;
+          translateXAnim.setValue(config.initial_view.translateX);
+          translateYAnim.setValue(config.initial_view.translateY);
+          scaleAnim.setValue(config.initial_view.scale);
         }
-
-        console.log('Parking configuration loaded successfully');
       } catch (error) {
-        console.error('Failed to load parking configuration:', error);
         if (isMounted) {
           setConfigError(error instanceof Error ? error.message : 'Unknown error');
         }
@@ -171,13 +174,11 @@ const ParkingMapScreen: React.FC = () => {
         }
       }
     };
-
     loadConfiguration();
-
     return () => {
       isMounted = false;
     };
-  }, [floorNumber]);
+  }, [floorNumber]); 
 
   // clear navigation when floor changes
   useEffect(() => {
@@ -195,23 +196,15 @@ const ParkingMapScreen: React.FC = () => {
     const previousSpot = previousParkingDataRef.current.find(spot => spot.id === navigatingToSpot);
 
     // check if the spot just became occupied (was not occupied before, now is occupied)
-    if (targetSpot && previousSpot && !previousSpot.isOccupied && targetSpot.isOccupied) {
-      // show confirmation modal asking if user parked
+    if (targetSpot && previousSpot && !previousSpot.isOccupied && targetSpot.isOccupied && NotificationManager.isRfidEntryDetected()) {
       setShowParkingConfirmModal(true);
     }
 
-    previousParkingDataRef.current = parkingData;
+    previousParkingDataRef.current = parkingData; //update old data to current
   }, [parkingData, navigatingToSpot, showNavigation]);
-
-  // Derived values from floor config
-  const sensorToSpotMapping = useMemo(() => {
-    if (!floorConfig) return {};
-    return ParkingConfigService.getSensorToSpotMapping(floorConfig);
-  }, [floorConfig]);
 
   const gestureLimits = useMemo(() => {
     if (!floorConfig?.gesture_limits) {
-      // Default gesture limits
       return {
         maxTranslateX: 300,
         minTranslateX: -300,
@@ -234,7 +227,7 @@ const ParkingMapScreen: React.FC = () => {
     const mapping = ParkingConfigService.getSensorToSpotMapping(floorConfig);
 
     Object.values(mapping).forEach(spotId => {
-      const section = spotId.charAt(1); // Extract section from '4A1' -> 'A'
+      const section = spotId.charAt(1); // extract section from '4A1' -> 'A'
       sectionMap[section] = (sectionMap[section] || 0) + 1;
     });
 
@@ -247,7 +240,7 @@ const ParkingMapScreen: React.FC = () => {
     })).sort((a, b) => a.id.localeCompare(b.id));
   }, [floorConfig]);
 
-  // Update sections when floor config changes
+  // update sections when floor config changes
   useEffect(() => {
     if (floorConfig) {
       setParkingSections(calculateSection());
@@ -376,8 +369,10 @@ const ParkingMapScreen: React.FC = () => {
   }, [updateParkingSpotsFromService]);
 
   useEffect(() => {
-    translateX.value = 90;
-    translateY.value = 70;
+    translateXRef.current = 90;
+    translateYRef.current = 70;
+    translateXAnim.setValue(90);
+    translateYAnim.setValue(70);
     subscribeToParkingData();
     return () => {
       Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
@@ -394,6 +389,9 @@ const ParkingMapScreen: React.FC = () => {
       if (!unsubscribeFunctionsRef.current.parkingUpdates) {
         subscribeToParkingData();
       }
+      if (NotificationManager.isRfidEntryDetected()) {
+        NotificationManager.resumeSpotNotifications();
+      }
     }, [subscribeToParkingData])
   );
 
@@ -405,77 +403,84 @@ const ParkingMapScreen: React.FC = () => {
     };
   }, []);
   
-  const startX = useSharedValue(0);
-  const startY = useSharedValue(0);
-  const startScale = useSharedValue(1);
-  const startPanelY = useSharedValue(0);
+  const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY,
+          minScale, maxScale, clampMinScale, clampMaxScale } = gestureLimits;
 
-  const panGesture = Gesture.Pan()
+  const panGesture = useMemo(() => Gesture.Pan()
+    .runOnJS(true)
     .onStart(() => {
-      startX.value = translateX.value;
-      startY.value = translateY.value;
+      // snapshot current values at gesture start
     })
     .onUpdate((event) => {
-      translateX.value = startX.value + event.translationX;
-      translateY.value = startY.value + event.translationY;
+      const newX = Math.max(minTranslateX, Math.min(maxTranslateX, translateXRef.current + event.translationX));
+      const newY = Math.max(minTranslateY, Math.min(maxTranslateY, translateYRef.current + event.translationY));
+      translateXAnim.setValue(newX);
+      translateYAnim.setValue(newY);
     })
-    .onEnd(() => {
-      const { maxTranslateX, minTranslateX, maxTranslateY, minTranslateY } = gestureLimits;
-      if (translateX.value > maxTranslateX) translateX.value = maxTranslateX;
-      else if (translateX.value < minTranslateX) translateX.value = minTranslateX;
-      if (translateY.value > maxTranslateY) translateY.value = maxTranslateY;
-      else if (translateY.value < minTranslateY) translateY.value = minTranslateY;
+    .onEnd((event) => {
+      translateXRef.current = Math.max(minTranslateX, Math.min(maxTranslateX, translateXRef.current + event.translationX));
+      translateYRef.current = Math.max(minTranslateY, Math.min(maxTranslateY, translateYRef.current + event.translationY));
     })
     .minPointers(1)
-    .maxPointers(1);
+    .maxPointers(1),
+  [minTranslateX, maxTranslateX, minTranslateY, maxTranslateY]);
 
-  const pinchGesture = Gesture.Pinch()
-    .onStart(() => {
-      startScale.value = scale.value;
-    })
+  const pinchGesture = useMemo(() => Gesture.Pinch()
+    .runOnJS(true)
     .onUpdate((event) => {
-      const { minScale, maxScale } = gestureLimits;
-      scale.value = Math.max(minScale, Math.min(maxScale, startScale.value * event.scale));
+      const newScale = Math.max(minScale, Math.min(maxScale, scaleRef.current * event.scale));
+      scaleAnim.setValue(newScale);
     })
-    .onEnd(() => {
-      const { clampMinScale, clampMaxScale } = gestureLimits;
-      if (scale.value < clampMinScale) scale.value = clampMinScale;
-      else if (scale.value > clampMaxScale) scale.value = clampMaxScale;
-    });
+    .onEnd((event) => {
+      const raw = scaleRef.current * event.scale;
+      scaleRef.current = Math.max(clampMinScale, Math.min(clampMaxScale, raw));
+      scaleAnim.setValue(scaleRef.current);
+    }),
+  [minScale, maxScale, clampMinScale, clampMaxScale]);
 
-  const mapGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+  const mapGesture = useMemo(
+    () => Gesture.Simultaneous(panGesture, pinchGesture),
+    [panGesture, pinchGesture]
+  );
 
-  const bottomPanelGesture = Gesture.Pan()
-    .onStart(() => {
-      startPanelY.value = bottomPanelY.value;
-    })
+  const bottomPanelGesture = useMemo(() => Gesture.Pan()
+    .runOnJS(true)
     .onUpdate((event) => {
-      const newY = startPanelY.value + event.translationY;
-      bottomPanelY.value = Math.max(-50, Math.min(150, newY));
+      const newY = Math.max(-50, Math.min(200, bottomPanelYRef.current + event.translationY));
+      bottomPanelYAnim.setValue(newY);
     })
     .onEnd((event) => {
       const velocity = event.velocityY;
-      const currentY = bottomPanelY.value;
-      if (velocity > 500 || currentY > 75) {
-        bottomPanelY.value = withSpring(120);
-      } else if (velocity < -500 || currentY < 25) {
-        bottomPanelY.value = withSpring(0);
+      const currentY = bottomPanelYRef.current + event.translationY;
+      let targetY: number;
+      if (velocity > 500 || currentY > 100) {
+        targetY = 200;
+      } else if (velocity < -500 || currentY < 50) {
+        targetY = 0;
       } else {
-        bottomPanelY.value = withSpring(currentY > 50 ? 120 : 0);
+        targetY = currentY > 100 ? 200 : 0;
       }
-    });
+      bottomPanelYRef.current = targetY;
+      RNAnimated.spring(bottomPanelYAnim, {
+        toValue: targetY,
+        useNativeDriver: true,
+        friction: 7,
+        tension: 40,
+      }).start();
+    }),
+  []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
+  const animatedStyle = {
     transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
+      { translateX: translateXAnim },
+      { translateY: translateYAnim },
+      { scale: scaleAnim },
     ],
-  }));
+  };
 
-  const bottomPanelAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: bottomPanelY.value }],
-  }));
+  const bottomPanelAnimatedStyle = {
+    transform: [{ translateY: bottomPanelYAnim }],
+  };
 
   const handleRefresh = useCallback(async () => {
     if (!isMountedRef.current) return;
@@ -483,7 +488,6 @@ const ParkingMapScreen: React.FC = () => {
     try {
       await RealTimeParkingService.forceUpdate();
     } catch (error) {
-      console.error('Manual refresh failed:', error);
       if (isMountedRef.current) {
         Alert.alert('Refresh Failed', 'Unable to refresh parking data. Please try again.');
       }
@@ -499,15 +503,15 @@ const ParkingMapScreen: React.FC = () => {
   }, []);
 
   const handleParkingConfirm = useCallback(async () => { //I've parked button
-    await NotificationManager.pauseSpotNotifications();
+    await NotificationManager.pauseSpotNotifications(); //stop notif
     try {
-      const tagsRes = await apiClient.get(API_ENDPOINTS.publicRfidTags);
-      const tags: any[] = tagsRes.data?.tags ?? [];
-      const currentUser = TokenManager.getUser();
-      const userTag = tags.find(t =>
+      const tagsResponse = await apiClient.get(API_ENDPOINTS.publicRfidTags); //fetch rfid tags
+      const tags: any[] = tagsResponse.data?.tags ?? []; //get tags list
+      const currentUser = TokenManager.getUser(); 
+      const userTag = tags.find(t =>  //find tag of currently logged in user
         t.user_name?.toLowerCase() === currentUser?.name?.toLowerCase() && t.status === 'active'
       );
-      if (userTag?.uid) {
+      if (userTag?.uid) { //if found, send rfid uid
         await apiClient.post(API_ENDPOINTS.publicRfidParked, { uid: userTag.uid });
       }
     } catch {
@@ -518,19 +522,19 @@ const ParkingMapScreen: React.FC = () => {
     setShowSuccessModal(true);
   }, [clearNavigation]);
 
-  //parking recommendation 
+  //parking recommendation  - Cancel Button
   const handleParkingCancel = useCallback(() => {
     setShowParkingConfirmModal(false);
     // find nearby available spots
     if (navigatingToSpot) {
-      const takenSpotSection = navigatingToSpot.charAt(1);
+      const takenSpotSection = navigatingToSpot.charAt(1); //get the letter 
       // find available spots in same section 
       const availableSpots = parkingData
         .filter(spot => spot.hasSensor && !spot.isOccupied && !spot.malfunctioned && spot.id !== navigatingToSpot)
         .sort((a, b) => {
           const aSection = a.id.charAt(1);
           const bSection = b.id.charAt(1);
-          // Prioritize same section
+          // prioritize same section
           if (aSection === takenSpotSection && bSection !== takenSpotSection) return -1;
           if (bSection === takenSpotSection && aSection !== takenSpotSection) return 1;
           return a.id.localeCompare(b.id);
@@ -553,11 +557,12 @@ const ParkingMapScreen: React.FC = () => {
     if (!spot.hasSensor) return;
 
     if (canAccessSpotActions) {
-      if (isSecurityRole && !spot.malfunctioned) {
+      if (!spot.malfunctioned) {
         setSpotPickerTarget(spot);
         setShowSpotPickerModal(true);
       } else {
         setSpotActionsTarget(spot);
+        setSpotActionsFromPicker(false);
         setReportIssue('');
         setReportCustomReason('');
         setIssueDropdownOpen(false);
@@ -575,10 +580,10 @@ const ParkingMapScreen: React.FC = () => {
       Alert.alert('Spot Occupied', 'This parking spot is currently occupied.');
       return;
     }
-
     setSelectedSpot(spot.id);
     setSelectedSpotForNav(spot.id);
     setHighlightedSpots([]);
+    setNavigationFromPicker(false);
     setShowNavigationModal(true);
   }, [canAccessSpotActions]);
 
@@ -596,7 +601,7 @@ const ParkingMapScreen: React.FC = () => {
     const isSelected = selectedSpot === spot.id;
     const spotSection = spot.id.charAt(1); // Extract section from '4A1' -> 'A'
     const isSectionHighlighted = highlightedSection === spotSection;
-    const isSpotHighlighted = highlightedSpots.includes(spot.id); // Check if this specific spot is highlighted
+    const isSpotHighlighted = highlightedSpots.includes(spot.id);
     const rotation = spot.rotation || '0deg';
     const w = spot.width || 30;
     const h = spot.height || 30;
@@ -610,7 +615,6 @@ const ParkingMapScreen: React.FC = () => {
         backgroundColor = spot.isOccupied ? COLORS.primary : COLORS.green;
       }
     }
-
     // Security and admin can interact with any sensor-assigned spot; others only available ones
     const isClickable = spot.hasSensor && (canAccessSpotActions || (!spot.isOccupied && !spot.malfunctioned));
 
@@ -891,42 +895,43 @@ const ParkingMapScreen: React.FC = () => {
           {parkingSections.map(renderSectionIndicator)}
         </ScrollView>
       </LinearGradient>
+      
+        <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+          <Ionicons name="refresh" size={20} color="white" />
+          <Text style={styles.refreshText}>Refresh</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-        <Ionicons name="refresh" size={20} color="white" />
-        <Text style={styles.refreshText}>Refresh</Text>
-      </TouchableOpacity>
-
-      <View style={{ position: 'absolute', top: 130, left: 12, right: 12, zIndex: 2000, flexDirection: 'row', justifyContent: 'center', gap: 10, backgroundColor: 'rgb(71, 69, 69)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, elevation: 10 }}>
+      <View style={styles.legendContainer}>
         {[
           { color: COLORS.green, label: 'Available' },
           { color: COLORS.primary, label: 'Occupied' },
           { color: '#FFDE42', label: 'Malfunction' },
           { color: '#CCCCCC', label: 'No Sensor' },
         ].map(({ color, label }) => (
-          <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: color }} />
-            <Text style={{ fontSize: 11, color: 'white', fontFamily: FONTS.regular }}>{label}</Text>
+          <View key={label} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <Text style={styles.legendLabel}>{label}</Text>
           </View>
         ))}
       </View>
+     
 
       <View style={styles.mapContainer}>
         <View style={styles.mapFrame}>
           <GestureDetector gesture={mapGesture}>
-            <Animated.View style={styles.mapWrapper}>
-              <Animated.View style={[styles.parkingLayout, animatedStyle]}>
+            <RNAnimated.View style={styles.mapWrapper}>
+              <RNAnimated.View style={[styles.parkingLayout, animatedStyle]}>
                 <MapLayout styles={styles} />
                 {parkingData.map(renderParkingSpot)}
                 {renderNavigationPath()}
-              </Animated.View>
-            </Animated.View>
+              </RNAnimated.View>
+            </RNAnimated.View>
           </GestureDetector>
         </View>
       </View>
 
       <GestureDetector gesture={bottomPanelGesture}>
-        <Animated.View style={[bottomPanelAnimatedStyle]}>
+        <RNAnimated.View style={[bottomPanelAnimatedStyle]}>
           <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.bottomPanel}>
             <View style={styles.dragHandle} />
             
@@ -942,7 +947,7 @@ const ParkingMapScreen: React.FC = () => {
                   <Text style={styles.availableNumber}>{currentFloorAvailableSpots}</Text>
                 </View>
               </View>
-              
+            
               <View style={styles.lastUpdated}>
                 <Text style={styles.lastUpdatedText}>
                   Last updated: {parkingStats?.lastUpdated || 'Loading...'}
@@ -968,24 +973,26 @@ const ParkingMapScreen: React.FC = () => {
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </LinearGradient>
-        </Animated.View>
+        </RNAnimated.View>
       </GestureDetector>
-
+      // navigation buttons
       {showNavigation && (
         <View style={{ position: 'absolute', top: 180, right: 20, gap: 10, zIndex: 2000 }}>
-          <TouchableOpacity
-            style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: NotificationManager.isRfidEntryDetected() ? COLORS.green : '#A0A0A0' }]}
-            onPress={() => {
-              if (!NotificationManager.isRfidEntryDetected()) {
-                Alert.alert('Not Inside Parking', 'Your RFID must be detected at the entrance before you can mark as parked.');
-                return;
-              }
-              setShowParkingConfirmModal(true);
-            }}
-          >
-            <Ionicons name="checkmark-circle" size={20} color="white" />
-            <Text style={styles.clearRouteText}>I've Parked</Text>
-          </TouchableOpacity>
+          {!canAccessSpotActions && (
+            <TouchableOpacity
+              style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: NotificationManager.isRfidEntryDetected() ? COLORS.green : '#A0A0A0' }]}
+              onPress={() => {
+                if (!NotificationManager.isRfidEntryDetected()) {
+                  Alert.alert('Not Inside Parking', 'Your RFID must be detected at the entrance before you can mark as parked.');
+                  return;
+                }
+                setShowParkingConfirmModal(true);
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="white" />
+              <Text style={styles.clearRouteText}>I've Parked</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.clearRouteButton, { position: 'relative', top: 0, right: 0, backgroundColor: COLORS.primary }]} onPress={clearNavigation}>
             <Ionicons name="close-circle" size={20} color="white" />
             <Text style={styles.clearRouteText}>Clear Route</Text>
@@ -1019,17 +1026,19 @@ const ParkingMapScreen: React.FC = () => {
 
           {/* Floor options - sorted by available spots (highest first) */}
           <View style={styles.floorOptionsContainer}>
-            {[1, 2, 3, 4]
-              .map((floor) => {
-                const floorData = parkingStats?.floors?.find(f => f.floor === floor);
+            {availableFloors
+              .map((floorCfg) => {
+                const floorData = parkingStats?.floors?.find(f => f.floor === floorCfg.floor_number);
                 return {
-                  floor,
+                  floor: floorCfg.floor_number,
+                  name: floorCfg.floor_name,
                   available: floorData?.available ?? 0,
                   total: floorData?.total ?? 0,
+                  malfunctioned: floorData?.malfunctioned ?? 0,
                 };
               })
               .sort((a, b) => b.available - a.available)
-              .map(({ floor, available, total }) => {
+              .map(({ floor, name, available, total, malfunctioned }) => {
               const isCurrentFloor = floorNumber === floor;
               const availableSpots = available;
               const totalSpots = total;
@@ -1057,14 +1066,14 @@ const ParkingMapScreen: React.FC = () => {
                       navigation.navigate('ParkingMap', { floor });
                     }
                   }}
-                  activeOpacity={hasData ? 0.7 : 1} // No opacity change if disabled
-                  disabled={!hasData} // Disable touch if no data
+                  activeOpacity={hasData ? 0.7 : 1}
+                  disabled={!hasData}
                 >
                   {/* Floor icon */}
                   <View style={[
                     styles.floorIconContainer,
                     isCurrentFloor ? styles.floorIconCurrent : styles.floorIconInactive,
-                    !hasData && styles.floorIconDisabled // Add disabled style
+                    !hasData && styles.floorIconDisabled 
                   ]}>
                     <Text style={[
                       styles.floorIconText,
@@ -1080,15 +1089,22 @@ const ParkingMapScreen: React.FC = () => {
                       styles.floorLabel1,
                       { color: isCurrentFloor ? 'white' : !hasData ? '#999' : '#333' }
                     ]}>
-                      {floor === 1 ? '1st' : floor === 2 ? '2nd' : floor === 3 ? '3rd' : '4th'} Floor
+                      {name}
                     </Text>
-                    <Text style={[
-                      styles.floorAvailability,
+                    <Text style={[styles.floorAvailability,
                       { color: isCurrentFloor ? 'rgba(255,255,255,0.8)' : !hasData ? '#999' : '#888' }
                     ]}>
                       {hasData ? `${availableSpots} ${availableSpots === 1 ? 'spot' : 'spots'} available` : 'No sensors assigned'}
                     </Text>
                   </View>
+
+                  {/* Malfunction indicator */}
+                  {canAccessSpotActions && malfunctioned > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6F00', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, marginRight: 6, gap: 3 }}>
+                      <Ionicons name="warning" size={12} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>{malfunctioned}</Text>
+                    </View>
+                  )}
 
                   {/* Status indicator */}
                   <View style={styles.floorStatusContainer}>
@@ -1140,6 +1156,17 @@ const ParkingMapScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.navigationModalContainer}>
             <View style={styles.navigationModalHeader}>
+              {navigationFromPicker && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowNavigationModal(false);
+                    setShowSpotPickerModal(true);
+                  }}
+                  style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
               <View style={styles.navigationHeaderText}>
                 <Text style={styles.navigationModalTitle}>Navigate to Spot</Text>
                 <Text style={styles.navigationModalSubtitle}>
@@ -1322,7 +1349,8 @@ const ParkingMapScreen: React.FC = () => {
         </View>
       </View>
     </Modal>
-      {/* Spot Picker Modal — Show Route or Report Malfunction */}
+
+      {/* Spot Picker Modal — Show Route, Log Incident or Report Malfunction */}
       <Modal
         visible={showSpotPickerModal}
         transparent
@@ -1335,12 +1363,11 @@ const ParkingMapScreen: React.FC = () => {
               <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 340, overflow: 'hidden' }}>
                 {/* Header */}
                 <View style={{ backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="location" size={20} color="#fff" />
-                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Spot {spotPickerTarget?.id}</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontFamily: FONTS.regular, fontSize: 12 }}>Available</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontFamily: FONTS.regular, fontSize: 12 }}>
+                      {spotPickerTarget?.isOccupied ? 'Occupied' : 'Available'}
+                    </Text>
                   </View>
                   <TouchableOpacity
                     onPress={() => setShowSpotPickerModal(false)}
@@ -1350,26 +1377,64 @@ const ParkingMapScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
+                {/* Status badge */}
+                <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                  <Text style={{ fontSize: 12, color: '#888', fontFamily: FONTS.regular }}>
+                    Floor: <Text style={{ fontFamily: FONTS.semiBold, color: '#333' }}>
+                      {floorNumber === 1 ? '1st' : floorNumber === 2 ? '2nd' : floorNumber === 3 ? '3rd' : `${floorNumber}th`} Floor
+                    </Text>
+                    {'  |  '}Status: <Text style={{ fontFamily: FONTS.semiBold, color: spotPickerTarget?.isOccupied ? COLORS.primary : COLORS.green }}>
+                      {spotPickerTarget?.isOccupied ? 'Occupied' : 'Available'}
+                    </Text>
+                  </Text>
+                </View>
+
                 {/* Options */}
                 <View style={{ padding: 16, gap: 10 }}>
-                  {/* Show Route */}
+                  {/* Show Route — only for available spots */}
+                  {!spotPickerTarget?.isOccupied && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.green, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                      onPress={() => {
+                        setShowSpotPickerModal(false);
+                        const spot = spotPickerTarget;
+                        if (!spot) return;
+                        setSelectedSpot(spot.id);
+                        setSelectedSpotForNav(spot.id);
+                        setHighlightedSpots([]);
+                        setNavigationFromPicker(true);
+                        setShowNavigationModal(true);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Show Route to Spot</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Display navigation on map</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Log Incident */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.green, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FF9801', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
                     onPress={() => {
+                      if (!spotPickerTarget) return;
+                      setIncidentTarget(spotPickerTarget);
+                      setIncidentCategory('');
+                      setIncidentCategoryOpen(false);
+                      setIncidentAt('');
+                      setIncidentInvolvedParty('');
+                      setIncidentNotes('');
+                      setIncidentActionTaken('');
                       setShowSpotPickerModal(false);
-                      const spot = spotPickerTarget;
-                      if (!spot) return;
-                      setSelectedSpot(spot.id);
-                      setSelectedSpotForNav(spot.id);
-                      setHighlightedSpots([]);
-                      setShowNavigationModal(true);
+                      setShowIncidentModal(true);
                     }}
                   >
-                    <Ionicons name="navigate" size={22} color="#fff" />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Show Route</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Display navigation on map</Text>
+                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Log Incident</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Report an incident at this spot</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
                   </TouchableOpacity>
@@ -1377,23 +1442,32 @@ const ParkingMapScreen: React.FC = () => {
                   {/* Report Malfunction */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderWidth: 1.5, borderColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
                     onPress={() => {
-                      setShowSpotPickerModal(false);
                       if (!spotPickerTarget) return;
                       setSpotActionsTarget(spotPickerTarget);
+                      setSpotActionsFromPicker(true);
                       setReportIssue('');
                       setReportCustomReason('');
                       setIssueDropdownOpen(false);
+                      setShowSpotPickerModal(false);
                       setShowSpotActionsModal(true);
                     }}
                   >
-                    <Ionicons name="warning" size={22} color={COLORS.primary} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: COLORS.primary, fontFamily: FONTS.semiBold, fontSize: 14 }}>Report Malfunction</Text>
-                      <Text style={{ color: '#888', fontFamily: FONTS.regular, fontSize: 12 }}>Flag this spot as malfunctioned</Text>
+                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Report Malfunction</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Flag this spot as malfunctioned</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
+
+                  {/* Cancel */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6c757d', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    onPress={() => setShowSpotPickerModal(false)}
+                  >
+                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1409,19 +1483,29 @@ const ParkingMapScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowSpotActionsModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowSpotActionsModal(false)}>
+        <View style={{ flex: 1 }}>
+          <TouchableWithoutFeedback onPress={() => setShowSpotActionsModal(false)}>
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }} />
+          </TouchableWithoutFeedback>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, pointerEvents: 'box-none' }}
           >
-            <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.spotActionsModalContainer}>
 
             {/* Red header */}
             <View style={styles.spotActionsModalHeader}>
-              <View style={styles.spotActionsIconContainer}>
-                <Ionicons name="warning" size={28} color="#fff" />
-              </View>
+              {spotActionsFromPicker && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowSpotActionsModal(false);
+                    setShowSpotPickerModal(true);
+                  }}
+                  style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 6 }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
               <View style={styles.spotActionsHeaderText}>
                 <Text style={styles.spotActionsModalTitle} numberOfLines={1}>Flag as Malfunctioned</Text>
                 <Text style={styles.spotActionsModalSubtitle}>Spot {spotActionsTarget?.id}</Text>
@@ -1642,9 +1726,8 @@ const ParkingMapScreen: React.FC = () => {
               )}
             </ScrollView>
               </View>
-            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
 
       {/* Spot Actions Result Modal */}
@@ -1671,6 +1754,217 @@ const ParkingMapScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Log Incident Modal */}
+      <Modal
+        visible={showIncidentModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowIncidentModal(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', maxWidth: 380 }}
+          >
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+              {/* Orange header */}
+              <View style={{ backgroundColor: '#FF9801', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowIncidentModal(false);
+                    setShowSpotPickerModal(true);
+                  }}
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#fff" />
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Log Incident — {incidentTarget?.id}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowIncidentModal(false)}
+                  style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <Ionicons name="close" size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ padding: 16, gap: 12 }}
+              >
+                {/* Floor / Status row */}
+                <Text style={{ fontSize: 12, color: '#888', fontFamily: FONTS.regular, marginBottom: 4 }}>
+                  Floor: <Text style={{ fontFamily: FONTS.semiBold, color: '#333' }}>
+                    {floorNumber === 1 ? '1st' : floorNumber === 2 ? '2nd' : floorNumber === 3 ? '3rd' : `${floorNumber}th`} Floor
+                  </Text>
+                  {'  |  '}Status: <Text style={{ fontFamily: FONTS.semiBold, color: incidentTarget?.isOccupied ? COLORS.primary : COLORS.green }}>
+                    {incidentTarget?.isOccupied ? 'Occupied' : 'Available'}
+                  </Text>
+                </Text>
+
+                {/* Category */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>
+                    Category <Text style={{ color: '#FF9801' }}>*</Text>
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setIncidentCategoryOpen(o => !o)}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      borderWidth: 1.5, borderColor: incidentCategory ? '#FF9801' : '#ddd',
+                      borderRadius: incidentCategoryOpen ? 8 : 8,
+                      borderBottomLeftRadius: incidentCategoryOpen ? 0 : 8,
+                      borderBottomRightRadius: incidentCategoryOpen ? 0 : 8,
+                      paddingHorizontal: 14, paddingVertical: 12,
+                      backgroundColor: '#fafafa',
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: incidentCategory ? '#1a1a1a' : '#aaa', fontFamily: FONTS.regular, flex: 1 }} numberOfLines={1}>
+                      {incidentCategory ? INCIDENT_CATEGORY_LABELS[incidentCategory as IncidentCategory] : '— Select category —'}
+                    </Text>
+                    <Ionicons name={incidentCategoryOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#888" />
+                  </TouchableOpacity>
+                  {incidentCategoryOpen && (
+                    <View style={{
+                      borderWidth: 1.5, borderColor: '#FF9801', borderTopWidth: 0,
+                      borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
+                      backgroundColor: '#fff', overflow: 'hidden',
+                    }}>
+                      {(Object.keys(INCIDENT_CATEGORY_LABELS) as IncidentCategory[]).map((cat, idx) => (
+                        <TouchableOpacity
+                          key={cat}
+                          activeOpacity={0.7}
+                          onPress={() => { setIncidentCategory(cat); setIncidentCategoryOpen(false); }}
+                          style={{
+                            paddingHorizontal: 14, paddingVertical: 12,
+                            backgroundColor: incidentCategory === cat ? '#fff3e0' : '#fff',
+                            borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: '#f0f0f0',
+                            flexDirection: 'row', alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ flex: 1, fontSize: 14, color: incidentCategory === cat ? '#FF9801' : '#333', fontFamily: FONTS.regular }}>
+                            {INCIDENT_CATEGORY_LABELS[cat]}
+                          </Text>
+                          {incidentCategory === cat && <Ionicons name="checkmark" size={16} color="#FF9801" />}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                {/* When did it happen */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>When did it happen?</Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a' }}
+                    placeholder="e.g. 2026-04-10 14:30"
+                    placeholderTextColor="#aaa"
+                    value={incidentAt}
+                    onChangeText={setIncidentAt}
+                  />
+                </View>
+
+                {/* Involved party */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>
+                    Involved party <Text style={{ fontFamily: FONTS.regular, color: '#888', fontSize: 12 }}>(plate no., person, etc.)</Text>
+                  </Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a' }}
+                    placeholder="e.g. ABC 1234, unknown pedestrian"
+                    placeholderTextColor="#aaa"
+                    value={incidentInvolvedParty}
+                    onChangeText={setIncidentInvolvedParty}
+                  />
+                </View>
+
+                {/* Description / Notes */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>Description / Notes</Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a', minHeight: 80, textAlignVertical: 'top' }}
+                    placeholder="What happened?"
+                    placeholderTextColor="#aaa"
+                    multiline
+                    value={incidentNotes}
+                    onChangeText={setIncidentNotes}
+                  />
+                </View>
+
+                {/* Action taken */}
+                <View>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: '#1a1a1a', marginBottom: 6 }}>Action taken</Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: FONTS.regular, backgroundColor: '#fafafa', color: '#1a1a1a' }}
+                    placeholder="e.g. Cordoned area, notified admin"
+                    placeholderTextColor="#aaa"
+                    value={incidentActionTaken}
+                    onChangeText={setIncidentActionTaken}
+                  />
+                </View>
+
+                {/* Buttons */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{ flex: 1, backgroundColor: '#6c757d', borderRadius: 10, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                    onPress={() => setShowIncidentModal(false)}
+                  >
+                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={isSubmittingIncident}
+                    style={{ flex: 1.4, backgroundColor: '#FF9801', borderRadius: 10, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                    onPress={async () => {
+                      if (!incidentCategory) {
+                        setSpotActionsResult({ type: 'warning', title: 'Category Required', message: 'Please select an incident category.' });
+                        return;
+                      }
+                      setIsSubmittingIncident(true);
+                      try {
+                        const floorLabel = `${floorNumber === 1 ? '1st' : floorNumber === 2 ? '2nd' : floorNumber === 3 ? '3rd' : `${floorNumber}th`} Floor`;
+                        const result = await IncidentService.create({
+                          floor_level: floorLabel,
+                          category: incidentCategory,
+                          space_code: incidentTarget?.id,
+                          incident_at: incidentAt || undefined,
+                          involved_party: incidentInvolvedParty || undefined,
+                          notes: incidentNotes || undefined,
+                          action_taken: incidentActionTaken || undefined,
+                        });
+                        setShowIncidentModal(false);
+                        if (result.success) {
+                          setSpotActionsResult({ type: 'success', title: 'Incident Logged', message: `Incident at spot ${incidentTarget?.id} has been recorded.` });
+                        } else {
+                          setSpotActionsResult({ type: 'error', title: 'Failed', message: result.message ?? 'Could not log incident. Try again.' });
+                        }
+                      } catch {
+                        setShowIncidentModal(false);
+                        setSpotActionsResult({ type: 'error', title: 'Error', message: 'Failed to submit incident report.' });
+                      } finally {
+                        setIsSubmittingIncident(false);
+                      }
+                    }}
+                  >
+                    {isSubmittingIncident
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <>
+                          <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Submit Log</Text>
+                        </>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
