@@ -946,6 +946,12 @@ export const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 20,
   },
+  reasonText:{
+    fontSize: 11, 
+    color: '#888',
+     marginTop: 4, 
+     fontFamily: FONTS.regular ,
+  },
   spotActionsStatusText: {
     color: '#fff',
     fontWeight: '700',
