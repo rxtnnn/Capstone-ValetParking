@@ -186,28 +186,36 @@ export const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 12,
     width: '50%',
-    padding: 20,
     alignItems: 'center'
   },
   OkButton:{
-    color: 'white',
+    color: 'black',
     fontSize: 20,
     fontFamily: FONTS.semiBold,
+    alignItems: 'center',
   },
-  textTitle1: {
-    width:'100%',
-    borderRadius: 10,
+  OkButtonBack:{
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 50,
   },
   notInsizeText1:{
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: FONTS.semiBold,
+    marginTop: 20
   },
   notInsizeText2:{
     color: 'white',
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: FONTS.regular,
     alignItems: 'center',
+    padding: 20,
   },
 
 

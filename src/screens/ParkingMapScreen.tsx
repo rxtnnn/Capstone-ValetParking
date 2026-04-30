@@ -1022,9 +1022,11 @@ const ParkingMapScreen: React.FC = () => {
                         <View style={styles.notInsideModal}>
                           <Text style={styles.notInsizeText1}>Not Inside Parking</Text>
                           <Text style={styles.notInsizeText2}>Your RFID must be detected at the entrance before you can mark as parked.</Text>
-                          <TouchableOpacity onPress={() => setShowNotInsideAlert(false)}> 
-                            <Text style={styles.OkButton}> OK </Text>
-                          </TouchableOpacity>
+                          <View style={styles.OkButtonBack}>
+                            <TouchableOpacity onPress={() => setShowNotInsideAlert(false)}> 
+                              <Text style={styles.OkButton}> OK </Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                   </Modal>
