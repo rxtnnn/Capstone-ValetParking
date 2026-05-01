@@ -320,7 +320,7 @@ const AdminDashboard: React.FC = () => {
                       <Text style={{ fontWeight: '700', color: '#333' }}>{scan.user_name ?? 'Unknown User'}</Text>
                       <Text style={{ color: '#666', fontSize: 12 }}>RFID: {scan.rfid_uid}</Text>
                       <Text style={{ color: '#666', fontSize: 12 }}>
-                        {new Date(scan.timestamp).toLocaleTimeString()} — {scan.reader_location ?? scan.reader_name ?? ''}
+                        Time:{new Date(scan.timestamp).toLocaleTimeString()} — {scan.reader_location ?? scan.reader_name ?? ''}
                       </Text>
                     </View>
                   ))}
