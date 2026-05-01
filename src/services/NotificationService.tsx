@@ -293,18 +293,24 @@ class NotificationServiceClass {
     forceShow: boolean = false
   ): Promise<void> {
     if (spotsAvailable <= 0) return;
-    if (!forceShow && !NotificationManager.isRfidEntryDetected()) return;
-    if (!forceShow && NotificationManager.isSpotNotificationsPaused()) return;
 
-    // Always re-read from AsyncStorage — in-memory flag can be stale after hot reload
+    // Always re-read from AsyncStorage — in-memory flags can be stale after hot reload
     if (!forceShow) {
       try {
         const userId = TokenManager.getUser()?.id;
         if (userId) {
-          const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
-          if (stored === 'true') return;
+          const rfidStored = await AsyncStorage.getItem(`@valet_rfid_entry_detected_${userId}`);
+          if (rfidStored !== 'true') return;
+          const pausedStored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
+          if (pausedStored === 'true') return;
+        } else {
+          if (!NotificationManager.isRfidEntryDetected()) return;
+          if (NotificationManager.isSpotNotificationsPaused()) return;
         }
-      } catch { /* ignore */ }
+      } catch {
+        if (!NotificationManager.isRfidEntryDetected()) return;
+        if (NotificationManager.isSpotNotificationsPaused()) return;
+      }
     }
 
     try {
@@ -371,17 +377,22 @@ class NotificationServiceClass {
   ): Promise<void> {
     if (availableSpots <= 0) return;
 
-    if (!NotificationManager.isRfidEntryDetected()) return;
-    if (NotificationManager.isSpotNotificationsPaused()) return;
-
-    // Always re-read from AsyncStorage
+    // Always re-read from AsyncStorage — in-memory flags can be stale after hot reload
     try {
       const userId = TokenManager.getUser()?.id;
       if (userId) {
-        const stored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
-        if (stored === 'true') return;
+        const rfidStored = await AsyncStorage.getItem(`@valet_rfid_entry_detected_${userId}`);
+        if (rfidStored !== 'true') return;
+        const pausedStored = await AsyncStorage.getItem(`@valet_spot_notifs_paused_${userId}`);
+        if (pausedStored === 'true') return;
+      } else {
+        if (!NotificationManager.isRfidEntryDetected()) return;
+        if (NotificationManager.isSpotNotificationsPaused()) return;
       }
-    } catch {}
+    } catch {
+      if (!NotificationManager.isRfidEntryDetected()) return;
+      if (NotificationManager.isSpotNotificationsPaused()) return;
+    }
 
     try {
       const settings = await this.getNotificationSettings();
