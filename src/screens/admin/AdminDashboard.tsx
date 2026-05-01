@@ -299,8 +299,8 @@ const AdminDashboard: React.FC = () => {
 
         {/* Activity Detail Modal */}
         <Modal visible={activityModal.visible} transparent animationType="slide">
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '70%' }}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', marginBottom: 45}}>
+            <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '80%' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>
                   {activityModal.type === 'entry' ? 'Entries Today' : activityModal.type === 'exit' ? 'Exits Today' : activityModal.type === 'invalid' ? 'Invalid Scans Today' : 'Currently Parked'}
