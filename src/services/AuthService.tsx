@@ -87,7 +87,6 @@ class AuthService {
             token: data.token,
           };
         }
-        
         return { 
           success: false, 
           message: data.message || ERROR_MESSAGES.INVALID_CREDENTIALS 

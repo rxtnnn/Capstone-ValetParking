@@ -120,10 +120,6 @@ const SwipeableNotificationItem: React.FC<SwipeableNotificationItemProps> = ({
     }
   };
 
-  const notificationData = notification.data as any;
-  const isFeedbackReply = notification.type === 'feedback_reply';
-  const isSpotAvailable = notification.type === 'spot_available';
-
   return (
     <View style={styles.swipeContainer}>
       <View style={styles.deleteButtonContainer}>
@@ -367,7 +363,6 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
 
     const filteredNotifications = useMemo(() => {
       const effectiveUserId = userId || currentUserId || userInfo.id;
-      
       let userNotifications = notifications;
       
       if (effectiveUserId) {
@@ -381,9 +376,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
         case 'unread':
           return userNotifications.filter(n => !n.isRead);
         case 'spots':
-          return userNotifications.filter(
-            n => n.type === 'spot_available' && n.data?.spotIds && n.data.spotIds.length > 0
-          );
+          return userNotifications.filter(n => n.type === 'spot_available' && n.data?.spotIds && n.data.spotIds.length > 0);
         case 'feedback':
           return userNotifications.filter(n => n.type === 'feedback_reply');
       default:
@@ -402,10 +395,10 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
         return <Ionicons name="chatbubble" size={20} color={COLORS.primary} />;
       case 'spot_malfunction':
         return <Ionicons name="warning" size={20} color="#FF9800" />;
-      case 'rfid_alert':
-        return <Ionicons name="card" size={20} color="#FF6B6B" />;
       case 'guest_request':
         return <Ionicons name="person-add" size={20} color={COLORS.blue} />;
+      case 'rfid_alert':
+        return <Ionicons name="notifications" size={20} color={COLORS.primary} />;
       default:
         return <Ionicons name="notifications" size={20} color="#666" />;
     }
@@ -442,8 +435,7 @@ const NotificationOverlay: React.FC<NotificationOverlayProps> = ({
   const handleNotificationDelete = async (notificationId: string) => {
     try {
       await NotificationManager.deleteNotification(notificationId);
-    } catch (error) {
-      console.error('Error deleting notification:', error);
+    } catch{
     }
   };
 

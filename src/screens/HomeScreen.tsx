@@ -484,7 +484,7 @@ const HomeScreen: React.FC = () => {
             const noData = status.text === 'NO DATA' || floor.total === 0;
             const isFull = floor.total > 0 && floor.available === 0;
 
-            // Floor is disabled if no sensor data OR if floor is full
+            // Floor is disabled if no sensor data
             const isDisabled = noData;
             const userRole = TokenManager.getUser()?.role;
             const canSeeMalfunction = userRole === 'admin' || userRole === 'ssd' || userRole === 'security';

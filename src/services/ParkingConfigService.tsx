@@ -200,7 +200,6 @@ class ParkingConfigServiceClass {
   }
 
   private getDefaultParkingConfig(locationId: string): ParkingLocationConfig {
-
     const createFloorConfig = (floorNumber: number, floorName: string): FloorConfig => ({
       floor_number: floorNumber,
       floor_name: floorName,

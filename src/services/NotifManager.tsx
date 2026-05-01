@@ -163,7 +163,6 @@ class NotificationManagerClass {
       const stored = await AsyncStorage.getItem(key);
       this.processedReplies = stored ? new Set(JSON.parse(stored)) : new Set();
     } catch (error) {
-      console.log('Error loading processed replies:', error);
       this.processedReplies = new Set();
     }
   }
@@ -227,7 +226,6 @@ class NotificationManagerClass {
         : [];
       this.notifyListeners();      
     } catch (error) {
-      console.log('Error loading notifications:', error);
       this.notifications = [];
       this.notifyListeners();
     }

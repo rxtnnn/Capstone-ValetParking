@@ -86,8 +86,8 @@ const ParkingMapScreen: React.FC = () => {
   const [highlightedSpots, setHighlightedSpots] = useState<string[]>([]); 
   const previousParkingDataRef = useRef<ParkingSpot[]>([]); 
   const optimisticMalfunctionRef = useRef<{ [spotId: string]: boolean }>({});
-  const [showSpotPickerModal, setShowSpotPickerModal] = useState(false);
-  const [spotPickerTarget, setSpotPickerTarget] = useState<ParkingSpot | null>(null);
+  const [showChoiceModal, setShowChoiceModal] = useState(false);
+  const [choiceTarget, setChoiceTarget] = useState<ParkingSpot | null>(null);
   const [showSpotActionsModal, setShowSpotActionsModal] = useState(false);
   const [spotActionsFromPicker, setSpotActionsFromPicker] = useState(false);
   const [spotActionsTarget, setSpotActionsTarget] = useState<ParkingSpot | null>(null);
@@ -562,8 +562,8 @@ const ParkingMapScreen: React.FC = () => {
 
     if (canAccessSpotActions) {
       if (!spot.malfunctioned) {
-        setSpotPickerTarget(spot);
-        setShowSpotPickerModal(true);
+        setChoiceTarget(spot);
+        setShowChoiceModal(true);
       } else {
         setSpotActionsTarget(spot);
         setSpotActionsFromPicker(false);
@@ -580,7 +580,7 @@ const ParkingMapScreen: React.FC = () => {
       return;
     }
 
-    if (spot.isOccupied) {
+    if (spot.isOccupied && !canAccessSpotActions) {
       Alert.alert('Spot Occupied', 'This parking spot is currently occupied.');
       return;
     }
@@ -589,7 +589,7 @@ const ParkingMapScreen: React.FC = () => {
     setHighlightedSpots([]);
     setNavigationFromPicker(false);
     setShowNavigationModal(true);
-  }, [canAccessSpotActions]);
+  }, [canAccessSpotActions, floorConfig]);
 
   const navigateHome = useCallback(() => {
     navigation.navigate('Home');
@@ -1028,7 +1028,7 @@ const ParkingMapScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Floor options - sorted by available spots (highest first) */}
+          {/* Select Floor Cards*/}
           <View style={styles.floorOptionsContainer}>
             {availableFloors
               .map((floorCfg) => {
@@ -1047,14 +1047,13 @@ const ParkingMapScreen: React.FC = () => {
               const availableSpots = available;
               const totalSpots = total;
               const hasData = totalSpots > 0;
-
               return (
                 <TouchableOpacity
                   key={floor}
                   style={[
                     styles.floorOption,
                     isCurrentFloor ? styles.floorOptionCurrent : styles.floorOptionInactive,
-                    !hasData && styles.floorOptionDisabled, //
+                    !hasData && styles.floorOptionDisabled, 
                     {
                       shadowColor: isCurrentFloor ? COLORS.primary : '#474747',
                       shadowOffset: { width: 0, height: isCurrentFloor ? 4 : 1 },
@@ -1081,7 +1080,7 @@ const ParkingMapScreen: React.FC = () => {
                   ]}>
                     <Text style={[
                       styles.floorIconText,
-                      { color: isCurrentFloor ? 'white' : !hasData ? '#999' : COLORS.primary }
+                      { color: isCurrentFloor ? 'white' : !hasData? '#999' : COLORS.primary }
                     ]}>
                       {floor}
                     </Text>
@@ -1164,7 +1163,7 @@ const ParkingMapScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={() => {
                     setShowNavigationModal(false);
-                    setShowSpotPickerModal(true);
+                    setShowChoiceModal(true);
                   }}
                   style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}
                 >
@@ -1354,55 +1353,52 @@ const ParkingMapScreen: React.FC = () => {
       </View>
     </Modal>
 
-      {/* Spot Picker Modal — Show Route, Log Incident or Report Malfunction */}
+      {/* Choice Modal — Show Route, Log Incident or Report Malfunction */}
       <Modal
-        visible={showSpotPickerModal}
+        visible={showChoiceModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowSpotPickerModal(false)}
+        onRequestClose={() => setShowChoiceModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowSpotPickerModal(false)}>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+        <TouchableWithoutFeedback onPress={() => setShowChoiceModal(false)}>
+          <View style={styles.choiceOverlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 340, overflow: 'hidden' }}>
+              <View style={styles.choiceContainer}>
                 {/* Header */}
-                <View style={{ backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 15 }}>Spot {spotPickerTarget?.id}</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontFamily: FONTS.regular, fontSize: 12 }}>
-                      {spotPickerTarget?.isOccupied ? 'Occupied' : 'Available'}
+                <View style={styles.choiceHeader}>
+                  <View style={styles.choiceHeaderInfo}>
+                    <Text style={styles.choiceTitle}>Spot {choiceTarget?.id}</Text>
+                    <Text style={styles.choiceSubtitle}>
+                      {choiceTarget?.isOccupied ? 'Occupied' : 'Available'}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => setShowSpotPickerModal(false)}
-                    style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
-                  >
+                  <TouchableOpacity onPress={() => setShowChoiceModal(false)} style={styles.choiceCloseBtn}>
                     <Ionicons name="close" size={16} color="#fff" />
                   </TouchableOpacity>
                 </View>
 
-                {/* Status badge */}
-                <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-                  <Text style={{ fontSize: 12, color: '#888', fontFamily: FONTS.regular }}>
-                    Floor: <Text style={{ fontFamily: FONTS.semiBold, color: '#333' }}>
+                {/* Status */}
+                <View style={styles.choiceStatus}>
+                  <Text style={styles.choiceStatusText}>
+                    Floor: <Text style={styles.choiceStatusBold}>
                       {floorNumber === 1 ? '1st' : floorNumber === 2 ? '2nd' : floorNumber === 3 ? '3rd' : `${floorNumber}th`} Floor
                     </Text>
-                    {'  |  '}Status: <Text style={{ fontFamily: FONTS.semiBold, color: spotPickerTarget?.isOccupied ? COLORS.primary : COLORS.green }}>
-                      {spotPickerTarget?.isOccupied ? 'Occupied' : 'Available'}
+                    {'  |  '}Status: <Text style={[styles.choiceStatusBold, { color: choiceTarget?.isOccupied ? COLORS.primary : COLORS.green }]}>
+                      {choiceTarget?.isOccupied ? 'Occupied' : 'Available'}
                     </Text>
                   </Text>
                 </View>
 
                 {/* Options */}
-                <View style={{ padding: 16, gap: 10 }}>
-                  {/* Show Route — only for available spots */}
-                  {!spotPickerTarget?.isOccupied && (
+                <View style={styles.choiceOptions}>
+                  {/* Show Route */}
+                  {(!choiceTarget?.isOccupied || canAccessSpotActions) && (
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.green, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                      style={[styles.choiceBtn, { backgroundColor: COLORS.green }]}
                       onPress={() => {
-                        setShowSpotPickerModal(false);
-                        const spot = spotPickerTarget;
+                        setShowChoiceModal(false);
+                        const spot = choiceTarget;
                         if (!spot) return;
                         setSelectedSpot(spot.id);
                         setSelectedSpotForNav(spot.id);
@@ -1411,9 +1407,9 @@ const ParkingMapScreen: React.FC = () => {
                         setShowNavigationModal(true);
                       }}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Show Route to Spot</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Display navigation on map</Text>
+                      <View style={styles.choiceBtnInfo}>
+                        <Text style={styles.choiceBtnTitle}>Show Route to Spot</Text>
+                        <Text style={styles.choiceBtnSubtitle}>Display navigation on map</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
                     </TouchableOpacity>
@@ -1422,23 +1418,23 @@ const ParkingMapScreen: React.FC = () => {
                   {/* Log Incident */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FF9801', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    style={[styles.choiceBtn, { backgroundColor: '#FF9801' }]}
                     onPress={() => {
-                      if (!spotPickerTarget) return;
-                      setIncidentTarget(spotPickerTarget);
+                      if (!choiceTarget) return;
+                      setIncidentTarget(choiceTarget);
                       setIncidentCategory('');
                       setIncidentCategoryOpen(false);
                       setIncidentAt('');
                       setIncidentInvolvedParty('');
                       setIncidentNotes('');
                       setIncidentActionTaken('');
-                      setShowSpotPickerModal(false);
+                      setShowChoiceModal(false);
                       setShowIncidentModal(true);
                     }}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Log Incident</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Report an incident at this spot</Text>
+                    <View style={styles.choiceBtnInfo}>
+                      <Text style={styles.choiceBtnTitle}>Log Incident</Text>
+                      <Text style={styles.choiceBtnSubtitle}>Report an incident at this spot</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
                   </TouchableOpacity>
@@ -1446,21 +1442,21 @@ const ParkingMapScreen: React.FC = () => {
                   {/* Report Malfunction */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
+                    style={[styles.choiceBtn, { backgroundColor: COLORS.primary }]}
                     onPress={() => {
-                      if (!spotPickerTarget) return;
-                      setSpotActionsTarget(spotPickerTarget);
+                      if (!choiceTarget) return;
+                      setSpotActionsTarget(choiceTarget);
                       setSpotActionsFromPicker(true);
                       setReportIssue('');
                       setReportCustomReason('');
                       setIssueDropdownOpen(false);
-                      setShowSpotPickerModal(false);
+                      setShowChoiceModal(false);
                       setShowSpotActionsModal(true);
                     }}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Report Malfunction</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: FONTS.regular, fontSize: 12 }}>Flag this spot as malfunctioned</Text>
+                    <View style={styles.choiceBtnInfo}>
+                      <Text style={styles.choiceBtnTitle}>Report Malfunction</Text>
+                      <Text style={styles.choiceBtnSubtitle}>Flag this spot as malfunctioned</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
                   </TouchableOpacity>
@@ -1468,10 +1464,10 @@ const ParkingMapScreen: React.FC = () => {
                   {/* Cancel */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#6c757d', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14 }}
-                    onPress={() => setShowSpotPickerModal(false)}
+                    style={styles.choiceCancelBtn}
+                    onPress={() => setShowChoiceModal(false)}
                   >
-                    <Text style={{ color: '#fff', fontFamily: FONTS.semiBold, fontSize: 14 }}>Cancel</Text>
+                    <Text style={styles.choiceCancelText}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1503,7 +1499,7 @@ const ParkingMapScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={() => {
                     setShowSpotActionsModal(false);
-                    setShowSpotPickerModal(true);
+                    setShowChoiceModal(true);
                   }}
                   style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 6 }}
                 >
@@ -1783,7 +1779,7 @@ const ParkingMapScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={() => {
                     setShowIncidentModal(false);
-                    setShowSpotPickerModal(true);
+                    setShowChoiceModal(true);
                   }}
                   style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
                 >
