@@ -48,7 +48,7 @@ const SecurityDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const isMountedRef = useRef(true);
-  const [activityModal, setActivityModal] = useState<{ visible: boolean; type: 'entry' | 'exit' | null; scans: RfidScanEvent[] }>({ visible: false, type: null, scans: [] });
+  const [activityModal, setActivityModal] = useState<{ visible: boolean; type: 'entry' | 'exit' | 'invalid' | null; scans: RfidScanEvent[] }>({ visible: false, type: null, scans: [] });
   const [activityLoading, setActivityLoading] = useState(false);
   const [parkedModal, setParkedModal] = useState(false);
   const [parkedUsers, setParkedUsers] = useState<any[]>([]);
@@ -71,7 +71,7 @@ const SecurityDashboard: React.FC = () => {
     setParkedLoading(false);
   };
 
-  const openActivityModal = async (type: 'entry' | 'exit') => {
+  const openActivityModal = async (type: 'entry' | 'exit' | 'invalid') => {
     setActivityModal({ visible: true, type, scans: [] });
     setActivityLoading(true);
     try {
@@ -79,7 +79,10 @@ const SecurityDashboard: React.FC = () => {
       const scans: any[] = res.data?.scans || [];
       const today = new Date().toDateString();
       const filtered: RfidScanEvent[] = scans
-        .filter(s => s.scan_type === type && s.status === 'valid' && new Date(s.timestamp).toDateString() === today)
+        .filter(s => type === 'invalid'
+          ? s.status !== 'valid' && new Date(s.timestamp).toDateString() === today
+          : s.scan_type === type && s.status === 'valid' && new Date(s.timestamp).toDateString() === today
+        )
         .map((raw: any) => ({
           id: `scan-${raw.id}`,
           timestamp: raw.timestamp,
@@ -351,11 +354,11 @@ const SecurityDashboard: React.FC = () => {
                 <Text style={styles.parkingLabel}>Currently Parked</Text>
               </TouchableOpacity>
               <View style={styles.parkingDivider} />
-              <View style={styles.parkingItem}>
+              <TouchableOpacity style={styles.parkingItem} onPress={() => openActivityModal('invalid' as any)}>
                 <Ionicons name="close-circle-outline" size={32} color="#FF6B6B" />
                 <Text style={styles.parkingValue}>{stats?.invalid_scans_today || 0}</Text>
                 <Text style={styles.parkingLabel}>Invalid Scans</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -633,7 +636,7 @@ const SecurityDashboard: React.FC = () => {
           <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '80%' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>
-                {activityModal.type === 'entry' ? 'Entries Today' : 'Exits Today'}
+                {activityModal.type === 'entry' ? 'Entries Today' : activityModal.type === 'invalid' ? 'Invalid Scans Today' : 'Exits Today'}
               </Text>
               <TouchableOpacity onPress={() => setActivityModal({ visible: false, type: null, scans: [] })}>
                 <Ionicons name="close" size={24} color="#333" />
@@ -649,9 +652,9 @@ const SecurityDashboard: React.FC = () => {
                   <View key={scan.id ?? index} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Text style={{ fontWeight: '700', color: '#333' }}>{scan.user_name ?? 'Unknown User'}</Text>
-                      <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: activityModal.type === 'entry' ? COLORS.green : COLORS.blue }}>
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: activityModal.type === 'entry' ? COLORS.green : activityModal.type === 'invalid' ? '#FF6B6B' : COLORS.blue }}>
                         <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                          {activityModal.type === 'entry' ? 'ENTRY' : 'EXIT'}
+                          {activityModal.type === 'entry' ? 'ENTRY' : activityModal.type === 'invalid' ? 'INVALID' : 'EXIT'}
                         </Text>
                       </View>
                     </View>
