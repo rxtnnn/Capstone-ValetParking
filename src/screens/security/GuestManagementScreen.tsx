@@ -11,10 +11,9 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableWithoutFeedback,
-  KeyboardAvoidingView,
   Platform,
-  Keyboard,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -44,6 +43,8 @@ const GuestManagementScreen: React.FC = () => {
   const [denyReason, setDenyReason] = useState('');
   const [newGuestModal, setNewGuestModal] = useState(false);
   const [newGuestLoading, setNewGuestLoading] = useState(false);
+  const [startDate, setStartDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [newGuest, setNewGuest] = useState({
     name: '',
     vehicle_plate: '',
@@ -129,7 +130,7 @@ const GuestManagementScreen: React.FC = () => {
     }
     setNewGuestLoading(true);
     try {
-      const valid_from = new Date();
+      const valid_from = startDate;
       const valid_until = new Date(valid_from.getTime() + hours * 60 * 60 * 1000);
       await apiClient.post(API_ENDPOINTS.guestAccess, {
         name: newGuest.name.trim(),
@@ -140,8 +141,9 @@ const GuestManagementScreen: React.FC = () => {
         valid_until: valid_until.toISOString(),
         notes: newGuest.notes.trim() || null,
       });
-      Keyboard.dismiss(); setNewGuestModal(false);
+      setNewGuestModal(false);
       setNewGuest({ name: '', vehicle_plate: '', phone: '', purpose: '', valid_hours: '24', notes: '', _purposeOpen: false });
+      setStartDate(new Date());
       loadGuests();
     } catch {
       Alert.alert('Error', 'Failed to create guest pass. Please try again.');
@@ -322,22 +324,18 @@ const GuestManagementScreen: React.FC = () => {
       <Modal
         visible={newGuestModal}
         transparent
-        animationType="fade"
-        onRequestClose={() => { Keyboard.dismiss(); setNewGuestModal(false); }}
+        animationType="slide"
+        onRequestClose={() => setNewGuestModal(false)}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }}>
-            <View style={styles.newGuestOverlay}>
-              <TouchableWithoutFeedback>
-                <View style={styles.newGuestSheet}>
+        <TouchableWithoutFeedback onPress={() => setNewGuestModal(false)}>
+          <View style={styles.newGuestOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.newGuestSheet}>
                   {/* Header */}
                   <View style={styles.newGuestHeader}>
                     <Ionicons name="person-add-outline" size={20} color="#333" />
                     <Text style={styles.newGuestTitle}>New Guest Pass</Text>
-                    <TouchableOpacity onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={() => setNewGuestModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <Ionicons name="close" size={22} color="#666" />
                     </TouchableOpacity>
                   </View>
@@ -345,7 +343,6 @@ const GuestManagementScreen: React.FC = () => {
                   <ScrollView
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    keyboardDismissMode="interactive"
                     contentContainerStyle={{ paddingBottom: 8 }}
                   >
                     {/* Guest Name */}
@@ -420,20 +417,50 @@ const GuestManagementScreen: React.FC = () => {
                       </View>
                     )}
 
-                    {/* Valid Duration */}
-                    <Text style={styles.fieldLabel}>Valid Duration <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <TextInput
-                        style={[styles.fieldInput, { flex: 1 }]}
-                        placeholder="24"
-                        placeholderTextColor="#aaa"
-                        value={newGuest.valid_hours}
-                        onChangeText={v => setNewGuest(p => ({ ...p, valid_hours: v.replace(/[^0-9]/g, '') }))}
-                        keyboardType="numeric"
-                      />
-                      <Text style={{ fontSize: 14, color: '#666' }}>hours</Text>
+                    {/* Start Date + Valid Duration */}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Start Date <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
+                        <TouchableOpacity
+                          style={[styles.fieldInput, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                          onPress={() => setShowDatePicker(true)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={{ fontSize: 14, color: '#333' }}>
+                            {`${String(startDate.getMonth() + 1).padStart(2, '0')}/${String(startDate.getDate()).padStart(2, '0')}/${startDate.getFullYear()}`}
+                          </Text>
+                          <Ionicons name="calendar-outline" size={16} color="#666" />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Valid Duration <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TextInput
+                            style={[styles.fieldInput, { flex: 1 }]}
+                            placeholder="24"
+                            placeholderTextColor="#aaa"
+                            value={newGuest.valid_hours}
+                            onChangeText={v => setNewGuest(p => ({ ...p, valid_hours: v.replace(/[^0-9]/g, '') }))}
+                            keyboardType="numeric"
+                          />
+                          <Text style={{ fontSize: 14, color: '#666' }}>hrs</Text>
+                        </View>
+                      </View>
                     </View>
                     <Text style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>Max: 168 hours (1 week)</Text>
+
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={startDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                        minimumDate={new Date()}
+                        onChange={(_, selected) => {
+                          setShowDatePicker(Platform.OS === 'ios');
+                          if (selected) setStartDate(selected);
+                        }}
+                      />
+                    )}
 
                     {/* Notes */}
                     <Text style={styles.fieldLabel}>Notes</Text>
@@ -451,7 +478,7 @@ const GuestManagementScreen: React.FC = () => {
                   <View style={styles.newGuestFooter}>
                     <TouchableOpacity
                       style={styles.newGuestCancelBtn}
-                      onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }}
+                      onPress={() => setNewGuestModal(false)}
                     >
                       <Text style={styles.newGuestCancelText}>Cancel</Text>
                     </TouchableOpacity>
@@ -470,7 +497,6 @@ const GuestManagementScreen: React.FC = () => {
               </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* Deny Modal */}
