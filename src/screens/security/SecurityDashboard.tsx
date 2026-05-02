@@ -10,8 +10,6 @@ import {
   Modal,
   TextInput,
   TouchableWithoutFeedback,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -415,10 +413,7 @@ const SecurityDashboard: React.FC = () => {
           <TouchableWithoutFeedback onPress={() => setShowVerifyModal(false)}>
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
           </TouchableWithoutFeedback>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, pointerEvents: 'box-none' }}
-          >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, pointerEvents: 'box-none' }}>
               <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, overflow: 'hidden' }}>
 
                 {/* Header */}
@@ -537,7 +532,7 @@ const SecurityDashboard: React.FC = () => {
                   </View>
                 </View>
               </View>
-          </KeyboardAvoidingView>
+          </View>
         </View>
       </Modal>
     </View>
