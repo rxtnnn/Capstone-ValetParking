@@ -548,6 +548,29 @@ class RfidSecurityServiceClass {
     }
   }
 
+  async getParkedUsers(): Promise<PaginatedResponse<RfidScanEvent>> {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.publicRfidParked);
+      const raw: any[] = response.data?.parked ?? response.data ?? [];
+      const mapped: RfidScanEvent[] = raw.map((item: any, index: number) => ({
+        id: `parked-${item.id ?? index}`,
+        timestamp: item.entry_time ?? item.parked_at ?? new Date().toISOString(),
+        reader_id: 'unknown',
+        reader_name: item.entry_type ?? 'Gate',
+        reader_location: 'Unknown Location',
+        rfid_uid: item.uid ?? item.rfid_uid ?? 'Unknown',
+        scan_type: 'parked' as any,
+        status: item.status ?? 'parked',
+        message: `${item.minutes_parked ?? 0} min parked`,
+        user_name: item.name ?? undefined,
+        vehicle_plate: item.plate ?? undefined,
+      }));
+      return { success: true, data: mapped, pagination: { current_page: 1, per_page: 50, total: mapped.length, total_pages: 1 } };
+    } catch {
+      return { success: false, data: [], pagination: { current_page: 1, per_page: 50, total: 0, total_pages: 1 } };
+    }
+  }
+
   async restoreRfidStateForUser(userName: string): Promise<void> {
     try {
       const response = await apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 1440 } });

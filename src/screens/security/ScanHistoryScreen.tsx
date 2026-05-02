@@ -30,37 +30,41 @@ const ScanHistoryScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<{
     status: 'all' | 'valid' | 'invalid';
-    type: 'all' | 'entry' | 'exit';
+    type: 'all' | 'entry' | 'exit' | 'parked';
   }>({ status: 'all', type: 'all' });
   const isMountedRef = useRef(true);
 
   const loadScans = async () => {
     const filterParams: ScanHistoryFilters = {};
-
     if (filters.status !== 'all') {
       filterParams.status = filters.status === 'valid' ? 'valid' : undefined;
     }
-    if (filters.type !== 'all') {
+    if (filters.type !== 'all' && filters.type !== 'parked') {
       filterParams.scan_type = filters.type;
     }
     if (searchQuery.trim()) {
       filterParams.search = searchQuery.trim();
     }
 
-    const response = await RfidSecurityService.getRecentScans(filterParams);
-    if (isMountedRef.current && response.success) {
-      let filteredData = response.data;
+    const [scansResponse, parkedResponse] = await Promise.all([
+      filters.type === 'parked' ? Promise.resolve({ success: true, data: [] as RfidScanEvent[] }) : RfidSecurityService.getRecentScans(filterParams),
+      (filters.type === 'all' || filters.type === 'parked') ? RfidSecurityService.getParkedUsers() : Promise.resolve({ success: true, data: [] as RfidScanEvent[] }),
+    ]);
 
-      // Additional client-side filtering for status
-      if (filters.status === 'invalid') {
-        filteredData = filteredData.filter(s => s.status !== 'valid');
-      } else if (filters.status === 'valid') {
-        filteredData = filteredData.filter(s => s.status === 'valid');
-      }
+    if (!isMountedRef.current) return;
 
-      setScans(filteredData);
-      setRefreshing(false);
+    let filteredData = [...(scansResponse.data ?? []), ...(parkedResponse.data ?? [])];
+
+    if (filters.status === 'invalid') {
+      filteredData = filteredData.filter(s => s.status !== 'valid');
+    } else if (filters.status === 'valid') {
+      filteredData = filteredData.filter(s => s.status === 'valid');
     }
+
+    filteredData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    setScans(filteredData);
+    setRefreshing(false);
   };
 
   useFocusEffect(
@@ -96,38 +100,47 @@ const ScanHistoryScreen: React.FC = () => {
       <View style={styles.scanHeader}>
         <View style={styles.scanTypeContainer}>
           <Ionicons
-            name={item.scan_type === 'entry' ? 'enter-outline' : 'exit-outline'}
+            name={(item as any).scan_type === 'parked' ? 'car-outline' : item.scan_type === 'entry' ? 'enter-outline' : 'exit-outline'}
             size={18}
-            color={item.scan_type === 'entry' ? COLORS.green : COLORS.blue}
+            color={(item as any).scan_type === 'parked' ? COLORS.limited : item.scan_type === 'entry' ? COLORS.green : COLORS.blue}
           />
           <Text style={styles.scanTime}>
             {new Date(item.timestamp).toLocaleTimeString()}
           </Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>
-            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-          </Text>
+        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          <View style={[styles.statusBadge, {
+            backgroundColor:
+              (item as any).scan_type === 'parked' ? '#F5A623' :
+              item.scan_type === 'entry' ? COLORS.green : '#FF6B6B',
+          }]}>
+            <Text style={styles.statusText}>
+              {(item as any).scan_type === 'parked' ? 'Parked' : item.scan_type === 'entry' ? 'Entry' : 'Exit'}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, {
+            backgroundColor: item.status === 'valid' ? COLORS.green : '#FF6B6B',
+          }]}>
+            <Text style={styles.statusText}>
+              {item.status === 'valid' ? 'Valid' : 'Invalid'}
+            </Text>
+          </View>
         </View>
       </View>
 
       <View style={styles.scanContent}>
-        <View style={styles.scanRow}>
-          <MaterialCommunityIcons name="card-account-details" size={16} color="#666" />
-          <Text style={styles.scanUid}>{item.rfid_uid}</Text>
-        </View>
-
         {item.user_name && (
           <View style={styles.scanRow}>
             <Ionicons name="person-outline" size={16} color="#666" />
             <Text style={styles.scanText}>{item.user_name}</Text>
           </View>
         )}
-
-        <View style={styles.scanRow}>
-          <Ionicons name="location-outline" size={16} color="#666" />
-          <Text style={styles.scanText}>{item.reader_name}</Text>
-        </View>
+        {item.vehicle_plate && (
+          <View style={styles.scanRow}>
+            <Ionicons name="car-outline" size={16} color="#666" />
+            <Text style={styles.scanText}>{item.vehicle_plate}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -224,6 +237,11 @@ const ScanHistoryScreen: React.FC = () => {
               label="Exit"
               active={filters.type === 'exit'}
               onPress={() => setFilters({ ...filters, type: 'exit' })}
+            />
+            <FilterChip
+              label="Parked"
+              active={filters.type === 'parked'}
+              onPress={() => setFilters({ ...filters, type: 'parked' })}
             />
           </View>
         </View>
