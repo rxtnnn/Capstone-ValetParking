@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -94,14 +94,19 @@ const ScanMonitorScreen: React.FC = () => {
     }
   };
 
+  const isUnregistered = (scan: RfidScanEvent) =>
+    scan.status === 'unknown' || scan.message?.toLowerCase().includes('not registered');
+
+  const registeredScans = scans.filter(s => !isUnregistered(s));
+
   const getFilteredScans = (): RfidScanEvent[] => {
     switch (filter) {
       case 'valid':
-        return scans.filter(s => s.status === 'valid');
+        return registeredScans.filter(s => s.status === 'valid');
       case 'invalid':
-        return scans.filter(s => s.status !== 'valid');
+        return registeredScans.filter(s => s.status !== 'valid');
       default:
-        return scans;
+        return registeredScans;
     }
   };
 
@@ -113,6 +118,7 @@ const ScanMonitorScreen: React.FC = () => {
     const isNew = index === 0;
     const AnimatedView = isNew ? Animated.View : View;
     const animStyle = isNew ? { transform: [{ scale: pulseAnim }] } : {};
+    const displayStatus: 'valid' = 'valid';
 
     return (
       <AnimatedView style={[styles.scanCard, animStyle, isNew && styles.scanCardNew]}>
@@ -127,9 +133,9 @@ const ScanMonitorScreen: React.FC = () => {
               {item.scan_type.charAt(0).toUpperCase() + item.scan_type.slice(1)}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(displayStatus) }]}>
             <Text style={styles.statusText}>
-              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+              {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
             </Text>
           </View>
         </View>
@@ -140,14 +146,14 @@ const ScanMonitorScreen: React.FC = () => {
             <Text style={styles.scanUid}>{item.rfid_uid}</Text>
           </View>
 
-          {item.user_name && item.status === 'valid' && (
+          {item.user_name && (
             <View style={styles.scanRow}>
               <Ionicons name="person-outline" size={18} color="#666" />
               <Text style={styles.scanText}>{item.user_name}</Text>
             </View>
           )}
 
-          {item.vehicle_plate && item.status === 'valid' && (
+          {item.vehicle_plate && (
             <View style={styles.scanRow}>
               <Ionicons name="car-outline" size={18} color="#666" />
               <Text style={styles.scanText}>{item.vehicle_plate}</Text>
@@ -158,13 +164,6 @@ const ScanMonitorScreen: React.FC = () => {
             <Ionicons name="location-outline" size={18} color="#666" />
             <Text style={styles.scanText}>{item.reader_name}</Text>
           </View>
-
-          {item.status !== 'valid' && (
-            <View style={styles.messageContainer}>
-              <Ionicons name="information-circle" size={16} color="#FF6B6B" />
-              <Text style={styles.messageText}>{item.message}</Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.scanFooter}>
@@ -238,17 +237,17 @@ const ScanMonitorScreen: React.FC = () => {
         <FilterButton
           label="All"
           value="all"
-          count={scans.length}
+          count={registeredScans.length}
         />
         <FilterButton
           label="Valid"
           value="valid"
-          count={scans.filter(s => s.status === 'valid').length}
+          count={registeredScans.filter(s => s.status === 'valid').length}
         />
         <FilterButton
           label="Invalid"
           value="invalid"
-          count={scans.filter(s => s.status !== 'valid').length}
+          count={registeredScans.filter(s => s.status !== 'valid').length}
         />
       </View>
 
