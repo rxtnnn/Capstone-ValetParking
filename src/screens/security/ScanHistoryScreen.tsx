@@ -107,18 +107,19 @@ const ScanHistoryScreen: React.FC = () => {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-          {item.status === 'valid' && (
+          {((item as any).scan_type === 'parked' || (item.status as any) === 'parked') ? (
+            <View style={[styles.statusBadge, { backgroundColor: '#F5A623' }]}>
+              <Text style={styles.statusText}>Parked</Text>
+            </View>
+          ) : item.status === 'valid' ? (
             <View style={[styles.statusBadge, {
-              backgroundColor:
-                (item as any).scan_type === 'parked' ? '#F5A623' :
-                item.scan_type === 'entry' ? COLORS.green : '#FF6B6B',
+              backgroundColor: item.scan_type === 'entry' ? COLORS.green : '#FF6B6B',
             }]}>
               <Text style={styles.statusText}>
-                {(item as any).scan_type === 'parked' ? 'Parked' : item.scan_type === 'entry' ? 'Entry' : 'Exit'}
+                {item.scan_type === 'entry' ? 'Entry' : 'Exit'}
               </Text>
             </View>
-          )}
-          {item.status !== 'valid' && (
+          ) : (
             <View style={[styles.statusBadge, {
               backgroundColor: (item.status as any) === 'already_inside' ? '#F5A623' : '#FF6B6B',
             }]}>
