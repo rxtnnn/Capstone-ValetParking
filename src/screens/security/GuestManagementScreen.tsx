@@ -11,9 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableWithoutFeedback,
-  Platform,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,8 +41,10 @@ const GuestManagementScreen: React.FC = () => {
   const [denyReason, setDenyReason] = useState('');
   const [newGuestModal, setNewGuestModal] = useState(false);
   const [newGuestLoading, setNewGuestLoading] = useState(false);
-  const [startDate, setStartDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [startDateText, setStartDateText] = useState(() => {
+    const t = new Date();
+    return `${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}/${t.getFullYear()}`;
+  });
   const [newGuest, setNewGuest] = useState({
     name: '',
     vehicle_plate: '',
@@ -128,9 +128,13 @@ const GuestManagementScreen: React.FC = () => {
       Alert.alert('Invalid Duration', 'Valid duration must be between 1 and 168 hours.');
       return;
     }
+    const today = new Date();
+    const todayStr = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
+    const [mm, dd, yyyy] = startDateText.split('/').map(Number);
+    const parsedStart = new Date(yyyy, mm - 1, dd);
+    const valid_from = (!Number.isNaN(parsedStart.getTime()) && startDateText.length === 10) ? parsedStart : today;
     setNewGuestLoading(true);
     try {
-      const valid_from = startDate;
       const valid_until = new Date(valid_from.getTime() + hours * 60 * 60 * 1000);
       await apiClient.post(API_ENDPOINTS.guestAccess, {
         name: newGuest.name.trim(),
@@ -143,7 +147,7 @@ const GuestManagementScreen: React.FC = () => {
       });
       setNewGuestModal(false);
       setNewGuest({ name: '', vehicle_plate: '', phone: '', purpose: '', valid_hours: '24', notes: '', _purposeOpen: false });
-      setStartDate(new Date());
+      setStartDateText(todayStr);
       loadGuests();
     } catch {
       Alert.alert('Error', 'Failed to create guest pass. Please try again.');
@@ -421,16 +425,24 @@ const GuestManagementScreen: React.FC = () => {
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.fieldLabel}>Start Date <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
-                        <TouchableOpacity
-                          style={[styles.fieldInput, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
-                          onPress={() => setShowDatePicker(true)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={{ fontSize: 14, color: '#333' }}>
-                            {`${String(startDate.getMonth() + 1).padStart(2, '0')}/${String(startDate.getDate()).padStart(2, '0')}/${startDate.getFullYear()}`}
-                          </Text>
-                          <Ionicons name="calendar-outline" size={16} color="#666" />
-                        </TouchableOpacity>
+                        <View style={[styles.fieldInput, { flexDirection: 'row', alignItems: 'center' }]}>
+                          <TextInput
+                            style={{ flex: 1, fontSize: 14, color: '#333', padding: 0 }}
+                            placeholder="MM/DD/YYYY"
+                            placeholderTextColor="#aaa"
+                            value={startDateText}
+                            onChangeText={v => {
+                              const digits = v.replaceAll(/\D/g, '');
+                              let formatted = digits;
+                              if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                              if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+                              setStartDateText(formatted);
+                            }}
+                            keyboardType="numeric"
+                            maxLength={10}
+                          />
+                          <Ionicons name="calendar-outline" size={16} color="#888" />
+                        </View>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.fieldLabel}>Valid Duration <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
@@ -448,19 +460,6 @@ const GuestManagementScreen: React.FC = () => {
                       </View>
                     </View>
                     <Text style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>Max: 168 hours (1 week)</Text>
-
-                    {showDatePicker && (
-                      <DateTimePicker
-                        value={startDate}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                        minimumDate={new Date()}
-                        onChange={(_, selected) => {
-                          setShowDatePicker(Platform.OS === 'ios');
-                          if (selected) setStartDate(selected);
-                        }}
-                      />
-                    )}
 
                     {/* Notes */}
                     <Text style={styles.fieldLabel}>Notes</Text>
