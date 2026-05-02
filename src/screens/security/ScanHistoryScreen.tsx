@@ -53,11 +53,9 @@ const ScanHistoryScreen: React.FC = () => {
 
     if (!isMountedRef.current) return;
 
-    let filteredData = [...(scansResponse.data ?? []), ...(parkedResponse.data ?? [])];
+    let filteredData = [...(scansResponse.data ?? []), ...(parkedResponse.data ?? [])].filter(s => s.status === 'valid' || (s as any).scan_type === 'parked');
 
-    if (filters.status === 'invalid') {
-      filteredData = filteredData.filter(s => s.status !== 'valid');
-    } else if (filters.status === 'valid') {
+    if (filters.status === 'valid') {
       filteredData = filteredData.filter(s => s.status === 'valid');
     }
 
@@ -109,22 +107,26 @@ const ScanHistoryScreen: React.FC = () => {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-          <View style={[styles.statusBadge, {
-            backgroundColor:
-              (item as any).scan_type === 'parked' ? '#F5A623' :
-              item.scan_type === 'entry' ? COLORS.green : '#FF6B6B',
-          }]}>
-            <Text style={styles.statusText}>
-              {(item as any).scan_type === 'parked' ? 'Parked' : item.scan_type === 'entry' ? 'Entry' : 'Exit'}
-            </Text>
-          </View>
-          <View style={[styles.statusBadge, {
-            backgroundColor: item.status === 'valid' ? COLORS.green : '#FF6B6B',
-          }]}>
-            <Text style={styles.statusText}>
-              {item.status === 'valid' ? 'Valid' : 'Invalid'}
-            </Text>
-          </View>
+          {item.status === 'valid' && (
+            <View style={[styles.statusBadge, {
+              backgroundColor:
+                (item as any).scan_type === 'parked' ? '#F5A623' :
+                item.scan_type === 'entry' ? COLORS.green : '#FF6B6B',
+            }]}>
+              <Text style={styles.statusText}>
+                {(item as any).scan_type === 'parked' ? 'Parked' : item.scan_type === 'entry' ? 'Entry' : 'Exit'}
+              </Text>
+            </View>
+          )}
+          {item.status !== 'valid' && (
+            <View style={[styles.statusBadge, {
+              backgroundColor: (item.status as any) === 'already_inside' ? '#F5A623' : '#FF6B6B',
+            }]}>
+              <Text style={styles.statusText}>
+                {(item.status as any) === 'already_inside' ? 'Already Inside' : 'Not Registered'}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -200,26 +202,6 @@ const ScanHistoryScreen: React.FC = () => {
 
       {/* Filters */}
       <View style={styles.filtersContainer}>
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Status:</Text>
-          <View style={styles.filterChips}>
-            <FilterChip
-              label="All"
-              active={filters.status === 'all'}
-              onPress={() => setFilters({ ...filters, status: 'all' })}
-            />
-            <FilterChip
-              label="Valid"
-              active={filters.status === 'valid'}
-              onPress={() => setFilters({ ...filters, status: 'valid' })}
-            />
-            <FilterChip
-              label="Invalid"
-              active={filters.status === 'invalid'}
-              onPress={() => setFilters({ ...filters, status: 'invalid' })}
-            />
-          </View>
-        </View>
         <View style={styles.filterRow}>
           <Text style={styles.filterLabel}>Type:</Text>
           <View style={styles.filterChips}>
