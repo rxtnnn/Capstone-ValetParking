@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -41,6 +42,13 @@ const GuestManagementScreen: React.FC = () => {
   const [denyReason, setDenyReason] = useState('');
   const [newGuestModal, setNewGuestModal] = useState(false);
   const [newGuestLoading, setNewGuestLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', e => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   const [startDateText, setStartDateText] = useState(() => {
     const t = new Date();
     return `${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}/${t.getFullYear()}`;
@@ -329,12 +337,13 @@ const GuestManagementScreen: React.FC = () => {
         visible={newGuestModal}
         transparent
         animationType="fade"
-        onRequestClose={() => { Keyboard.dismiss(); setTimeout(() => setNewGuestModal(false), 100); }}
+        onRequestClose={() => { Keyboard.dismiss(); setNewGuestModal(false); }}
+        statusBarTranslucent
       >
-        <TouchableWithoutFeedback onPress={() => setNewGuestModal(false)}>
-          <View style={styles.newGuestOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.newGuestSheet}>
+        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }}>
+            <View style={styles.newGuestOverlay}>
+              <TouchableWithoutFeedback>
+              <View style={[styles.newGuestSheet, { marginBottom: keyboardHeight }]}>
                   {/* Header */}
                   <View style={styles.newGuestHeader}>
                     <Ionicons name="person-add-outline" size={20} color="#333" />
