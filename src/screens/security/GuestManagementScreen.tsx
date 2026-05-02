@@ -323,7 +323,7 @@ const GuestManagementScreen: React.FC = () => {
         visible={newGuestModal}
         transparent
         animationType="fade"
-        onRequestClose={() => { Keyboard.dismiss(); setNewGuestModal(false); }}
+        onRequestClose={() => { Keyboard.dismiss(); setTimeout(() => setNewGuestModal(false), 100); }}
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
