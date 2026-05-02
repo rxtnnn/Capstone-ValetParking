@@ -11,9 +11,6 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableWithoutFeedback,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -44,6 +41,10 @@ const GuestManagementScreen: React.FC = () => {
   const [denyReason, setDenyReason] = useState('');
   const [newGuestModal, setNewGuestModal] = useState(false);
   const [newGuestLoading, setNewGuestLoading] = useState(false);
+  const [startDateText, setStartDateText] = useState(() => {
+    const t = new Date();
+    return `${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}/${t.getFullYear()}`;
+  });
   const [newGuest, setNewGuest] = useState({
     name: '',
     vehicle_plate: '',
@@ -127,9 +128,13 @@ const GuestManagementScreen: React.FC = () => {
       Alert.alert('Invalid Duration', 'Valid duration must be between 1 and 168 hours.');
       return;
     }
+    const today = new Date();
+    const todayStr = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
+    const [mm, dd, yyyy] = startDateText.split('/').map(Number);
+    const parsedStart = new Date(yyyy, mm - 1, dd);
+    const valid_from = (!Number.isNaN(parsedStart.getTime()) && startDateText.length === 10) ? parsedStart : today;
     setNewGuestLoading(true);
     try {
-      const valid_from = new Date();
       const valid_until = new Date(valid_from.getTime() + hours * 60 * 60 * 1000);
       await apiClient.post(API_ENDPOINTS.guestAccess, {
         name: newGuest.name.trim(),
@@ -140,8 +145,9 @@ const GuestManagementScreen: React.FC = () => {
         valid_until: valid_until.toISOString(),
         notes: newGuest.notes.trim() || null,
       });
-      Keyboard.dismiss(); setNewGuestModal(false);
+      setNewGuestModal(false);
       setNewGuest({ name: '', vehicle_plate: '', phone: '', purpose: '', valid_hours: '24', notes: '', _purposeOpen: false });
+      setStartDateText(todayStr);
       loadGuests();
     } catch {
       Alert.alert('Error', 'Failed to create guest pass. Please try again.');
@@ -325,19 +331,15 @@ const GuestManagementScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => { Keyboard.dismiss(); setTimeout(() => setNewGuestModal(false), 100); }}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }}>
-            <View style={styles.newGuestOverlay}>
-              <TouchableWithoutFeedback>
-                <View style={styles.newGuestSheet}>
+        <TouchableWithoutFeedback onPress={() => setNewGuestModal(false)}>
+          <View style={styles.newGuestOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.newGuestSheet}>
                   {/* Header */}
                   <View style={styles.newGuestHeader}>
                     <Ionicons name="person-add-outline" size={20} color="#333" />
                     <Text style={styles.newGuestTitle}>New Guest Pass</Text>
-                    <TouchableOpacity onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={() => setNewGuestModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <Ionicons name="close" size={22} color="#666" />
                     </TouchableOpacity>
                   </View>
@@ -345,7 +347,6 @@ const GuestManagementScreen: React.FC = () => {
                   <ScrollView
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    keyboardDismissMode="interactive"
                     contentContainerStyle={{ paddingBottom: 8 }}
                   >
                     {/* Guest Name */}
@@ -420,18 +421,43 @@ const GuestManagementScreen: React.FC = () => {
                       </View>
                     )}
 
-                    {/* Valid Duration */}
-                    <Text style={styles.fieldLabel}>Valid Duration <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <TextInput
-                        style={[styles.fieldInput, { flex: 1 }]}
-                        placeholder="24"
-                        placeholderTextColor="#aaa"
-                        value={newGuest.valid_hours}
-                        onChangeText={v => setNewGuest(p => ({ ...p, valid_hours: v.replace(/[^0-9]/g, '') }))}
-                        keyboardType="numeric"
-                      />
-                      <Text style={{ fontSize: 14, color: '#666' }}>hours</Text>
+                    {/* Start Date + Valid Duration */}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Start Date <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
+                        <View style={[styles.fieldInput, { flexDirection: 'row', alignItems: 'center' }]}>
+                          <TextInput
+                            style={{ flex: 1, fontSize: 14, color: '#333', padding: 0 }}
+                            placeholder="MM/DD/YYYY"
+                            placeholderTextColor="#aaa"
+                            value={startDateText}
+                            onChangeText={v => {
+                              const digits = v.replaceAll(/\D/g, '');
+                              let formatted = digits;
+                              if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                              if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+                              setStartDateText(formatted);
+                            }}
+                            keyboardType="numeric"
+                            maxLength={10}
+                          />
+                          <Ionicons name="calendar-outline" size={16} color="#888" />
+                        </View>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Valid Duration <Text style={{ color: '#FF6B6B' }}>*</Text></Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TextInput
+                            style={[styles.fieldInput, { flex: 1 }]}
+                            placeholder="24"
+                            placeholderTextColor="#aaa"
+                            value={newGuest.valid_hours}
+                            onChangeText={v => setNewGuest(p => ({ ...p, valid_hours: v.replace(/[^0-9]/g, '') }))}
+                            keyboardType="numeric"
+                          />
+                          <Text style={{ fontSize: 14, color: '#666' }}>hrs</Text>
+                        </View>
+                      </View>
                     </View>
                     <Text style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>Max: 168 hours (1 week)</Text>
 
@@ -451,7 +477,7 @@ const GuestManagementScreen: React.FC = () => {
                   <View style={styles.newGuestFooter}>
                     <TouchableOpacity
                       style={styles.newGuestCancelBtn}
-                      onPress={() => { Keyboard.dismiss(); setNewGuestModal(false); }}
+                      onPress={() => setNewGuestModal(false)}
                     >
                       <Text style={styles.newGuestCancelText}>Cancel</Text>
                     </TouchableOpacity>
@@ -470,7 +496,6 @@ const GuestManagementScreen: React.FC = () => {
               </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* Deny Modal */}
