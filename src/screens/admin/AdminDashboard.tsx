@@ -49,6 +49,9 @@ const AdminDashboard: React.FC = () => {
   const isMountedRef = useRef(true);
   const [activityModal, setActivityModal] = useState<{ visible: boolean; type: 'entry' | 'exit' | 'parked' | 'invalid' | null; scans: RfidScanEvent[] }>({ visible: false, type: null, scans: [] });
   const [activityLoading, setActivityLoading] = useState(false);
+  const [parkedUsers, setParkedUsers] = useState<any[]>([]);
+  const [parkedModal, setParkedModal] = useState(false);
+  const [parkedLoading, setParkedLoading] = useState(false);
 
   const {
     showVerifyModal, setShowVerifyModal,
@@ -99,11 +102,29 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const fetchParkedUsers = async () => {
+    try {
+      const res = await apiClient.get(API_ENDPOINTS.publicRfidParked);
+      const list: any[] = res.data?.parked ?? res.data ?? [];
+      if (isMountedRef.current) setParkedUsers(list);
+    } catch {
+      if (isMountedRef.current) setParkedUsers([]);
+    }
+  };
+
+  const openParkedModal = async () => {
+    setParkedModal(true);
+    setParkedLoading(true);
+    await fetchParkedUsers();
+    setParkedLoading(false);
+  };
+
   useFocusEffect(
     useCallback(() => {
       isMountedRef.current = true;
       loadStats();
       loadActiveGuests();
+      fetchParkedUsers();
       return () => { isMountedRef.current = false; };
     }, [])
   );
@@ -260,6 +281,26 @@ const AdminDashboard: React.FC = () => {
               color={COLORS.limited}
               onPress={() => navigation.navigate('RfidTagList', { filter: 'expired' })}
             />
+          </View>
+        </View>
+
+        {/* Parking Status */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Parking Status</Text>
+          <View style={styles.activityCard}>
+            <View style={styles.activityRow}>
+              <TouchableOpacity style={styles.activityItem} onPress={openParkedModal}>
+                <Ionicons name="car" size={24} color={COLORS.primary} />
+                <Text style={styles.activityValue}>{parkedUsers.length}</Text>
+                <Text style={styles.activityLabel}>Currently Parked</Text>
+              </TouchableOpacity>
+              <View style={styles.activityDivider} />
+              <TouchableOpacity style={styles.activityItem} onPress={() => openActivityModal('invalid')}>
+                <Ionicons name="close-circle-outline" size={24} color="#FF6B6B" />
+                <Text style={styles.activityValue}>{stats?.today_invalid_scans || 0}</Text>
+                <Text style={styles.activityLabel}>Invalid Scans</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -478,6 +519,80 @@ const AdminDashboard: React.FC = () => {
                   </View>
                 </View>
               </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Activity Detail Modal */}
+      <Modal visible={activityModal.visible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', marginBottom: 45 }}>
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '80%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>
+                {activityModal.type === 'entry' ? 'Entries Today' : activityModal.type === 'exit' ? 'Exits Today' : activityModal.type === 'invalid' ? 'Invalid Scans Today' : 'Currently Parked'}
+              </Text>
+              <TouchableOpacity onPress={() => setActivityModal({ visible: false, type: null, scans: [] })}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            {activityLoading ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : activityModal.scans.length === 0 ? (
+              <Text style={{ color: '#999', textAlign: 'center', marginTop: 20 }}>No records found.</Text>
+            ) : (
+              <ScrollView>
+                {activityModal.scans.map((scan, index) => (
+                  <View key={scan.id ?? index} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontWeight: '700', color: '#333' }}>{scan.user_name ?? 'Unknown User'}</Text>
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: activityModal.type === 'invalid' ? '#FF6B6B' : activityModal.type === 'exit' ? COLORS.blue : activityModal.type === 'entry' ? COLORS.green : '#F5A623' }}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                          {activityModal.type === 'invalid' ? 'INVALID' : activityModal.type === 'exit' ? 'EXIT' : activityModal.type === 'entry' ? 'ENTRY' : 'PARKED'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ color: '#666', fontSize: 12 }}>RFID: {scan.rfid_uid ?? (scan as any).uid ?? 'Unknown'}</Text>
+                    {scan.vehicle_plate && <Text style={{ color: '#666', fontSize: 12 }}>Plate: {scan.vehicle_plate}</Text>}
+                    <Text style={{ color: '#666', fontSize: 12 }}>Time: {new Date(scan.timestamp).toLocaleTimeString()}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Parked Users Modal */}
+      <Modal visible={parkedModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', marginBottom: 45 }}>
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '80%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>Currently Parked</Text>
+              <TouchableOpacity onPress={() => setParkedModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            {parkedLoading ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : parkedUsers.length === 0 ? (
+              <Text style={{ color: '#999', textAlign: 'center', marginTop: 20 }}>No parked users found.</Text>
+            ) : (
+              <ScrollView>
+                {parkedUsers.map((user, index) => (
+                  <View key={user.id ?? index} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontWeight: '700', color: '#333' }}>{user.name ?? 'Unknown User'}</Text>
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: '#F5A623' }}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>PARKED</Text>
+                      </View>
+                    </View>
+                    <Text style={{ color: '#666', fontSize: 12 }}>Plate: {user.plate ?? 'N/A'}</Text>
+                    <Text style={{ color: '#666', fontSize: 12 }}>Entry: {new Date(user.entry_time).toLocaleTimeString()}</Text>
+                    <Text style={{ color: '#666', fontSize: 12 }}>Duration: {user.minutes_parked ?? 0} min</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>
