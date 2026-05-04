@@ -153,9 +153,6 @@ const HomeScreen: React.FC = () => {
     }
   }, []);
 
-  const getProgressPercentage = useCallback((available: number, total: number) => {
-    return total === 0 ? 0 : ((total - available) / total) * 100;
-  }, []);
 
   useEffect(() => {
     ParkingConfigService.getDefaultFloors().then(floors => {
@@ -479,24 +476,25 @@ const HomeScreen: React.FC = () => {
 
           // Floor Cards
           {displayFloors.map((floor) => {
+            const malfunctionedCount = floor.malfunctioned ?? 0;
+            const occupiedCount = Math.max(0, floor.total - floor.available - malfunctionedCount);
             const status = getFloorStatus(floor.available, floor.total);
-            const progressPercentage = getProgressPercentage(floor.available, floor.total);
+            const progressPercentage = floor.total > 0 ? (occupiedCount / floor.total) * 100 : 0;
             const noData = status.text === 'NO DATA' || floor.total === 0;
             const isFull = floor.total > 0 && floor.available === 0;
 
-            // Floor is disabled if no sensor data
-            const isDisabled = noData;
             const userRole = TokenManager.getUser()?.role;
             const canSeeMalfunction = userRole === 'admin' || userRole === 'ssd' || userRole === 'security';
-            const malfunctionedCount = floor.malfunctioned ?? 0;
+            const isDisabled = userRole === 'user' ? (noData || isFull) : noData;
 
             return (
               <TouchableOpacity
                 key={`floor-${floor.floor}`}
                 style={[
                   styles.floorCard,
-                  noData && styles.noDataFloorCard,
-                  isFull && styles.fullFloorCard
+                  (noData && (userRole === 'user' || floor.total === 0)) && styles.noDataFloorCard,
+                  (isFull && userRole === 'user') && styles.fullFloorCard,
+                  isDisabled && userRole === 'user' && { opacity: 0.6 }
                 ]}
                 onPress={() => handleFloorPress(floor)}
                 activeOpacity={isDisabled ? 1 : 0.8}
@@ -505,7 +503,7 @@ const HomeScreen: React.FC = () => {
                 <View style={styles.floorHeader}>
                   <Text style={[
                     styles.floorTitle,
-                    isDisabled && styles.fullFloorText
+                    isDisabled && userRole === 'user' && styles.fullFloorText
                   ]}>
                     {getFloorName(floor.floor)}
                   </Text>
@@ -532,13 +530,13 @@ const HomeScreen: React.FC = () => {
                     <Text style={[
                       styles.statNumber,
                       { color: COLORS.green },
-                      isDisabled && styles.fullFloorText
+                      isDisabled && userRole === 'user' && styles.fullFloorText
                     ]}>
                       {floor.available}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      isDisabled && styles.fullFloorText
+                      isDisabled && userRole === 'user' && styles.fullFloorText
                     ]}>Available</Text>
                   </View>
 
@@ -546,13 +544,13 @@ const HomeScreen: React.FC = () => {
                     <Text style={[
                       styles.statNumber,
                       { color: COLORS.primary },
-                      isDisabled && styles.fullFloorText
+                      isDisabled && userRole === 'user' && styles.fullFloorText
                     ]}>
-                      {floor.total - floor.available}
+                      {occupiedCount}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      isDisabled && styles.fullFloorText
+                      isDisabled && userRole === 'user' && styles.fullFloorText
                     ]}>Occupied</Text>
                   </View>
 
@@ -560,13 +558,13 @@ const HomeScreen: React.FC = () => {
                     <Text style={[
                       styles.statNumber,
                       { color: COLORS.blue },
-                      isDisabled && styles.fullFloorText
+                      isDisabled && userRole === 'user' && styles.fullFloorText
                     ]}>
                       {floor.total}
                     </Text>
                     <Text style={[
                       styles.statLabel,
-                      isDisabled && styles.fullFloorText
+                      isDisabled && userRole === 'user' && styles.fullFloorText
                     ]}>Total Spots</Text>
                   </View>
                 </View>
@@ -585,7 +583,7 @@ const HomeScreen: React.FC = () => {
                   </View>
                   <Text style={[
                     styles.progressBarText,
-                    isDisabled && styles.fullFloorText
+                    isDisabled && userRole === 'user' && styles.fullFloorText
                   ]}>
                     {noData ? 'No sensors' : `${Math.round(progressPercentage)}% Occupied`}
                   </Text>

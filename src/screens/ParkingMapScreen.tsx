@@ -1047,13 +1047,16 @@ const ParkingMapScreen: React.FC = () => {
               const availableSpots = available;
               const totalSpots = total;
               const hasData = totalSpots > 0;
+              // For users: disable if no sensors assigned OR no available spots (malfunctioned already excluded from available)
+              const isDisabledForUser = userRole === 'user' && (!hasData || availableSpots === 0);
+
               return (
                 <TouchableOpacity
                   key={floor}
                   style={[
                     styles.floorOption,
                     isCurrentFloor ? styles.floorOptionCurrent : styles.floorOptionInactive,
-                    !hasData && styles.floorOptionDisabled, 
+                    isDisabledForUser && styles.floorOptionDisabled,
                     {
                       shadowColor: isCurrentFloor ? COLORS.primary : '#474747',
                       shadowOffset: { width: 0, height: isCurrentFloor ? 4 : 1 },
@@ -1063,24 +1066,24 @@ const ParkingMapScreen: React.FC = () => {
                     }
                   ]}
                   onPress={() => {
-                    if (!hasData) return; // Prevent action if no data
+                    if (isDisabledForUser) return;
                     setShowFloorModal(false);
                     if (floor !== floorNumber) {
                       navigation.navigate('ParkingMap', { floor });
                     }
                   }}
-                  activeOpacity={hasData ? 0.7 : 1}
-                  disabled={!hasData}
+                  activeOpacity={isDisabledForUser ? 1 : 0.7}
+                  disabled={isDisabledForUser}
                 >
                   {/* Floor icon */}
                   <View style={[
                     styles.floorIconContainer,
                     isCurrentFloor ? styles.floorIconCurrent : styles.floorIconInactive,
-                    !hasData && styles.floorIconDisabled 
+                    isDisabledForUser && styles.floorIconDisabled
                   ]}>
                     <Text style={[
                       styles.floorIconText,
-                      { color: isCurrentFloor ? 'white' : !hasData? '#999' : COLORS.primary }
+                      { color: isCurrentFloor ? 'white' : isDisabledForUser ? '#999' : COLORS.primary }
                     ]}>
                       {floor}
                     </Text>
@@ -1090,12 +1093,12 @@ const ParkingMapScreen: React.FC = () => {
                   <View style={styles.floorInfoContainer}>
                     <Text style={[
                       styles.floorLabel1,
-                      { color: isCurrentFloor ? 'white' : !hasData ? '#999' : '#333' }
+                      { color: isCurrentFloor ? 'white' : isDisabledForUser ? '#999' : '#333' }
                     ]}>
                       {name}
                     </Text>
                     <Text style={[styles.floorAvailability,
-                      { color: isCurrentFloor ? 'rgba(255,255,255,0.8)' : !hasData ? '#999' : '#888' }
+                      { color: isCurrentFloor ? 'rgba(255,255,255,0.8)' : isDisabledForUser ? '#999' : '#888' }
                     ]}>
                       {hasData ? `${availableSpots} ${availableSpots === 1 ? 'spot' : 'spots'} available` : 'No sensors assigned'}
                     </Text>

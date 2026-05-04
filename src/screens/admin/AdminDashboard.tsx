@@ -587,8 +587,7 @@ const AdminDashboard: React.FC = () => {
                       </View>
                     </View>
                     <Text style={{ color: '#666', fontSize: 12 }}>Plate: {user.plate ?? 'N/A'}</Text>
-                    <Text style={{ color: '#666', fontSize: 12 }}>Entry: {new Date(user.entry_time).toLocaleTimeString()}</Text>
-                    <Text style={{ color: '#666', fontSize: 12 }}>Duration: {user.minutes_parked ?? 0} min</Text>
+                    <Text style={{ color: '#666', fontSize: 12 }}>Time: {new Date(user.entry_time).toLocaleTimeString()}</Text>
                   </View>
                 ))}
               </ScrollView>
