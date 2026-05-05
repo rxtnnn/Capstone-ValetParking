@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -62,13 +62,6 @@ const SecurityDashboard: React.FC = () => {
     } catch {
       if (isMountedRef.current) setParkedUsers([]);
     }
-  };
-
-  const openParkedModal = async () => {
-    setParkedModal(true);
-    setParkedLoading(true);
-    await fetchParkedUsers();
-    setParkedLoading(false);
   };
 
   const openActivityModal = async (type: 'entry' | 'exit' | 'invalid') => {
@@ -340,26 +333,6 @@ const SecurityDashboard: React.FC = () => {
               badge={stats?.pending_guests}
               onPress={() => navigation.navigate('GuestManagement')}
             />
-          </View>
-        </View>
-
-        {/* Parking Status */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Parking Status</Text>
-          <View style={styles.parkingCard}>
-            <View style={styles.parkingRow}>
-              <TouchableOpacity style={styles.parkingItem} onPress={openParkedModal}>
-                <Ionicons name="car" size={32} color={COLORS.primary} />
-                <Text style={styles.parkingValue}>{parkedUsers.length || stats?.current_parked || 0}</Text>
-                <Text style={styles.parkingLabel}>Currently Parked</Text>
-              </TouchableOpacity>
-              <View style={styles.parkingDivider} />
-              <TouchableOpacity style={styles.parkingItem} onPress={() => openActivityModal('invalid' as any)}>
-                <Ionicons name="close-circle-outline" size={32} color="#FF6B6B" />
-                <Text style={styles.parkingValue}>{stats?.invalid_scans_today || 0}</Text>
-                <Text style={styles.parkingLabel}>Invalid Scans</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
 

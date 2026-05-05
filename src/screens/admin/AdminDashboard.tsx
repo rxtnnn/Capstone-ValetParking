@@ -112,13 +112,6 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const openParkedModal = async () => {
-    setParkedModal(true);
-    setParkedLoading(true);
-    await fetchParkedUsers();
-    setParkedLoading(false);
-  };
-
   useFocusEffect(
     useCallback(() => {
       isMountedRef.current = true;
@@ -128,31 +121,6 @@ const AdminDashboard: React.FC = () => {
       return () => { isMountedRef.current = false; };
     }, [])
   );
-
-  const openActivityModal = async (type: 'entry' | 'exit' | 'parked' | 'invalid') => {
-    setActivityModal({ visible: true, type, scans: [] });
-    setActivityLoading(true);
-    try {
-      const res = await apiClient.get(API_ENDPOINTS.publicRfidScans, { params: { minutes: 1440 } });
-      const scans: RfidScanEvent[] = res.data?.scans || [];
-      const today = new Date().toDateString();
-      let filtered: RfidScanEvent[];
-      if (type === 'entry') {
-        filtered = scans.filter(s => s.scan_type === 'entry' && s.status === 'valid' && new Date(s.timestamp).toDateString() === today);
-      } else if (type === 'exit') {
-        filtered = scans.filter(s => s.scan_type === 'exit' && s.status === 'valid' && new Date(s.timestamp).toDateString() === today);
-      } else if (type === 'invalid') {
-        filtered = scans.filter(s => s.status !== 'valid' && new Date(s.timestamp).toDateString() === today);
-      } else {
-        filtered = scans.filter(s => s.scan_type === 'entry' && s.status === 'valid' && new Date(s.timestamp).toDateString() === today);
-      }
-      setActivityModal({ visible: true, type, scans: filtered });
-    } catch {
-      setActivityModal({ visible: true, type, scans: [] });
-    } finally {
-      setActivityLoading(false);
-    }
-  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -281,26 +249,6 @@ const AdminDashboard: React.FC = () => {
               color={COLORS.limited}
               onPress={() => navigation.navigate('RfidTagList', { filter: 'expired' })}
             />
-          </View>
-        </View>
-
-        {/* Parking Status */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Parking Status</Text>
-          <View style={styles.activityCard}>
-            <View style={styles.activityRow}>
-              <TouchableOpacity style={styles.activityItem} onPress={openParkedModal}>
-                <Ionicons name="car" size={24} color={COLORS.primary} />
-                <Text style={styles.activityValue}>{parkedUsers.length}</Text>
-                <Text style={styles.activityLabel}>Currently Parked</Text>
-              </TouchableOpacity>
-              <View style={styles.activityDivider} />
-              <TouchableOpacity style={styles.activityItem} onPress={() => openActivityModal('invalid')}>
-                <Ionicons name="close-circle-outline" size={24} color="#FF6B6B" />
-                <Text style={styles.activityValue}>{stats?.today_invalid_scans || 0}</Text>
-                <Text style={styles.activityLabel}>Invalid Scans</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
 

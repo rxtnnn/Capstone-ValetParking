@@ -170,7 +170,7 @@ const HomeScreen: React.FC = () => {
         })));
       }
     });
-  }, []);
+  }, []); 
 
   //display floor cards
   const displayFloors = useMemo(() => {
